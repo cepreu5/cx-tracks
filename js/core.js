@@ -10,6 +10,7 @@
   var JOIN_WIN = 25; // прозорец (м) за изгладения профил на разстоянието между два трака
   var JOIN_TIE = 0.002; // при равни разстояния - по-близо до края на общата отсечка (м на м)
   var LINK_MIN = 1; // между части от различни тракове скок над толкова метра се свързва (до отклонението)
+  var GAP_BRIDGE_MAX_M = 500; // пръстенът на дупката и "Изчисти преди сглобяване" свързват направо дупка до толкова метра; по-дългата се чертае
 
   // Натрупани разстояния и дължина - пазят се върху обекта, без да се записват.
   function prep(t) {
@@ -571,6 +572,39 @@
     return { keep: keep, secs: secs, trackIds: ids };
   }
 
+  /* Числото в маркера: колко застъпени участъка събира кликът върху него - тези, които падат
+     (dupCluster.secs), и копието, което остава. Всеки маркер от една група показва същото число.
+     {ключ на участъка: число}. */
+  function dupCounts(pend, order) {
+    var out = {};
+    (pend || []).forEach(function (s) { out[s.key] = dupCluster(pend, s, order).secs.length + 1; });
+    return out;
+  }
+
+  /* "Изчисти преди сглобяване": групите, които кликове върху всички маркери един след друг
+     биха махнали - по една за всеки маркер, който не е паднал с предишна група. */
+  function dupGroups(pend, order) {
+    var done = [], out = [];
+    (pend || []).forEach(function (s) {
+      if (done.indexOf(s) >= 0) return;
+      var cl = dupCluster(pend, s, order);
+      cl.secs.forEach(function (p) { if (done.indexOf(p) < 0) done.push(p); });
+      out.push(cl);
+    });
+    return out;
+  }
+
+  // Дупка, която пръстенът и "Изчисти преди сглобяване" свързват направо: до GAP_BRIDGE_MAX_M.
+  function canBridge(gap) { return !!gap && gap.d <= GAP_BRIDGE_MAX_M; }
+  /* Свързва направо всяка дупка между части (gaps от routeGeometry) до GAP_BRIDGE_MAX_M, както
+     "Свържи направо"; по-дългите остават отворени за чертане. От последната към първата, за да не
+     се местят местата на още несвързаните. Връща броя на свързаните. */
+  function bridgeGaps(items, gaps) {
+    var gs = (gaps || []).filter(canBridge).sort(function (p, q) { return q.beforeIdx - p.beforeIdx; });
+    gs.forEach(function (g) { items.splice(g.beforeIdx, 0, { type: 'draw', pts: [], bridge: true, link: true }); });
+    return gs.length;
+  }
+
   /* "Изтрий разклонението" - маршрутът в точката j (fork от routeForks или null):
      ако е сменял клона там, продължава направо по трака, по който е дошъл (до края на слетия
      участък), и смяната отпада; две съседни части от един трак, които се допират в j, стават една.
@@ -1099,7 +1133,7 @@
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
     trackBounds: trackBounds, overlap: overlap, ROUTE_GAP: ROUTE_GAP, LINK_MIN: LINK_MIN, DUP_BRIDGE: DUP_BRIDGE,
     routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe,
-    redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
+    redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: function (tol) { return Math.max(ROUTE_GAP, 1.5 * (tol || 20)); }

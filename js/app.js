@@ -354,9 +354,21 @@
     return out;
   }
 
-  /* Маркерите на непотвърдените дубликати: кръг с × по средата на участъка. Застъпени
-     маркери се раздалечават, за да се натискат поотделно. */
+  /* Маркерите на непотвърдените дубликати: кръг с число по средата на участъка - колко застъпени
+     участъка събира кликът (Core.dupCounts). Застъпени маркери се раздалечават, за да се натискат поотделно. */
   var MARK_R = 13;
+  // Числата и групите на маркерите се смятат веднъж за всеки нов анализ (A.pend е нов масив след него).
+  function dupInfo() {
+    var c = ui.dupInfo;
+    if (!c || c.pend !== A.pend) c = ui.dupInfo = { pend: A.pend, n: Core.dupCounts(A.pend, trackOrder()), cl: {} };
+    return c;
+  }
+  function trackOrder() { return S.tracks.map(function (t) { return t.id; }); }
+  // Участъците, които кликът върху маркера на sec маха - за осветяването при посочване и задържане.
+  function markerCluster(sec) {
+    var c = dupInfo();
+    return c.cl[sec.key] || (c.cl[sec.key] = Core.dupCluster(A.pend, sec, trackOrder()));
+  }
   function placeMarkers(pr) {
     var tb = byId(), out = [];
     var offs = [[0, 0], [0, -32], [32, 0], [0, 32], [-32, 0], [28, -28], [-28, 28], [28, 28], [-28, -28], [0, -64], [64, 0]];
@@ -366,7 +378,7 @@
       for (var k = 0; k < offs.length; k++) {
         var x = q[0] + offs[k][0], y = q[1] + offs[k][1];
         if (k === offs.length - 1 || !out.some(function (o) { return Math.hypot(o.x - x, o.y - y) < 2 * MARK_R + 4; })) {
-          out.push({ x: x, y: y, ax: q[0], ay: q[1], sec: s, key: s.key });
+          out.push({ x: x, y: y, ax: q[0], ay: q[1], sec: s, key: s.key, n: dupInfo().n[s.key] || 2 });
           break;
         }
       }
@@ -381,17 +393,22 @@
       if (o.x !== o.ax || o.y !== o.ay) {
         ctx.beginPath(); ctx.moveTo(o.ax, o.ay); ctx.lineTo(o.x, o.y); stroke(ctx, C.dup, 1.5, [2, 3]);
       }
-      // При посочване кръгът се свива и под него пише какво прави кликът.
-      var r = hot ? MARK_R - 3 : MARK_R, k = r * 0.38;
+      // При посочване кръгът се свива, пази числото си, а под него пише кои тракове са и какво прави кликът.
+      var r = hot ? MARK_R - 3 : MARK_R;
       ctx.beginPath(); ctx.arc(o.x, o.y, r, 0, Math.PI * 2);
       ctx.fillStyle = C.dup; ctx.fill();
       ctx.lineWidth = 2.5; ctx.strokeStyle = C.casing; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(o.x - k, o.y - k); ctx.lineTo(o.x + k, o.y + k); ctx.moveTo(o.x + k, o.y - k); ctx.lineTo(o.x - k, o.y + k);
-      stroke(ctx, C.casing, 2.4);
+      ctx.fillStyle = C.casing;
+      ctx.font = '700 ' + (hot ? 11 : 13) + 'px ' + U.cssVar('--app-mono');
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(String(o.n), o.x, o.y + 0.5);
       if (hot) {
+        var tb = byId(), wt = tb[o.sec.withId];
+        var il = trackLabel(tb[o.sec.trackId]) + (wt ? ' · ' + trackLabel(wt) : '') + ' · ' + U.km(o.sec.len);
         ctx.font = '600 12px ' + U.cssVar('--app-font');
-        var dl = T('map.dupX'), w = ctx.measureText(dl).width;
-        mapLabel(ctx, o.x - w / 2, o.y + MARK_R + 10, dl, C.dup);
+        var dl = T('map.dupX'), w = ctx.measureText(dl).width, iw = ctx.measureText(il).width;
+        mapLabel(ctx, o.x - iw / 2, o.y + MARK_R + 10, il, C.dup);
+        mapLabel(ctx, o.x - w / 2, o.y + MARK_R + 26, dl, C.dup);
       }
     });
     ui.markers = ms;
@@ -544,6 +561,8 @@
 
     // Посочен ред от списъка или сегмент под курсора.
     var hv = ui.hover;
+    // Маркерът под курсора е от стар анализ (дубликатът е махнат): посочването пада.
+    if (hv && hv.kind === 'marker' && A.pend.indexOf(hv.sec) < 0) hv = ui.hover = null;
     if (hv && hv.kind === 'part') {
       var ht = tb[hv.sec.trackId];
       if (ht) { path(ctx, pr, Core.slice(ht, hv.sec.a, hv.sec.b)); stroke(ctx, C.accent, 9); stroke(ctx, C.casing, 4); stroke(ctx, trackColor(ht), 2.5); }
@@ -553,6 +572,15 @@
     if (ui.hl && ui.hl.sec) {
       var hs = ui.hl.sec, htt = tb[hs.trackId];
       if (htt) { path(ctx, pr, Core.slice(htt, hs.a, hs.b)); ctx.globalAlpha = 0.45; stroke(ctx, C.accent, 12); ctx.globalAlpha = 1; }
+    }
+    // Посочен (или задържан на телефон) маркер: удвоеният участък - всичко, което кликът маха, дебело и полупрозрачно.
+    ui.dupHl = [];
+    if (hv && hv.kind === 'marker' && !following) {
+      markerCluster(hv.sec).secs.forEach(function (d) {
+        var dt = tb[d.trackId]; if (!dt) return;
+        path(ctx, pr, Core.slice(dt, d.a, d.b)); ctx.globalAlpha = 0.45; stroke(ctx, C.accent, 12); ctx.globalAlpha = 1;
+        ui.dupHl.push({ trackId: d.trackId, a: d.a, b: d.b });
+      });
     }
 
     // 2. Сглобеният маршрут - дебело, частите се редуват по цвят.
@@ -618,13 +646,18 @@
     // Точки на прекъсване: пръстен на всяко място, където се събират или пресичат приети участъци.
     if (!following) drawForks(ctx, m, pr, tb, hv);
 
-    // 3. Дупки между частите.
+    // 3. Дупки между частите: пунктир, а по средата прекъснат кехлибарен пръстен - кликът го свързва направо.
+    // Затворените сами дупки (горе) знак нямат.
+    ui.gapRings = [];
     if (G && !following) {
       G.gaps.forEach(function (gp) {
         var a = pr(gp.from[0], gp.from[1]), b = pr(gp.to[0], gp.to[1]);
+        var mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, hot = hv && hv.kind === 'gap' && hv.gap.beforeIdx === gp.beforeIdx;
         ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
         stroke(ctx, C.casing, 5); stroke(ctx, C.gap, 3, [5, 5]);
-        mapLabel(ctx, (a[0] + b[0]) / 2 + 8, (a[1] + b[1]) / 2, T('map.gap', { d: U.dist(gp.d) }), C.gap);
+        gapRing(ctx, mx, my, hot ? GAP_R + 2 : GAP_R);
+        mapLabel(ctx, mx + GAP_R + 8, my, T('map.gap', { d: U.dist(gp.d) }), C.gap);
+        ui.gapRings.push({ x: mx, y: my, beforeIdx: gp.beforeIdx });
       });
     }
 
@@ -728,6 +761,22 @@
       ctx.fillStyle = C.accent; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = C.casing; ctx.stroke();
     }
   }
+  // Знакът на отворена дупка: пръстен, прекъснат отдолу.
+  var GAP_R = 9;
+  function gapRing(ctx, x, y, r) {
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = C.casing; ctx.fill();
+    ctx.beginPath(); ctx.arc(x, y, r, Math.PI * 0.62, Math.PI * 2.38);
+    ctx.lineCap = 'butt'; stroke(ctx, C['walk-gap'], 3.2); ctx.lineCap = 'round';
+  }
+  function hitGapRing(p) {
+    var best = null;
+    (ui.gapRings || []).forEach(function (o) {
+      var d = Math.hypot(o.x - p.x, o.y - p.y), gp = G && G.gaps.filter(function (g) { return g.beforeIdx === o.beforeIdx; })[0];
+      if (gp && d <= GAP_R + 6 && (!best || d < best.d)) best = { kind: 'gap', gap: gp, d: d };
+    });
+    return best;
+  }
   function endMarker(ctx, q, color, text) {
     ctx.beginPath(); ctx.arc(q[0], q[1], 8, 0, Math.PI * 2);
     ctx.fillStyle = color; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = C.casing; ctx.stroke();
@@ -793,7 +842,7 @@
     if (ui.follower) return null;
     var v = hitVertex(p);
     if (v) return v;
-    var mk = hitMarker(p);
+    var mk = hitMarker(p) || hitGapRing(p);
     if (mk) return mk;
     var best = null;
     (A.junctions || []).forEach(function (j) {
@@ -837,7 +886,7 @@
       if (h.g.link) return U.esc(T('tip.link')) + ' · <b>' + U.dist(h.g.len) + '</b><br>' + U.esc(T('tip.clickRemove'));
       return U.esc(T('tip.part', { n: h.g.no })) + ' · <b>' + U.km(h.g.len) + '</b><br>' + U.esc(h.g.bad ? T('tip.invalid', { why: h.g.badWhy }) : T('tip.itemMenu'));
     }
-    if (h.kind === 'gap') return U.esc(T('tip.gap')) + ' <b>' + U.dist(h.gap.d) + '</b><br>' + U.esc(T('tip.gapClick'));
+    if (h.kind === 'gap') return U.esc(T('tip.gap')) + ' <b>' + U.dist(h.gap.d) + '</b><br>' + U.esc(Core.canBridge(h.gap) ? T('tip.gapClick') : T('tip.gapLong', { max: U.dist(Core.GAP_BRIDGE_MAX_M) }));
     if (h.kind === 'fork') {
       var f = forkOf(h.j);
       return U.esc(T('tip.junction')) + ' · ' + U.esc(T.n('n.branches', h.j.branches.length)) + '<br>' +
@@ -938,10 +987,16 @@
   // Клик върху маркера: от участъка падат всички тракове един върху друг освен един (Core.dupCluster).
   function skipDup(sec) {
     if (!track(sec.trackId)) return;
-    var cl = Core.dupCluster(A.pend, sec, S.tracks.map(function (t) { return t.id; }));
+    var cl = Core.dupCluster(A.pend, sec, trackOrder());
     pushUndo();
-    var r = cur();
-    cl.secs.forEach(function (d) {
+    applyDups([cl]);
+    toast(T.n('msg.dupRemoved', cl.trackIds.length, { len: U.km(sec.len) }));
+  }
+  // Прилага групите (от Core.dupCluster) без отпечатък за "Отмени" - него го прави този, който вика.
+  function applyDups(cls) {
+    var r = cur(), secs = [];
+    cls.forEach(function (cl) { secs = secs.concat(cl.secs); });
+    secs.forEach(function (d) {
       var t = track(d.trackId); if (!t) return;
       t.skips = Core.mergeIv((t.skips || []).concat([{ a: d.a, b: d.b }]));
       r.items = Core.trimItems(r.items, d.trackId, d.a, d.b);
@@ -952,7 +1007,7 @@
     // Границата на дубликата може да се е преместила към точката на прекъсване: краищата на
     // изрязаните части я следват, за да стигнат до свръзката.
     var moved = false;
-    cl.secs.forEach(function (d) {
+    secs.forEach(function (d) {
       r.items.forEach(function (it) {
         if (it.type !== 'part' || it.trackId !== d.trackId) return;
         (A.byTrack[d.trackId] || []).forEach(function (s) {
@@ -963,7 +1018,24 @@
       });
     });
     if (moved) routeChanged();
-    toast(T.n('msg.dupRemoved', cl.trackIds.length, { len: U.km(sec.len) }));
+  }
+  /* "Изчисти преди сглобяване": всеки чакащ дубликат пада по правилото на клика върху маркера
+     (остава по едно копие от всяка група), после всяка отворена дупка до Core.GAP_BRIDGE_MAX_M
+     се свързва направо; по-дългите остават за чертане. Един отпечатък за "Отмени" за всичко. */
+  function cleanRoute() {
+    if (!A.pend.length && !(G && G.gaps.some(Core.canBridge))) { toast(T(G && G.gaps.length ? 'msg.cleanLongOnly' : 'msg.cleanNone', { max: U.dist(Core.GAP_BRIDGE_MAX_M) })); return; }
+    pushUndo();
+    var n = 0;
+    // Махането може да покаже нов чакащ участък - още един кръг, но не безкрайно.
+    for (var pass = 0; pass < 5 && A.pend.length; pass++) {
+      var gs = Core.dupGroups(A.pend, trackOrder());
+      gs.forEach(function (cl) { n += cl.secs.length; });
+      applyDups(gs);
+    }
+    var nb = G ? Core.bridgeGaps(cur().items, G.gaps) : 0;
+    if (nb) { ui.drawTarget = null; routeChanged(); }
+    var nl = G ? G.gaps.length : 0;
+    toast(T('msg.cleaned', { n: n, g: nb }) + (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: U.dist(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl ? 6000 : undefined);
   }
   // "Отвори пак": затворената сама дупка става обикновена дупка с двата бутона.
   function reopenGap(gp) {
@@ -993,6 +1065,11 @@
     routeChanged();
     bridgeLabel(it);
     map.redraw();
+  }
+  // Клик върху пръстена (или пунктира) на дупка: до Core.GAP_BRIDGE_MAX_M се свързва направо, по-дългата остава за чертане.
+  function ringGap(gp) {
+    if (Core.canBridge(gp)) bridgeGap(gp);
+    else toast(T('msg.gapLong', { d: U.dist(gp.d), max: U.dist(Core.GAP_BRIDGE_MAX_M) }));
   }
   /* Къде отива връзка, начертана без избрана дупка: между двете съседни части, до чийто
      скок е най-близо кликът (предимство имат местата със скок). Никога в края на маршрута -
@@ -1093,6 +1170,16 @@
   }
   function onLongPress(p) {
     var v = hitVertex(p, 18);
+    if (!v && !ui.follower && ui.mode === 'select') {
+      // Задържане върху маркер на дубликат (телефон): светва удвоеният участък и остава до следващото докосване.
+      var mk = hitMarker(p);
+      if (!mk) return null;
+      if (navigator.vibrate) try { navigator.vibrate(15); } catch (e) { /* няма значение */ }
+      mk.press = true;
+      ui.hover = mk;
+      map.redraw();
+      return { move: function () {}, end: function () {} };
+    }
     if (!v) return null;
     if (navigator.vibrate) try { navigator.vibrate(20); } catch (e) { /* няма значение */ }
     toast(T('msg.drag'));
@@ -1100,6 +1187,8 @@
   }
 
   function onClick(p) {
+    // Осветеното със задържане гасне със следващото докосване.
+    if (ui.hover && ui.hover.press) { ui.hover = null; map.redraw(); }
     // Отворено меню на разклонение или участък: клик встрани само го затваря.
     if (ui.om) { hideObjMenu(); return; }
     hidePointMenu();
@@ -1121,7 +1210,7 @@
     if (h.kind === 'part') { showSegMenu(h.sec, null, p); return; }
     if (h.kind === 'item' && h.g.item.type === 'part') { showSegMenu(secAt(h.g.item, p), h.idx, p); return; }
     if (h.kind === 'item') removeItem(h.idx);
-    else if (h.kind === 'gap') closeGap(h.gap);
+    else if (h.kind === 'gap') ringGap(h.gap);
     else if (h.kind === 'vertex') showPointMenu(h);
   }
   function toggleBar() { setBar(!document.body.classList.contains('bar-hidden')); }
@@ -1579,6 +1668,11 @@
     if (np) cnt.push(T('dups.toDecide', { n: np }));
     if (n) cnt.push(T.n('dups.skippedN', n));
     $('#dupsCount').textContent = cnt.length ? cnt.join(' · ') : '(0)';
+    var gaps = G ? G.gaps : [], gd = 0;
+    gaps.forEach(function (g) { gd += g.d; });
+    $('#dupsGaps').textContent = T.n('dups.gaps', gaps.length, { d: U.dist(gd) });
+    $('#dupsGaps').hidden = !gaps.length;
+    $('#cleanBtn').disabled = !np && !gaps.some(Core.canBridge);
   }
 
   function renderRoutes() {
@@ -2786,6 +2880,7 @@
       case 'undo': undo(); break;
       case 'clear-tracks': clearTracks(); break;
       case 'clear-parts': clearParts(); break;
+      case 'clean-route': cleanRoute(); break;
       case 'zoom-in': map.zoomAround(Math.round(map.zoom) + 1); break;
       case 'zoom-out': map.zoomAround(Math.round(map.zoom) - 1); break;
       case 'fit': fitRoute(); break;
