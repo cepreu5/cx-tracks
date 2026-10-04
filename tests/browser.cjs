@@ -620,8 +620,8 @@ function barFits() {
   const fab380 = await page.evaluate(fabState);
   check(fab380.shown && !fab380.overTr && !fab380.overHandle, 'на 380 px "Следене" върху картата не застъпва нищо: ' + JSON.stringify(fab380));
   // 1.1.5: редица, когато се събират вляво от реда горе вдясно (8 px запас), иначе стълбичка.
-  const st2 = await page.evaluate(tlFit), st2ok = st2.n === 3 && !st2.over && (st2.need <= st2.room - 1 ? st2.row : st2.need > st2.room + 1 ? st2.col : st2.row || st2.col);
-  check(await page.evaluate(() => document.body.classList.contains('bar-hidden')) && await page.isVisible('#barHandle') && st2ok, 'на 380 px: лентата скрита, "↓", "Лента" и "Следене" са ' + (st2.row ? 'в редица' : 'в стълбичка') + ', както им стига мястото: ' + JSON.stringify(st2));
+  const st2 = await page.evaluate(tlFit), st2ok = st2.n === 2 && !st2.over && (st2.need <= st2.room - 1 ? st2.row : st2.need > st2.room + 1 ? st2.col : st2.row || st2.col);
+  check(await page.evaluate(() => document.body.classList.contains('bar-hidden')) && await page.isVisible('#barHandle') && st2ok, 'на 380 px: лентата скрита, "Лента" и "Следене" (1.6: без "↓") са ' + (st2.row ? 'в редица' : 'в стълбичка') + ', както им стига мястото: ' + JSON.stringify(st2));
   await page.screenshot({ path: path.join(OUT, 'bar-hidden-380.png') });
   await page.click('#barHandle');
   check(await page.evaluate(() => !document.body.classList.contains('bar-hidden') && document.querySelector('#barHandle').dataset.dir === 'up'), 'на 380 px табчето връща лентата, стрелкичката сочи нагоре');
@@ -808,6 +808,8 @@ function barFits() {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+  // 1.6: надписът следва мястото - долу стрелката сочи нагоре (събитието за скрола идва в следващия кадър).
+  await page.waitForFunction(() => document.querySelector('#toTopBtn').dataset.dir === 'up', null, { timeout: 3000 }).catch(() => {});
   const sy0 = await page.evaluate(() => window.scrollY);
   check(sy0 > 300 && await page.evaluate(() => document.querySelector('#toTopBtn').getAttribute('aria-label') === 'Най-горе на страницата'), 'стрелката нагоре е с надпис на български; страницата е свалена до ' + Math.round(sy0) + ' px');
   await page.screenshot({ path: path.join(OUT, 'totop-390-bottom.png') });
