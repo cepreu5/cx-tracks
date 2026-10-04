@@ -811,3 +811,75 @@ console.log('общ участък OK');
   });
   console.log('1.4.2 клон, по-къс от сондата: OK');
 })();
+
+// 1.4.3: тракът пресича себе си (X) между два различни приети участъка - разклонение с пръстен,
+// а другата отсечка се предлага в двете посоки. Плиткото пресичане и пресичането вътре в един
+// участък не са кръстовища.
+(function () {
+  var lat0 = 42.6, lon0 = 24.5, ky = 111320, kx = 111320 * Math.cos(lat0 * Math.PI / 180);
+  function at(e, n) { return [lat0 + n / ky, lon0 + e / kx]; }
+  function leg(e0, n0, e1, n1) {
+    var len = Math.hypot(e1 - e0, n1 - n0), k = Math.max(1, Math.round(len / 10)), p = [];
+    for (var i = 1; i <= k; i++) { var q = at(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k); p.push([q[0], q[1], 600]); }
+    return p;
+  }
+  function jump(e, n) { var q = at(e, n); return [[q[0], q[1], 600]]; }
+  // 800 м на изток, 600 м на север, загубен сигнал (скок от 395 м - дупка, нов участък), после
+  // 1000 м на юг през първата отсечка: кръстовище под 90° в (405, 0).
+  var start = at(0, 0), X = at(405, 0);
+  var xPts = [[start[0], start[1], 600]].concat(leg(0, 0, 800, 0), leg(800, 0, 800, 600), jump(405, 600), leg(405, 600, 405, -400));
+  var T = { id: 'X', pts: xPts }, tb = { X: T };
+  var r = Core.analyze([T], 20);
+  var near = r.junctions.filter(function (j) { return U.hav(j.lat, j.lon, X[0], X[1]) < 30; });
+  console.log('X', r.byTrack.X.map(function (s) { return s.kind + ':' + Math.round(s.a) + '-' + Math.round(s.b); }), r.junctions.map(function (j) { return j.branches.length + (j.self ? 's' : '') + (j.cross ? 'c' : ''); }));
+  assert.strictEqual(r.junctions.length, 1, 'X: точно един пръстен - на кръстовището');
+  assert.ok(near.length === 1 && near[0].self && !near[0].cross, 'X: кръстовището е разклонение на трака със себе си, не „без избор“');
+  var xj = near[0];
+  assert.strictEqual(xj.branches.length, 4, 'X: 4 клона - двете отсечки в двете посоки');
+  assert.ok(xj.branches.every(function (br) { return br.trackId === 'X' && !br.loop; }), 'X: всички клонове са по трака, без примка');
+  assert.strictEqual(Core.redundantJunctions(r.junctions, tb, 20).length, 0, 'X: пръстенът не се предлага за махане');
+  var parts = r.byTrack.X.filter(function (s) { return s.kind === 'part'; });
+  var want = [[0, 405], [405, 1400], [1795, 2395], [2395, 2795]]; // по равнината; хаверсинусът дава до 0,2% по-малко
+  assert.ok(parts.length === 4 && parts.every(function (s, i) { return Math.abs(s.a - want[i][0]) < 8 && Math.abs(s.b - want[i][1]) < 8; }),
+    'X: двата участъка се режат в кръстовището: ' + parts.map(function (s) { return Math.round(s.a) + '..' + Math.round(s.b); }));
+  function ab(s) { return Math.round(s.a) + '..' + Math.round(s.b); }
+  // Маршрутът идва от запад и продължава на изток; другата отсечка се предлага в двете посоки.
+  var route = { forks: [], items: [parts[0], parts[1]].map(function (s) { return { type: 'part', trackId: 'X', a: s.a, b: s.b }; }) };
+  var f = Core.routeForks(Core.routeGeometry(route, tb, r), [xj], 20, tb)[0];
+  assert.ok(f && f.chosen >= 0 && f.incoming >= 0, 'X: маршрутът е разпознат в кръстовището (chosen ' + (f && f.chosen) + ', incoming ' + (f && f.incoming) + ')');
+  assert.ok(xj.branches[f.incoming].key === parts[0].key && xj.branches[f.chosen].key === parts[1].key, 'X: идва по първата отсечка, продължава по нея');
+  var alts = xj.branches.filter(function (br, bi) { return bi !== f.chosen && bi !== f.incoming; });
+  assert.deepStrictEqual(alts.map(function (br) { return br.key + '@' + br.from; }).sort(), [parts[2].key + '@b', parts[3].key + '@a'].sort(), 'X: алтернативите са другата отсечка - на север (срещу записа) и на юг (по записа)');
+  // Изборът на юг продължава маршрута натам; досегашното продължение се пази и се връща.
+  Core.switchFork(route, f, alts.filter(function (br) { return br.from === 'a'; })[0], tb, 20);
+  assert.deepStrictEqual(route.items.map(function (it) { return ab(it) + (it.rev ? 'r' : ''); }), [ab(parts[0]), ab(parts[3])], 'X: маршрутът завива на юг');
+  var f2 = Core.routeForks(Core.routeGeometry(route, tb, r), [xj], 20, tb)[0];
+  assert.ok(f2.chosen >= 0 && xj.branches[f2.chosen].key === parts[3].key && f2.incoming === f.incoming, 'X: след избора маршрутът е на южната отсечка');
+  Core.switchFork(route, f2, alts.filter(function (br) { return br.from === 'b'; })[0], tb, 20);
+  assert.deepStrictEqual(route.items.map(function (it) { return ab(it) + (it.rev ? 'r' : ''); }), [ab(parts[0]), ab(parts[2]) + 'r'], 'X: маршрутът завива на север, срещу посоката на записа');
+  var f3 = Core.routeForks(Core.routeGeometry(route, tb, r), [xj], 20, tb)[0];
+  Core.switchFork(route, f3, xj.branches[f.chosen], tb, 20);
+  assert.deepStrictEqual(route.items.map(ab), [ab(parts[0]), ab(parts[1])], 'X: изборът на старата посока връща пазеното продължение');
+  console.log('1.4.3 тракът пресича себе си между два участъка - разклонение, двете посоки на другата отсечка: OK');
+
+  // Същото кръстовище без загубения сигнал: един участък - пресичането вътре в него не е разклонение.
+  var one = { id: 'O', pts: [[start[0], start[1], 600]].concat(leg(0, 0, 800, 0), leg(800, 0, 800, 600), leg(800, 600, 405, 600), leg(405, 600, 405, -400)) };
+  var ro = Core.analyze([one], 20);
+  assert.strictEqual(ro.byTrack.O.filter(function (s) { return s.kind === 'part'; }).length, 1, 'един участък');
+  assert.strictEqual(ro.junctions.length, 0, 'пресичане вътре в един участък не дава пръстен');
+  // Пресичане между два участъка под ъгъл deg (градуси) в (405, 0).
+  function slant(deg) {
+    var dy = 400 * Math.tan(deg * Math.PI / 180) / 2;
+    return { id: 'S', pts: [[start[0], start[1], 600]].concat(leg(0, 0, 800, 0), leg(800, 0, 800, 600), jump(205, 600), leg(205, 600, 205, dy), leg(205, dy, 605, -dy)) };
+  }
+  [20, 25].forEach(function (deg) {
+    var rs = Core.analyze([slant(deg)], deg === 20 ? 10 : 20);
+    assert.strictEqual(rs.byTrack.S.filter(function (s) { return s.kind === 'part'; }).length, 2, deg + '°: два участъка, нищо не ги реже');
+    assert.strictEqual(rs.junctions.length, 0, deg + '°: плиткото пресичане (под ' + Core.SELF_ANGLE + '°) не дава пръстен');
+  });
+  [35, 60].forEach(function (deg) {
+    var rt = Core.analyze([slant(deg)], 20);
+    assert.ok(rt.junctions.length === 1 && rt.junctions[0].self && rt.junctions[0].branches.length === 4, deg + '°: пресичане между два участъка е разклонение с 4 клона');
+  });
+  console.log('1.4.3 праг на ъгъла и граница „различни участъци“: OK');
+})();
