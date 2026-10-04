@@ -1173,9 +1173,9 @@
     });
     return { pts: pts, map: map, cum: U.cumulative(pts) };
   }
-  // ext - новите върхове от края навън ([[lat, lon]]), последният е новият край.
+  // ext - новите върхове от края навън ([[lat, lon]], както са дадени - краят ляга точно във върха на друг трак), последният е новият край.
   function extendEnd(t, e, side, ext) {
-    var s = around(t, e), c = t._cum, E = s.at >= 0 ? s.at : vtx(pointAt(t, e)), nv = (ext || []).map(function (p) { return vtx([p[0], p[1], p[2] == null ? null : p[2]]); });
+    var s = around(t, e), c = t._cum, E = s.at >= 0 ? s.at : vtx(pointAt(t, e)), nv = (ext || []).map(function (p) { return [p[0], p[1], p[2] == null ? null : p[2]]; });
     var r, nE, nX, f;
     if (side === 'b') {
       r = build(t, s.lo.concat([E]).concat(nv).concat(s.hi));
@@ -1874,6 +1874,6 @@
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: joinTol, nearestLive: nearestLive, skipEnds: skipEnds, collectionLinks: collectionLinks, openEnds: openEnds, addLink: addLink,
     remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX,
-    liveParts: liveParts, partAt: partAt, extendEnd: extendEnd, trimEnd: trimEnd, insertVertex: insertVertex, nearestInRange: nearestIn
+    liveParts: liveParts, partAt: partAt, JOIN_MIN: JOIN_MIN, extendEnd: extendEnd, trimEnd: trimEnd, insertVertex: insertVertex, nearestInRange: nearestIn
   };
 })();
