@@ -1107,9 +1107,9 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.4.2' && await p5.isVisible('#appVersion') && /^Версия 1\.4\.2 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.4.3' && await p5.isVisible('#appVersion') && /^Версия 1\.4\.3 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.4.2' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.4.3' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -2743,6 +2743,67 @@ function barFits() {
     check(JSON.stringify(l2.items) === JSON.stringify(l0.items) && l2.chFrom === 'loop@a', tag + '„Отмени“ връща примката в посоката на записа: ' + l2.items.join(' '));
     check(!el.length, tag + 'конзолата е чиста' + (el.length ? ': ' + el.join(' | ') : ''));
     await cl.close();
+  }
+
+  // ---- 1.4.3: тракът пресича себе си (X) между два участъка - пръстен, менюто предлага двете посоки на другата отсечка ----
+  {
+    const tag = '1.4.3: ';
+    const cx = await browser.newContext({ viewport: { width: 1280, height: 800 }, menus: true });
+    const px = await cx.newPage();
+    const ex = [];
+    px.on('pageerror', e => ex.push('pageerror: ' + e.message));
+    px.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) ex.push('console: ' + m.text()); });
+    await px.goto(url);
+    await px.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    // Същото X като в tests/core.test.js: 800 м на изток, 600 м на север, загубен сигнал, 1000 м на юг през първата отсечка.
+    const la0 = 42.6, kyX = 111320, kxX = 111320 * Math.cos(la0 * Math.PI / 180), atX = (e, n) => [la0 + n / kyX, 24.5 + e / kxX];
+    const leg = (e0, n0, e1, n1) => { const k = Math.max(1, Math.round(Math.hypot(e1 - e0, n1 - n0) / 10)), p = []; for (let i = 1; i <= k; i++) { const q = atX(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k); p.push([q[0], q[1], 600]); } return p; };
+    const xPts = [[...atX(0, 0), 600]].concat(leg(0, 0, 800, 0), leg(800, 0, 800, 600), [[...atX(405, 600), 600]], leg(405, 600, 405, -400));
+    await px.setInputFiles('#fileInput', writeGpx('krastopat', xPts));
+    await px.waitForFunction(() => __gpxk.S.tracks.length === 1);
+    await px.evaluate(() => { const d = document.querySelector('#dlgImport'); if (d.open) d.close(); window.scrollTo(0, 0); });
+    const frameX = () => px.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const X = atX(405, 0);
+    await px.evaluate(a => __gpxk.map.setView(a[0], a[1], 17), X); await frameX();
+    const j0 = await px.evaluate(a => { const js = __gpxk.A.junctions; return { n: js.length, near: js.filter(j => U.hav(j.lat, j.lon, a[0], a[1]) < 30).map(j => ({ nb: j.branches.length, self: !!j.self, cross: !!j.cross })),
+      red: (__gpxk.ui.redundant || []).length, rings: !!document.querySelector('#dlgRings').open }; }, X);
+    check(j0.n === 1 && j0.near.length === 1 && j0.near[0].nb === 4 && j0.near[0].self && !j0.near[0].cross, tag + 'кръстовището на трака със себе си е пръстен с 4 клона: ' + JSON.stringify(j0));
+    check(j0.red === 0 && !j0.rings, tag + 'пръстенът не е „без избор“ и не се предлага за махане (излишни: ' + j0.red + ')');
+    // Маршрутът: от запад до кръстовището и нататък на изток (първите две части).
+    await px.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), t = S.tracks[0];
+      r.items = __gpxk.A.byTrack[t.id].filter(s => s.kind === 'part').slice(0, 2).map(s => ({ type: 'part', trackId: t.id, a: s.a, b: s.b, rev: false })); __gpxk.refresh(); });
+    await frameX();
+    const xs = () => frameX().then(() => px.evaluate(a => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), b = document.querySelector('#map').getBoundingClientRect();
+      const j = __gpxk.A.junctions.find(x => U.hav(x.lat, x.lon, a[0], a[1]) < 30), f = (__gpxk.G.forks || []).find(x => x.j === j), ring = j && (__gpxk.ui.rings || []).find(o => o.key === j.key);
+      const parts = __gpxk.A.byTrack[S.tracks[0].id].filter(s => s.kind === 'part').map(s => s.key);
+      return { items: r.items.map(i => Math.round(i.a) + '..' + Math.round(i.b) + (i.rev ? 'r' : '')), undo: __gpxk.ui.undo.length,
+        chosen: f && j.branches[f.chosen] ? parts.indexOf(j.branches[f.chosen].key) + '@' + j.branches[f.chosen].from : '', incoming: f && j.branches[f.incoming] ? parts.indexOf(j.branches[f.incoming].key) + '@' + j.branches[f.incoming].from : '',
+        ring: ring ? { x: b.left + ring.x, y: b.top + ring.y, sel: ring.selected } : null }; }, X));
+    const x0 = await xs();
+    check(x0.items.length === 2 && x0.incoming === '0@b' && x0.chosen === '1@a' && x0.ring && x0.ring.sel, tag + 'маршрутът минава през кръстовището и е разпознат (идва ' + x0.incoming + ', продължава ' + x0.chosen + '), пръстенът е плътен');
+    await px.mouse.click(x0.ring.x, x0.ring.y);
+    await px.waitForFunction(() => { const m = document.querySelector('#objMenu'); return m && !m.hidden && m.dataset.kind === 'junc'; });
+    const xm = await px.evaluate(() => [...document.querySelectorAll('#objMenu [data-omk="go"]')].map(b => b.textContent.trim()));
+    const fwd = xm.findIndex(t => /^Продължи по krastopat(\.gpx)? · 0[,.]4\d?\sкм · по посоката на записа$/.test(t)), rev = xm.findIndex(t => /^Продължи по krastopat(\.gpx)? · 0[,.][56]\d?\sкм · срещу посоката на записа$/.test(t));
+    check(xm.length === 2 && fwd >= 0 && rev >= 0, tag + 'менюто на пръстена предлага двете посоки на другата отсечка: ' + JSON.stringify(xm));
+    await px.screenshot({ path: path.join(OUT, 'self-cross-143.png') });
+    await px.click('#objMenu [data-omk="go"] >> nth=' + fwd);
+    const x1 = await xs();
+    check(x1.items.length === 2 && x1.items[0] === x0.items[0] && x1.chosen === '3@a' && x1.undo === x0.undo + 1, tag + 'изборът завива на юг по другата отсечка: ' + x1.items.join(' ') + ' (' + x1.chosen + '), едно действие за „Отмени“');
+    await px.mouse.click(x1.ring.x, x1.ring.y);
+    await px.waitForFunction(() => { const m = document.querySelector('#objMenu'); return m && !m.hidden && m.dataset.kind === 'junc'; });
+    const xm2 = await px.evaluate(() => [...document.querySelectorAll('#objMenu [data-omk="go"]')].map(b => b.textContent.trim()));
+    const back = xm2.findIndex(t => /срещу посоката на записа$/.test(t));
+    check(xm2.length === 2 && back >= 0, tag + 'след избора менюто предлага старото продължение и посоката на север: ' + JSON.stringify(xm2));
+    await px.click('#objMenu [data-omk="go"] >> nth=' + back);
+    const x2 = await xs();
+    check(x2.items.length === 2 && x2.chosen === '2@b' && /r$/.test(x2.items[1]), tag + 'втори избор: на север, срещу посоката на записа: ' + x2.items.join(' '));
+    await px.click('#undoBtn');
+    await px.click('#undoBtn');
+    const x3 = await xs();
+    check(JSON.stringify(x3.items) === JSON.stringify(x0.items) && x3.chosen === '1@a', tag + '„Отмени“ връща маршрута на изток: ' + x3.items.join(' '));
+    check(!ex.length, tag + 'конзолата е чиста' + (ex.length ? ': ' + ex.join(' | ') : ''));
+    await cx.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));
