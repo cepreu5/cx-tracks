@@ -301,6 +301,23 @@
     return best;
   }
 
+  /* Всички места в участъка [a,b], където тракът минава на jt метра от точка: по едно на
+     всяко поредно минаване (най-близкото в него). Тракът, който се връща по същия път, докосва
+     точката два пъти - веднъж в края си и веднъж по средата; отсечка, която върви успоредно
+     в jt, е едно минаване и не се троши на парчета. */
+  function touchPoints(t, a, b, lat, lon, kx, ky, jt) {
+    var c = t._cum, pts = t.pts, px = lon * kx, py = lat * ky, out = [], run = null, jt2 = jt * jt;
+    for (var i = 0; i < pts.length - 1; i++) {
+      if (c[i + 1] < a || c[i] > b) continue;
+      var r = U.projectSeg(px, py, pts[i][1] * kx, pts[i][0] * ky, pts[i + 1][1] * kx, pts[i + 1][0] * ky);
+      if (r.d2 > jt2) { if (run) out.push(run.d); run = null; continue; }
+      var d = c[i] + r.t * (c[i + 1] - c[i]);
+      if (!run || r.d2 < run.d2) run = { d2: r.d2, d: d };
+    }
+    if (run) out.push(run.d);
+    return out.map(function (d) { return Math.max(a, Math.min(b, d)); });
+  }
+
   // Пресичане на две отсечки: връща дела по първата или null.
   function segCross(ax, ay, bx, by, cx, cy, dx, dy) {
     var rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy;
@@ -435,8 +452,9 @@
         if (s.kind !== 'part' || s.pend) { out.push(s); return; }
         var at = [];
         js.forEach(function (j) {
-          var n = nearestInRange(t, s.a, s.b, j.lat, j.lon, kx, ky);
-          if (n && n.dist <= jt && n.d - s.a > JOIN_MIN && s.b - n.d > JOIN_MIN) at.push(n.d);
+          touchPoints(t, s.a, s.b, j.lat, j.lon, kx, ky, jt).forEach(function (d) {
+            if (d - s.a > JOIN_MIN && s.b - d > JOIN_MIN) at.push(d);
+          });
         });
         at.sort(function (x, y) { return x - y; });
         var a = s.a;

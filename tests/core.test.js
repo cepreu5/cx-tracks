@@ -717,3 +717,43 @@ console.log('общ участък OK');
   assert.deepStrictEqual(route2.items.map(function (it) { return it.type === 'part' ? it.trackId : 'bridge'; }), ['X', 'bridge', 'Y', 'bridge', 'Z', 'W'], 'между Z и W връзка няма');
   console.log('1.4 число в маркера, изчистване наведнъж, свързване на дупките до 500 м: OK');
 })();
+
+// 1.4.1: тракът се връща по същия път (близалка) - общата отсечка дава пръстен в двата си края,
+// и преди махането на дубликата, и след него. Синтетичен трак: в хранилището няма истински записи.
+(function () {
+  var lat0 = 42.7, lon0 = 24.6, ky = 111320, kx = 111320 * Math.cos(lat0 * Math.PI / 180);
+  function at(e, n) { return [lat0 + n / ky, lon0 + e / kx]; }
+  // Отсечка от (e0,n0) до (e1,n1) в метри, точка на всеки ~10 м; без първата точка, за да се лепят.
+  function leg(e0, n0, e1, n1) {
+    var len = Math.hypot(e1 - e0, n1 - n0), k = Math.max(1, Math.round(len / 10)), p = [];
+    for (var i = 1; i <= k; i++) { var q = at(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k); p.push([q[0], q[1], 600]); }
+    return p;
+  }
+  var start = at(0, 0), pts = [[start[0], start[1], 600]]
+    .concat(leg(0, 0, 700, 0))          // 700 м на изток
+    .concat(leg(700, 0, 850, 0))        // общата отсечка, 150 м
+    .concat(leg(850, 0, 1150, 300))     // примката: далеч от линията
+    .concat(leg(1150, 300, 1150, -300))
+    .concat(leg(1150, -300, 850, 4))    // обратно в края на общата отсечка (на 4 м встрани)
+    .concat(leg(850, 4, 700, 4))        // обратното минаване по същата линия
+    .concat(leg(700, 4, 700, -600));    // и далеч на юг
+  var L = { id: 'L', pts: pts }, e1 = at(700, 0), e2 = at(850, 0);
+  function ends(res, when) {
+    var near1 = res.junctions.filter(function (j) { return U.hav(j.lat, j.lon, e1[0], e1[1]) < 40; });
+    var near2 = res.junctions.filter(function (j) { return U.hav(j.lat, j.lon, e2[0], e2[1]) < 40; });
+    console.log('близалка ' + when, res.junctions.map(function (j) { return Math.round(U.hav(j.lat, j.lon, e1[0], e1[1])) + 'м/' + j.branches.length; }));
+    assert.strictEqual(res.junctions.length, 2, when + ': общата отсечка дава точно 2 пръстена, има ' + res.junctions.length);
+    assert.ok(near1.length === 1 && near1[0].branches.length >= 2, when + ': пръстен в началото на общата отсечка');
+    assert.ok(near2.length === 1 && near2[0].branches.length >= 2, when + ': пръстен в края на общата отсечка');
+  }
+  var r0 = Core.analyze([L], 20);
+  assert.strictEqual(r0.pend.length, 1, 'обратното минаване е чакащ дубликат');
+  ends(r0, 'преди махането');
+  // Клик върху маркера: t.skips от чакащия дубликат.
+  L.skips = Core.mergeIv([{ a: r0.pend[0].a, b: r0.pend[0].b }]);
+  var r1 = Core.analyze([L], 20);
+  assert.strictEqual(r1.pend.length, 0, 'дубликатът е махнат');
+  ends(r1, 'след махането');
+  assert.strictEqual(Core.redundantJunctions(r1.junctions, { L: L }, 20).length, 0, 'нито един от двата пръстена не се предлага за махане');
+  console.log('1.4.1 пръстен в двата края на общата отсечка при връщане по същия път: OK');
+})();
