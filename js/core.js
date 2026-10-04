@@ -643,6 +643,168 @@
     return gs.length;
   }
 
+  /* 1.5: самозатваряне на малките дупки след махнат дубликат (клик върху маркера), махнато излишно
+     разклонение и изтрит участък. Праг по подразбиране AUTO_GAP_DEF, сменя се в „Настройки“ (0 = никога),
+     таван AUTO_GAP_MAX. Отделно е от самозатварянето до отклонението в routeGeometry - то важи винаги. */
+  var AUTO_GAP_DEF = 100, AUTO_GAP_MAX = 500;
+  function autoGapMax(v) {
+    v = Math.round(+v);
+    return isFinite(v) ? Math.max(0, Math.min(AUTO_GAP_MAX, v)) : AUTO_GAP_DEF;
+  }
+  /* Свързва направо всяка дупка между части (gaps от routeGeometry) до max м: празна връзка с autoClose,
+     която влиза в маршрута и в .gpx, но не е част. Отворената пак с „Отвори пак“ (route.openGaps) не
+     се пипа. От последната към първата, за да не се местят местата. Връща броя на затворените. */
+  function closeSmallGaps(route, gaps, max) {
+    max = autoGapMax(max);
+    if (!max) return 0;
+    var gs = (gaps || []).filter(function (g) { return g.d <= max && !isReopened(route, g.from, g.to); })
+      .sort(function (p, q) { return q.beforeIdx - p.beforeIdx; });
+    gs.forEach(function (g) { route.items.splice(g.beforeIdx, 0, { type: 'draw', pts: [], bridge: true, link: true, autoClose: true }); });
+    return gs.length;
+  }
+
+  /* 1.5: какво лежи под участък [a,b] от трака t - друг видим трак (или същият, минал оттук втори път),
+     който върви в рамките на отклонението по поне 40% от участъка. Маркер не е нужен: под прага
+     minDup, при разминаване над отклонението и при къс завой на косата (lag) analyze не маркира нищо,
+     а линията пак си е там. Изтритото (dels) и махнатото (skips) не се брои - не се вижда.
+     Връща [{trackId, a, b, len, self}] - отрязъкът от другия трак под участъка, най-дългият първи. */
+  var UNDER_SHARE = 0.4;
+  function underTracks(t, a, b, tracks, tol) {
+    tol = Math.max(ROUTE_GAP, 1.5 * (tol == null ? 20 : tol));
+    prep(t);
+    if (b < a) { var tmp = a; a = b; b = tmp; }
+    var L = b - a;
+    if (L <= 0) return [];
+    var n = Math.max(2, Math.min(400, Math.ceil(L / Math.min(10, Math.max(2, tol / 2))))), samples = [];
+    for (var i = 0; i <= n; i++) samples.push(pointAt(t, a + L * i / n));
+    var lat0 = samples[0][0], kx = Math.cos(lat0 * U.RAD) * MPD, ky = MPD;
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    samples.forEach(function (p) {
+      var x = p[1] * kx, y = p[0] * ky;
+      x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+    });
+    x0 -= tol; x1 += tol; y0 -= tol; y1 += tol;
+    var out = [];
+    (tracks || []).forEach(function (o) {
+      if (!o || !o.pts || o.pts.length < 2) return;
+      prep(o);
+      var c = o._cum, self = o === t || o.id === t.id;
+      // Самият участък и съседството му (по трака) не са „под него“.
+      var nearA = a - 2 * tol, nearB = b + 2 * tol;
+      function off(d) {
+        if (self && d >= nearA && d <= nearB) return true;
+        if (isCut(o, d)) return true;
+        var sk = o.skips || [];
+        for (var k = 0; k < sk.length; k++) if (d > sk[k].a + 0.5 && d < sk[k].b - 0.5) return true;
+        return false;
+      }
+      var segs = [];
+      for (var j = 0; j < o.pts.length - 1; j++) {
+        var p = o.pts[j], q = o.pts[j + 1];
+        var px = p[1] * kx, py = p[0] * ky, qx = q[1] * kx, qy = q[0] * ky;
+        if (Math.max(px, qx) < x0 || Math.min(px, qx) > x1 || Math.max(py, qy) < y0 || Math.min(py, qy) > y1) continue;
+        if (off(c[j]) && off(c[j + 1])) continue;
+        segs.push(j);
+      }
+      if (!segs.length) return;
+      var hit = 0, lo = Infinity, hi = -Infinity;
+      samples.forEach(function (s) {
+        var sx = s[1] * kx, sy = s[0] * ky, bd = Infinity, bdd = null;
+        segs.forEach(function (j) {
+          var p = o.pts[j], q = o.pts[j + 1];
+          var px = p[1] * kx, py = p[0] * ky, dx = q[1] * kx - px, dy = q[0] * ky - py, l2 = dx * dx + dy * dy;
+          var f = l2 ? Math.max(0, Math.min(1, ((sx - px) * dx + (sy - py) * dy) / l2)) : 0;
+          var d = Math.hypot(px + f * dx - sx, py + f * dy - sy), along = c[j] + f * (c[j + 1] - c[j]);
+          if (d < bd && !off(along)) { bd = d; bdd = along; }
+        });
+        if (bd <= tol) { hit++; lo = Math.min(lo, bdd); hi = Math.max(hi, bdd); }
+      });
+      if (hit / samples.length < UNDER_SHARE || hi - lo < 1) return;
+      out.push({ trackId: o.id, a: lo, b: hi, len: hi - lo, self: self });
+    });
+    out.sort(function (p, q) { return q.len - p.len; });
+    return out;
+  }
+
+  /* 1.5 „Проверка за дубликати“: застъпвания, които analyze не маркира - под minDup, при разминаване над
+     отклонението (линиите са на до joinTol една от друга) и при къс завой на косата (под lag по трака).
+     Всеки трак се обхожда на стъпки и се сравнява с по-ранните тракове и с по-ранното си минаване (поне
+     SELF_SEP*jt назад по трака); пресичанията (под ъгъл над SELF_ANGLE) не се броят. Изтритото и махнатото
+     не участва. Връща [{trackId, a, b, len, withId, withA, withB}] - отрязъци от поне max(JOIN_MIN, 2*tol) м. */
+  var SELF_SEP = 4, OVL_MISS = 2;
+  function leftoverOverlaps(tracks, tol) {
+    tol = tol == null ? 20 : tol;
+    var jt = Math.max(ROUTE_GAP, 1.5 * tol), minLen = Math.max(JOIN_MIN, 2 * tol), cosMax = Math.cos(SELF_ANGLE * Math.PI / 180);
+    var live = (tracks || []).filter(function (t) { return t && t.pts && t.pts.length > 1; });
+    if (!live.length) return [];
+    live.forEach(prep);
+    var kx = Math.cos(live[0].pts[0][0] * U.RAD) * MPD, ky = MPD, cell = 2 * jt, grid = new Map();
+    function hidden(t, d) {
+      if (isCut(t, d)) return true;
+      var sk = t.skips || [];
+      for (var k = 0; k < sk.length; k++) if (d > sk[k].a + 0.5 && d < sk[k].b - 0.5) return true;
+      return false;
+    }
+    var info = live.map(function (t, ti) {
+      var c = t._cum, gl = gapLimit(t), gap = new Uint8Array(t.pts.length);
+      for (var j = 0; j < t.pts.length - 1; j++) {
+        if (c[j + 1] - c[j] > gl || (t.breaks || []).indexOf(j + 1) >= 0) { gap[j] = 1; continue; }
+        if (hidden(t, c[j]) && hidden(t, c[j + 1])) continue;
+        var p = t.pts[j], q = t.pts[j + 1];
+        var ix0 = Math.floor(Math.min(p[1], q[1]) * kx / cell), ix1 = Math.floor(Math.max(p[1], q[1]) * kx / cell);
+        var iy0 = Math.floor(Math.min(p[0], q[0]) * ky / cell), iy1 = Math.floor(Math.max(p[0], q[0]) * ky / cell);
+        for (var ix = ix0; ix <= ix1; ix++) for (var iy = iy0; iy <= iy1; iy++) {
+          var key = ix + ',' + iy, l = grid.get(key);
+          if (!l) grid.set(key, l = []);
+          l.push([ti, j]);
+        }
+      }
+      return { t: t, gap: gap };
+    });
+    function segAt(t, d) {
+      var c = t._cum, lo = 0, hi = c.length - 1;
+      while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (c[mid] <= d) lo = mid; else hi = mid; }
+      return lo;
+    }
+    var out = [];
+    info.forEach(function (I, ti) {
+      var t = I.t, step = Math.min(10, Math.max(2, jt / 3)), run = null, miss = 0;
+      function flush() {
+        if (run && run.b - run.a + step >= minLen) { run.len = run.b - run.a; out.push(run); }
+        run = null; miss = 0;
+      }
+      for (var d = 0; d <= t.len; d += step) {
+        if (hidden(t, d) || I.gap[segAt(t, d)]) { flush(); continue; }
+        var p = pointAt(t, d), px = p[1] * kx, py = p[0] * ky;
+        var p0 = pointAt(t, Math.max(0, d - 5)), p1 = pointAt(t, Math.min(t.len, d + 5));
+        var vx = (p1[1] - p0[1]) * kx, vy = (p1[0] - p0[0]) * ky, vl = Math.hypot(vx, vy) || 1;
+        var gx = Math.floor(px / cell), gy = Math.floor(py / cell), best = null;
+        for (var ix = gx - 1; ix <= gx + 1; ix++) for (var iy = gy - 1; iy <= gy + 1; iy++) {
+          (grid.get(ix + ',' + iy) || []).forEach(function (sg) {
+            if (sg[0] > ti) return;
+            var o = info[sg[0]].t, j = sg[1], a = o.pts[j], b = o.pts[j + 1], oc = o._cum;
+            var ax = a[1] * kx, ay = a[0] * ky, dx = b[1] * kx - ax, dy = b[0] * ky - ay, l2 = dx * dx + dy * dy;
+            var f = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+            var dd = Math.hypot(ax + f * dx - px, ay + f * dy - py);
+            if (dd > jt || best && dd >= best.dd) return;
+            var along = oc[j] + f * (oc[j + 1] - oc[j]);
+            if (sg[0] === ti && along > d - SELF_SEP * jt) return;
+            if (hidden(o, along)) return;
+            if (l2 && Math.abs((vx * dx + vy * dy) / (vl * Math.sqrt(l2))) < cosMax) return;
+            best = { dd: dd, o: o, along: along };
+          });
+        }
+        if (!best) { if (run && ++miss > OVL_MISS) flush(); continue; }
+        if (run && run.withId !== best.o.id) flush();
+        if (!run) run = { trackId: t.id, a: d, b: d, withId: best.o.id, withA: best.along, withB: best.along };
+        run.b = d; miss = 0;
+        run.withA = Math.min(run.withA, best.along); run.withB = Math.max(run.withB, best.along);
+      }
+      flush();
+    });
+    return out;
+  }
+
   /* "Изтрий разклонението" - маршрутът в точката j (fork от routeForks или null):
      ако е сменял клона там, продължава направо по трака, по който е дошъл (до края на слетия
      участък), и смяната отпада; две съседни части от един трак, които се допират в j, стават една.
@@ -1194,7 +1356,7 @@
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
     trackBounds: trackBounds, overlap: overlap, ROUTE_GAP: ROUTE_GAP, LINK_MIN: LINK_MIN, DUP_BRIDGE: DUP_BRIDGE,
     routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe, probeK: probeK, PROBE: PROBE, SELF_ANGLE: SELF_ANGLE,
-    redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
+    redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, closeSmallGaps: closeSmallGaps, autoGapMax: autoGapMax, AUTO_GAP_DEF: AUTO_GAP_DEF, AUTO_GAP_MAX: AUTO_GAP_MAX, underTracks: underTracks, leftoverOverlaps: leftoverOverlaps, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: function (tol) { return Math.max(ROUTE_GAP, 1.5 * (tol || 20)); }

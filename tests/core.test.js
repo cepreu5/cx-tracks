@@ -883,3 +883,91 @@ console.log('общ участък OK');
   });
   console.log('1.4.3 праг на ъгъла и граница „различни участъци“: OK');
 })();
+
+// 1.5: самозатваряне на малките дупки (праг в „Настройки“) и застъпване без маркер.
+(function () {
+  var lat0 = 42.7, lon0 = 24.6, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
+  function at(e, n) { return [lat0 + n / ky, lon0 + e / kx, 500]; }
+  function leg(e0, n0, e1, n1, step) {
+    step = step || 5;
+    var L = Math.hypot(e1 - e0, n1 - n0), k = Math.max(1, Math.round(L / step)), o = [];
+    for (var i = 1; i <= k; i++) o.push(at(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k));
+    return o;
+  }
+  // Прагът: 100 м по подразбиране, 0 = никога, таван 500 м.
+  assert.strictEqual(Core.AUTO_GAP_DEF, 100, 'прагът по подразбиране е 100 м');
+  assert.strictEqual(Core.AUTO_GAP_MAX, 500, 'таванът е 500 м');
+  assert.deepStrictEqual([Core.autoGapMax(900), Core.autoGapMax(-5), Core.autoGapMax('x'), Core.autoGapMax('70')], [500, 0, 100, 70], 'прагът се стяга в 0..500');
+
+  // Трак 2 км на изток; маршрутът е целият. „Изтрий участъка“ маха 60 м и 300 м от него.
+  var P = { id: 'P', pts: [at(0, 0)].concat(leg(0, 0, 2000, 0)) }, tb = { P: P };
+  function cutRoute(max, open) {
+    P.dels = [{ a: 500, b: 560 }, { a: 1200, b: 1500 }];
+    var route = { items: [{ type: 'part', trackId: 'P', a: 0, b: Core.prep(P).len }], openGaps: open || [] };
+    P.dels.forEach(function (d) { route.items = Core.trimItems(route.items, 'P', d.a, d.b); });
+    var r = Core.analyze([P], 20), g = Core.routeGeometry(route, tb, r);
+    var n = Core.closeSmallGaps(route, g.gaps, max);
+    return { n: n, before: g, after: Core.routeGeometry(route, tb, r), route: route };
+  }
+  var c100 = cutRoute(100);
+  assert.deepStrictEqual(c100.before.gaps.map(function (g) { return Math.round(g.d); }), [60, 300], 'две дупки след изтриването: 60 и 300 м');
+  assert.strictEqual(c100.n, 1, 'при праг 100 м се затваря само дупката от 60 м');
+  assert.deepStrictEqual(c100.after.gaps.map(function (g) { return Math.round(g.d); }), [300], 'дупката от 300 м остава с пръстена');
+  var auto = c100.route.items.filter(function (it) { return it.autoClose; });
+  assert.ok(auto.length === 1 && auto[0].type === 'draw' && auto[0].link && !auto[0].pts.length, 'затворената сама дупка е празна връзка в маршрута');
+  var parts = function (g) { return g.items.filter(function (x) { return x.item.type === 'part' && x.pts.length; }).length; };
+  assert.strictEqual(parts(c100.after), parts(c100.before), 'връзката не е част');
+  var li = c100.route.items.indexOf(auto[0]);
+  assert.ok(c100.route.items[li - 1].type === 'part' && c100.route.items[li + 1].type === 'part', 'връзката стои между двете части - .gpx минава направо от края на едната до началото на другата');
+  assert.strictEqual(cutRoute(0).n, 0, 'праг 0: нищо не се затваря');
+  assert.strictEqual(cutRoute(500).n, 2, 'праг 500: и двете');
+  var g0 = c100.before.gaps[0];
+  assert.strictEqual(cutRoute(100, [[g0.from[0], g0.from[1], g0.to[0], g0.to[1]]]).n, 0, 'отворената пак дупка не се затваря сама');
+  // Сегашното самозатваряне до отклонението си остава: при отклонение 40 м дупка от 35 м е autoGap, без да пипа route.items.
+  P.dels = [{ a: 500, b: 535 }];
+  var rt = { items: Core.trimItems([{ type: 'part', trackId: 'P', a: 0, b: P.len }], 'P', 500, 535) };
+  var g15 = Core.routeGeometry(rt, tb, Core.analyze([P], 40));
+  assert.ok(g15.gaps.length === 0 && g15.autoGaps.length === 1, 'дупка под отклонението се затваря сама както досега');
+  delete P.dels;
+  console.log('1.5 самозатваряне на малките дупки до прага: OK');
+
+  // Застъпване без маркер: analyze не слага маркер, а линия под участъка има.
+  function marks(r, id) { return r.pend.filter(function (s) { return s.trackId === id; }).length; }
+  function lo(ts) { return Core.leftoverOverlaps(ts, 20); }
+  // а) Късо съвпадение: Q върви 60 м на 8 м от P (под minDup = 100 м).
+  var Q = { id: 'Q', pts: [at(500, -400)].concat(leg(500, -400, 500, -8), leg(500, -8, 560, -8), leg(560, -8, 560, -400)) };
+  var ra = Core.analyze([P, Q], 20);
+  assert.ok(marks(ra, 'Q') + marks(ra, 'P') === 0, 'а) късото съвпадение няма маркер');
+  var ua = Core.underTracks(Q, 392, 452, [P, Q], 20);
+  assert.ok(ua.length === 1 && ua[0].trackId === 'P' && Math.abs(ua[0].a - 500) < 6 && Math.abs(ua[0].b - 560) < 6, 'а) под участъка лежи P, км 0,50-0,56: ' + JSON.stringify(ua.map(function (u) { return [u.trackId, Math.round(u.a), Math.round(u.b)]; })));
+  var la = lo([P, Q]);
+  assert.ok(la.length === 1 && la[0].trackId === 'Q' && la[0].withId === 'P', 'а) проверката за дубликати го намира');
+  // б) Разминаване над отклонението: Z се люшка между 10 м и 27 м от P - нито едно близко парче не стига 100 м.
+  var zz = [at(0, 10)];
+  for (var e = 0; e < 1000; e += 200) zz = zz.concat(leg(e, 10, e + 60, 10), leg(e + 60, 10, e + 65, 27), leg(e + 65, 27, e + 195, 27), leg(e + 195, 27, e + 200, 10));
+  var Z = { id: 'Z', pts: zz }, rb = Core.analyze([P, Z], 20);
+  assert.ok(marks(rb, 'Z') + marks(rb, 'P') === 0, 'б) разминаването над отклонението - без маркер');
+  var ub = Core.underTracks(Z, 0, Core.prep(Z).len, [P, Z], 20);
+  assert.ok(ub.length === 1 && ub[0].trackId === 'P' && ub[0].len > 900, 'б) под участъка лежи P, ~1 км');
+  assert.ok(lo([P, Z]).some(function (x) { return x.trackId === 'Z' && x.withId === 'P' && x.len > 900; }), 'б) проверката за дубликати го намира');
+  // в) Къс завой на косата: H отива 120 м и се връща на 8 м - под lag (300 м) тракът не се сравнява със себе си.
+  var H = { id: 'H', pts: [at(0, 1000)].concat(leg(0, 1000, 120, 1000), leg(120, 1000, 120, 1008), leg(120, 1008, 0, 1008)) };
+  var rc = Core.analyze([H], 20);
+  assert.strictEqual(marks(rc, 'H'), 0, 'в) късият завой на косата няма маркер');
+  var uc = Core.underTracks(H, 0, 100, [H], 20);
+  assert.ok(uc.length === 1 && uc[0].self && uc[0].a > 128, 'в) под отиването лежи връщането на същия трак');
+  assert.ok(lo([H]).some(function (x) { return x.trackId === 'H' && x.withId === 'H'; }), 'в) проверката за дубликати го намира');
+  // г) Маркирано застъпване: маркерът е на B, а под обикновения участък на P лежи B. Махнатото (skips) не се брои.
+  var B = { id: 'B', pts: [at(200, 9)].concat(leg(200, 9, 1400, 9)) };
+  var rd = Core.analyze([P, B], 20);
+  assert.ok(marks(rd, 'B') === 1 && marks(rd, 'P') === 0, 'г) маркерът е само на B');
+  assert.ok(Core.underTracks(P, 400, 1000, [P, B], 20)[0].trackId === 'B', 'г) под обикновения участък на P лежи B');
+  B.skips = [{ a: 0, b: Core.prep(B).len }];
+  assert.strictEqual(Core.underTracks(P, 400, 1000, [P, B], 20).length, 0, 'г) след махането на B отдолу няма нищо');
+  assert.strictEqual(lo([P, B]).length, 0, 'г) проверката за дубликати: няма останали');
+  // Пресичане под прав ъгъл не е застъпване.
+  var X = { id: 'X', pts: [at(700, -500)].concat(leg(700, -500, 700, 500)) };
+  assert.strictEqual(Core.underTracks(X, 0, Core.prep(X).len, [P, X], 20).length, 0, 'пресичането не е „под него“');
+  assert.strictEqual(lo([P, X]).length, 0, 'пресичането не е останал дубликат');
+  console.log('1.5 застъпване без маркер (под прага, над отклонението, къс завой) и проверката за дубликати: OK');
+})();
