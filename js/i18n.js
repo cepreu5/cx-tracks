@@ -653,8 +653,6 @@ I18N.add({
   'lang.tr.fail': ['Преводът не стана - интерфейсът се връща към речника.', 'The translation failed - the interface goes back to the dictionary.']
 });
 
-I18N.start();
-
 /* ---- 1.5: един бутон за зареждане, трак под участъка, самозатваряне, „Настройки“, „Проверка за дубликати“ ---- */
 I18N.add({
   'act.addAny': ['Добави .gpx или колекция', 'Add .gpx or collection'],
@@ -694,3 +692,5 @@ I18N.add({
   'msg.collLeft.1': ['Внимание: проверката за дубликати намери {n} застъпване без маркер.', 'Warning: the duplicate check found {n} overlap without a marker.'],
   'msg.collLeft.n': ['Внимание: проверката за дубликати намери {n} застъпвания без маркер.', 'Warning: the duplicate check found {n} overlaps without a marker.']
 });
+
+I18N.start();

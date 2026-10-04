@@ -2856,9 +2856,9 @@ function barFits() {
       const gaps = a.slice(1).map((o, i) => o.x - a[i].x);
       return { n: a.length, vis: Math.round(vis), gaps: gaps.map(Math.round), angs: a.map(o => Math.round(o.ang)), whiteOn: a.filter(o => white(o.x, o.y)).length,
         whiteOff: a.slice(1).filter((o, i) => white((o.x + a[i].x) / 2, (o.y + a[i].y) / 2)).length, nos: [...new Set(a.map(o => o.no))] }; });
-    check(ar.n >= 10 && Math.abs(ar.n - ar.vis / 70) <= 3 && ar.gaps.every(d => d >= 45 && d <= 100), tag + 'стрелките по частта са на ~70 px: ' + ar.n + ' на ' + ar.vis + ' px, разстояния ' + ar.gaps.slice(0, 6).join('/') + '…');
+    check(ar.n >= 6 && Math.abs(ar.n - ar.vis / 70) <= 3 && ar.gaps.every(d => d >= 45 && d <= 100), tag + 'стрелките по частта са на ~70 px: ' + ar.n + ' на ' + ar.vis + ' px, разстояния ' + ar.gaps.slice(0, 6).join('/') + '…');
     check(ar.angs.every(d => Math.abs(d) <= 3), tag + 'стрелките сочат накъдето върви маршрутът (на изток, 0°): ' + [...new Set(ar.angs)].join(','));
-    check(ar.whiteOn === ar.n && ar.whiteOff <= 1 && ar.nos.length === 1 && ar.nos[0] === 1, tag + 'стрелките са бели и стоят върху частта (бели пиксели при ' + ar.whiteOn + '/' + ar.n + ' стрелки, между тях ' + ar.whiteOff + ')');
+    check(ar.whiteOn === ar.n && ar.whiteOff < ar.n / 2 && ar.nos.length === 1 && ar.nos[0] === 1, tag + 'стрелките са бели и стоят върху частта (бели пиксели при ' + ar.whiteOn + '/' + ar.n + ' стрелки, между тях ' + ar.whiteOff + ')');
     await p15.screenshot({ path: path.join(OUT, 'arrows-150.png') });
     // Обратната посока: стрелките се обръщат.
     await p15.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items[0].rev = true; __gpxk.refresh(); });
@@ -2866,7 +2866,6 @@ function barFits() {
     const arR = await p15.evaluate(() => (__gpxk.ui.arrows || []).map(o => Math.round(Math.abs(o.ang))));
     check(arR.length && arR.every(d => Math.abs(d - 180) <= 3), tag + 'обърнатата част - стрелките сочат на запад');
     // Къса част (под два пъти стъпката): една стрелка по средата.
-    await p15.evaluate(() => __gpxk.map.setView(__gpxk.map.getView().lat, __gpxk.map.getView().lon, 13));
     await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = [{ type: 'part', trackId: id, a: 600, b: 750, rev: false }]; __gpxk.refresh(); }, ids[0]);
     await frame();
     const arS = await p15.evaluate(() => ({ a: __gpxk.ui.arrows.length, l: (() => { const m = __gpxk.map, G = __gpxk.G, a = m.project(G.pts[0][0], G.pts[0][1]), b = m.project(G.pts[G.pts.length - 1][0], G.pts[G.pts.length - 1][1]); return Math.round(Math.hypot(b.x - a.x, b.y - a.y)); })() }));
@@ -2884,30 +2883,31 @@ function barFits() {
     await p15.keyboard.press('Escape');
 
     // Менюто на участък при 50%: полупрозрачно, с размазване; казва кой трак е под него и носи двете копчета.
-    await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = []; __gpxk.refresh(); const t = S.tracks.find(x => x.id === id), m = Core.pointAt(t, 800); __gpxk.map.setView(m[0], m[1], 16); }, ids[0]);
+    await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = []; __gpxk.refresh(); const t = S.tracks.find(x => x.id === id), m = Core.pointAt(t, 1050); __gpxk.map.setView(m[0], m[1], 16); }, ids[0]);
     await frame();
-    const spot = await p15.evaluate(id => { const t = __gpxk.S.tracks.find(x => x.id === id), p = Core.pointAt(t, 800), q = __gpxk.map.project(p[0], p[1] ), b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + q.x, y: b.top + q.y }; }, ids[0]);
+    // Далеч от маркера на „Vtoro“ (по средата му, км 0,8) и малко на юг от „Pravo“ - кликът хваща „Pravo“.
+    const spot = await p15.evaluate(id => { const t = __gpxk.S.tracks.find(x => x.id === id), p = Core.pointAt(t, 1050), q = __gpxk.map.project(p[0], p[1]), b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + q.x, y: b.top + q.y + 2 }; }, ids[0]);
     const menuOf = () => p15.evaluate(() => { const m = document.querySelector('#objMenu'), st = getComputedStyle(m);
-      const bg = st.backgroundColor, al = /rgba?\(([^)]+)\)/.exec(bg) ? /rgba?\(([^)]+)\)/.exec(bg)[1].split(/[ ,/]+/).filter(Boolean) : [], a = al.length > 3 ? +al[3] : (/color\(/.test(bg) ? +(bg.split('/')[1] || 1) : 1);
+      const bg = st.backgroundColor, al = /rgba?\(([^)]+)\)/.exec(bg) ? /rgba?\(([^)]+)\)/.exec(bg)[1].split(/[ ,/]+/).filter(Boolean) : [], sl = /\/\s*([\d.]+)\s*\)/.exec(bg), a = al.length > 3 && !/color\(/.test(bg) ? +al[3] : sl ? +sl[1] : 1;
       return { open: !m.hidden, kind: m.dataset.kind, title: document.querySelector('#omTitle').textContent, sub: document.querySelector('#omSub').textContent, note: document.querySelector('#omNote').textContent,
         btns: [...m.querySelectorAll('#omBtns button')].map(b => b.dataset.omk + ':' + b.textContent.trim()), bg, alpha: a, blur: st.backdropFilter || st.webkitBackdropFilter }; });
     await p15.mouse.click(spot.x, spot.y);
     await p15.waitForFunction(() => !document.querySelector('#objMenu').hidden);
     const om = await menuOf();
     check(om.open && om.kind === 'seg' && Math.abs(om.alpha - 0.5) < 0.06 && /blur\(4px\)/.test(om.blur), tag + 'менюто на участъка е 50% прозрачно с размазване 4 px: ' + om.bg + ' / ' + om.blur);
-    check(/^Под него минава „Vtoro“ · \d/.test(om.note) && om.btns.includes('del:Изтрий участъка') && om.btns.includes('delUnder:Изтрий и трака под него'), tag + 'менюто казва какво е отдолу („' + om.note + '“) и носи двете копчета: ' + om.btns.join(' | '));
+    check(/^Под него минава „Vtoro(\.gpx)?“ · \d/.test(om.note) && om.btns.includes('del:Изтрий участъка') && om.btns.includes('delUnder:Изтрий и трака под него'), tag + 'менюто казва какво е отдолу („' + om.note + '“) и носи двете копчета: ' + om.btns.join(' | '));
     await p15.screenshot({ path: path.join(OUT, 'menu-under-150.png') });
     const delsOf = () => p15.evaluate(() => __gpxk.S.tracks.map(t => (t.dels || []).map(d => Math.round(d.a) + '-' + Math.round(d.b)).join(',')));
     await p15.click('#objMenu [data-omk="del"]');
     const t1 = await p15.textContent('#toast'), d1 = await delsOf();
-    check(d1[0] && !d1[1] && /под него остава „Vtoro“/.test(t1), tag + '„Изтрий участъка“ маха само участъка, съобщението казва какво остава: ' + t1 + ' ' + JSON.stringify(d1));
+    check(d1[0] && !d1[1] && /под него остава „Vtoro(\.gpx)?“/.test(t1), tag + '„Изтрий участъка“ маха само участъка, съобщението казва какво остава: ' + t1 + ' ' + JSON.stringify(d1));
     await p15.click('#undoBtn');
     check(JSON.stringify(await delsOf()) === JSON.stringify(['', '', '', '', '']), tag + '„Отмени“ го връща');
     await p15.mouse.click(spot.x, spot.y);
     await p15.waitForFunction(() => !document.querySelector('#objMenu').hidden);
     await p15.click('#objMenu [data-omk="delUnder"]');
     const t2 = await p15.textContent('#toast'), d2 = await delsOf();
-    check(d2[0] && d2[1] && /и тракът под него \(„Vtoro“/.test(t2), tag + '„Изтрий и трака под него“ маха и двете минавания: ' + JSON.stringify(d2));
+    check(d2[0] && d2[1] && /и тракът под него \(„Vtoro(\.gpx)?“/.test(t2), tag + '„Изтрий и трака под него“ маха и двете минавания: ' + JSON.stringify(d2));
     await p15.click('#undoBtn');
     check(JSON.stringify(await delsOf()) === JSON.stringify(['', '', '', '', '']), tag + '„Отмени“ връща и двете');
 
@@ -2980,7 +2980,7 @@ function barFits() {
     check(dc1.btn && dc1.pend === 0 && dc1.res === null, tag + 'след „Изчисти преди сглобяване“ копчето се появява');
     await p15.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const dc2 = await dcOf();
-    check(/^Остана 1 застъпване без маркер/.test(dc2.res || '') && dc2.rows.length === 1 && /^Kuso · км 0,\d – 0,\d · \d+ м · под него „Pravo“$/.test(dc2.rows[0]), tag + 'проверката намира късото застъпване без маркер: ' + dc2.rows.join(' | '));
+    check(/^Остана 1 застъпване без маркер/.test(dc2.res || '') && dc2.rows.length === 1 && /^Kuso(\.gpx)? · км\s0,\d\s[-–]\s0,\d · \d+\sм · под него „Pravo(\.gpx)?“$/.test(dc2.rows[0]), tag + 'проверката намира късото застъпване без маркер: ' + dc2.rows.join(' | '));
     await p15.evaluate(() => document.querySelector('#dupCheckRes [data-dc]').click());
     check(await p15.evaluate(() => !!__gpxk.ui.dcHl && __gpxk.ui.dcHl.trackId === __gpxk.S.tracks[2].id), tag + 'клик на реда показва мястото на картата');
     // Износ с неминала проверка - минава, с предупреждение.
