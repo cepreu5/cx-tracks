@@ -192,7 +192,7 @@ function barFits() {
     'клик върху маркера: ' + dsum.text + ' (Пропуснати ' + dsum.skip + '), маркерът го няма, частите не са пипнати ' + JSON.stringify([dsum.skipShown, dsum.pendShown, dsum.markers.length, dsum.dups, dsum.items]));
 
   // Поле за отклонение (до 3 цифри, без плъзгач): 40 м + Enter - обратният трак на 35 м става дубликат.
-  const tf = await page.evaluate(() => { const i = document.querySelector('#bar .tolInput'); return { ok: !!i, type: i && i.type, max: i && i.maxLength, mode: i && i.inputMode, ranges: document.querySelectorAll('input[type="range"]').length, val: i && i.value }; });
+  const tf = await page.evaluate(() => { const i = document.querySelector('#bar .tolInput'); return { ok: !!i, type: i && i.type, max: i && i.maxLength, mode: i && i.inputMode, ranges: document.querySelectorAll('input[type="range"]:not(#setAlpha)').length, val: i && i.value }; });
   check(tf.ok && tf.type === 'text' && tf.max === 3 && tf.mode === 'numeric' && tf.ranges === 0 && tf.val === '20', 'в лентата е поле за число (до 3 цифри), плъзгач няма: ' + JSON.stringify(tf));
   await page.fill('#bar .tolInput', '');
   await page.type('#bar .tolInput', '9x9912');
@@ -649,8 +649,8 @@ function barFits() {
   check(icos.every(i => i.svg && i.text === '' && i.label && i.title), 'Сателит, Топо и Центрирай са икони <svg> без дума, с aria-label и title: ' + icos.map(i => i.label).join(' / '));
   check(icos[0].label === 'Сателит' && icos[0].radar && icos[1].label === 'Топо' && /^Центрирай/.test(icos[2].label), 'имената на иконите за екранни четци са на място');
   const lbl = await page.evaluate(() => { const t = document.querySelector('#labelsToggle'), c = document.querySelector('#labelsChk').getBoundingClientRect(), sv = document.querySelector('#bar [data-act="save"]').getBoundingClientRect();
-    return { inBar: !!t.closest('#bar'), inTr: !!t.closest('.mapctl.tr'), type: t.type, text: document.querySelector('#labelsChk').textContent.trim(), right: c.left >= sv.right, last: document.querySelector('#labelsChk').nextElementSibling === document.querySelector('#langBtn') && !document.querySelector('#langBtn').nextElementSibling, sameRow: c.top < sv.bottom && sv.top < c.bottom, prev: document.querySelector('#labelsChk').previousElementSibling.dataset.act, vtxOnMap: !!document.querySelector('.mapctl.tr #vtxToggle') }; });
-  check(lbl.inBar && !lbl.inTr && lbl.type === 'checkbox' && lbl.text === 'Имена' && lbl.right && lbl.last && lbl.sameRow && lbl.prev === 'save' && lbl.vtxOnMap, '„Имена“ е квадратче в първия ред на лентата, вдясно от „Запази“, след него е само копчето „Език“; „Точки“ остава на картата: ' + JSON.stringify(lbl));
+    return { inBar: !!t.closest('#bar'), inTr: !!t.closest('.mapctl.tr'), type: t.type, text: document.querySelector('#labelsChk').textContent.trim(), right: c.left >= sv.right, last: document.querySelector('#labelsChk').nextElementSibling === document.querySelector('#langBtn') && document.querySelector('#langBtn').nextElementSibling === document.querySelector('#setBtn') && !document.querySelector('#setBtn').nextElementSibling, sameRow: c.top < sv.bottom && sv.top < c.bottom, prev: document.querySelector('#labelsChk').previousElementSibling.dataset.act, vtxOnMap: !!document.querySelector('.mapctl.tr #vtxToggle') }; });
+  check(lbl.inBar && !lbl.inTr && lbl.type === 'checkbox' && lbl.text === 'Имена' && lbl.right && lbl.last && lbl.sameRow && lbl.prev === 'save' && lbl.vtxOnMap, '„Имена“ е квадратче в първия ред на лентата, вдясно от „Запази“, след него са само „Език“ и (от 1.5) зъбното колелце; „Точки“ остава на картата: ' + JSON.stringify(lbl));
   const layN = () => page.evaluate(() => ({ n: __gpxk.map.layers.length, chk: document.querySelector('#labelsToggle').checked, ls: localStorage.getItem('gpxk.labels') }));
   const lay0 = await layN();
   await page.click('#labelsToggle');
@@ -1107,9 +1107,9 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.4.3' && await p5.isVisible('#appVersion') && /^Версия 1\.4\.3 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.5.0' && await p5.isVisible('#appVersion') && /^Версия 1\.5\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.4.3' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.5.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -2804,6 +2804,216 @@ function barFits() {
     check(JSON.stringify(x3.items) === JSON.stringify(x0.items) && x3.chosen === '1@a', tag + '„Отмени“ връща маршрута на изток: ' + x3.items.join(' '));
     check(!ex.length, tag + 'конзолата е чиста' + (ex.length ? ': ' + ex.join(' | ') : ''));
     await cx.close();
+  }
+
+
+  // ---- 1.5: един бутон за зареждане, по-дебели линии и стрелки, „Настройки“, трак под участъка, самозатваряне, „Проверка за дубликати“ ----
+  {
+    const tag = '1.5: ';
+    const c15 = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true, menus: true });
+    const p15 = await c15.newPage();
+    const e15 = [];
+    p15.on('pageerror', e => e15.push('pageerror: ' + e.message));
+    p15.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) e15.push('console: ' + m.text()); });
+    await p15.goto(url);
+    await p15.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    // Празният екран: едно копче, прозорецът приема и .gpx, и колекция; долното „Зареди колекция“ го няма.
+    const em = await p15.evaluate(() => ({ btns: [...document.querySelectorAll('#empty button')].map(b => b.dataset.act + ':' + b.textContent.trim()), load: document.querySelectorAll('[data-act="load-collection"]').length,
+      exp: document.querySelectorAll('#tracksCard [data-act="export-collection"]').length, add: document.querySelectorAll('#tracksCard [data-act="add-tracks"]').length }));
+    check(em.btns.length === 1 && em.btns[0] === 'add-tracks:Добави .gpx или колекция' && em.load === 0 && em.exp === 1 && em.add === 1, tag + 'празният екран има едно копче „Добави .gpx или колекция“, „Зареди колекция“ го няма никъде, „Изнеси колекцията“ остава: ' + JSON.stringify(em));
+    await p15.click('#empty [data-act="add-tracks"]');
+    check(await p15.evaluate(() => document.querySelector('#dlgImport').open && /\.json/.test(document.querySelector('#fileInput').accept)), tag + 'копчето отваря прозореца, който приема .gpx и колекция (.json)');
+    // Синтетични тракове: P (2 км на изток), B върху P (маркер), Q - късо съвпадение с P без маркер, X1/X2 пресичат P на 60 м едно от друго.
+    const lat0 = 42.52, lon0 = 24.70, KY = 6371008.8 * Math.PI / 180, KX = Math.cos(lat0 * Math.PI / 180) * KY;
+    const poly = v => { const at = (e, n) => [lat0 + n / KY, lon0 + e / KX]; const o = [at(v[0][0], v[0][1])];
+      for (let i = 1; i < v.length; i++) { const a = v[i - 1], b = v[i], k = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10)); for (let j = 1; j <= k; j++) o.push(at(a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k)); }
+      return o; };
+    const gpx = (name, v) => ({ name: name + '.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from('<?xml version="1.0"?><gpx version="1.1" creator="t" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>' + name + '</name><trkseg>' +
+      poly(v).map(p => '<trkpt lat="' + p[0].toFixed(7) + '" lon="' + p[1].toFixed(7) + '"><ele>500</ele></trkpt>').join('') + '</trkseg></trk></gpx>') });
+    await p15.setInputFiles('#fileInput', [gpx('Pravo', [[0, 0], [2000, 0]]), gpx('Vtoro', [[200, 9], [1400, 9]]), gpx('Kuso', [[500, -300], [500, -8], [560, -8], [560, -300]]),
+      gpx('Krast1', [[1700, -300], [1700, 300]]), gpx('Krast2', [[1760, -300], [1760, 300]])]);
+    await p15.waitForFunction(() => __gpxk.S.tracks.length === 5 && !/Чета файл/.test(document.querySelector('#importMsg').textContent));
+    await p15.keyboard.press('Escape');
+    await p15.waitForFunction(() => !document.querySelector('#dlgImport').open && !document.querySelector('#dlgRings').open);
+    const frame = () => p15.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const ids = await p15.evaluate(() => __gpxk.S.tracks.map(t => t.id));
+    check(await p15.evaluate(id => __gpxk.A.pend.length === 1 && __gpxk.A.pend[0].trackId === id, ids[1]), tag + 'един маркер - на „Vtoro“ върху „Pravo“');
+
+    // Ширините: на едно място, източници 4,4 / кант 8, части 7,5 / кант 11.
+    const lw = await p15.evaluate(() => __gpxk.LW);
+    check(lw.track === 4.4 && lw.trackCase === 8 && lw.part === 7.5 && lw.partCase === 11 && lw.trackHl > lw.trackCase && lw.partHl > lw.partCase && lw.arrowStep === 70, tag + 'ширините: източници 4,4 (кант 8), части 7,5 (кант 11), подчертаването е по-широко: ' + JSON.stringify(lw));
+
+    // Маршрутът: целият „Pravo“ като една част; стрелки на ~70 px по посоката на движение.
+    await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), t = S.tracks.find(x => x.id === id);
+      r.items = [{ type: 'part', trackId: id, a: 0, b: Core.prep(t).len, rev: false }]; __gpxk.refresh();
+      __gpxk.map.setBearing(0); const m = Core.pointAt(t, 1000); __gpxk.map.setView(m[0], m[1], 15); }, ids[0]);
+    await frame();
+    const ar = await p15.evaluate(() => { const m = __gpxk.map, G = __gpxk.G, a = (__gpxk.ui.arrows || []).slice().sort((p, q) => p.x - q.x);
+      const pr = (p) => m.project(p[0], p[1]), q0 = pr(G.pts[0]), q1 = pr(G.pts[G.pts.length - 1]);
+      const vis = Math.min(m.w, Math.max(q0.x, q1.x)) - Math.max(0, Math.min(q0.x, q1.x));
+      const cv = document.querySelector('.map-canvas'), cx = cv.getContext('2d'), k = cv.width / cv.getBoundingClientRect().width;
+      const white = (x, y) => { const d = cx.getImageData(Math.round(x * k) - 2, Math.round(y * k) - 2, 5, 5).data; for (let i = 0; i < d.length; i += 4) if (d[i] > 225 && d[i + 1] > 225 && d[i + 2] > 225) return true; return false; };
+      const gaps = a.slice(1).map((o, i) => o.x - a[i].x);
+      return { n: a.length, vis: Math.round(vis), gaps: gaps.map(Math.round), angs: a.map(o => Math.round(o.ang)), whiteOn: a.filter(o => white(o.x, o.y)).length,
+        whiteOff: a.slice(1).filter((o, i) => white((o.x + a[i].x) / 2, (o.y + a[i].y) / 2)).length, nos: [...new Set(a.map(o => o.no))] }; });
+    check(ar.n >= 6 && Math.abs(ar.n - ar.vis / 70) <= 3 && ar.gaps.every(d => d >= 45 && d <= 100), tag + 'стрелките по частта са на ~70 px: ' + ar.n + ' на ' + ar.vis + ' px, разстояния ' + ar.gaps.slice(0, 6).join('/') + '…');
+    check(ar.angs.every(d => Math.abs(d) <= 3), tag + 'стрелките сочат накъдето върви маршрутът (на изток, 0°): ' + [...new Set(ar.angs)].join(','));
+    check(ar.whiteOn === ar.n && ar.whiteOff < ar.n / 2 && ar.nos.length === 1 && ar.nos[0] === 1, tag + 'стрелките са бели и стоят върху частта (бели пиксели при ' + ar.whiteOn + '/' + ar.n + ' стрелки, между тях ' + ar.whiteOff + ')');
+    await p15.screenshot({ path: path.join(OUT, 'arrows-150.png') });
+    // Обратната посока: стрелките се обръщат.
+    await p15.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items[0].rev = true; __gpxk.refresh(); });
+    await frame();
+    const arR = await p15.evaluate(() => (__gpxk.ui.arrows || []).map(o => Math.round(Math.abs(o.ang))));
+    check(arR.length && arR.every(d => Math.abs(d - 180) <= 3), tag + 'обърнатата част - стрелките сочат на запад');
+    // Къса част (под два пъти стъпката): една стрелка по средата.
+    await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = [{ type: 'part', trackId: id, a: 600, b: 750, rev: false }]; __gpxk.refresh(); }, ids[0]);
+    await frame();
+    const arS = await p15.evaluate(() => ({ a: __gpxk.ui.arrows.length, l: (() => { const m = __gpxk.map, G = __gpxk.G, a = m.project(G.pts[0][0], G.pts[0][1]), b = m.project(G.pts[G.pts.length - 1][0], G.pts[G.pts.length - 1][1]); return Math.round(Math.hypot(b.x - a.x, b.y - a.y)); })() }));
+    check(arS.a === 1, tag + 'къса част (' + arS.l + ' px) - една стрелка: ' + arS.a);
+
+    // Зъбното колелце в лентата, до копчето за език; „Настройки“ с трите раздела.
+    const gear = await p15.evaluate(() => { const g = document.querySelector('#bar #setBtn'), l = document.querySelector('#langBtn'); const r = g && g.getBoundingClientRect(), q = l.getBoundingClientRect();
+      return { ok: !!g && r.width > 0, next: g && g.previousElementSibling === l && Math.abs(r.top - q.top) < 4, label: g && g.getAttribute('aria-label') }; });
+    check(gear.ok && gear.next && gear.label === 'Настройки', tag + 'зъбното колелце е в лентата до копчето за език: ' + JSON.stringify(gear));
+    await p15.click('#setBtn');
+    const sd = await p15.evaluate(() => ({ open: document.querySelector('#dlgSettings').open, tabs: [...document.querySelectorAll('#dlgSettings [data-settab]')].map(b => b.textContent.trim()),
+      alpha: document.querySelector('#setAlpha').value, alphaT: document.querySelector('#setAlphaVal').textContent, gap: document.querySelector('#setGap').value, cols: document.querySelectorAll('#setColors input[type="color"]').length }));
+    check(sd.open && sd.tabs.join('|') === 'Менюта|Дупки|Цветове' && sd.alpha === '50' && sd.alphaT === '50%' && sd.gap === '100' && sd.cols === 11, tag + '„Настройки“: раздели ' + sd.tabs.join(', ') + ', прозрачност ' + sd.alphaT + ', праг ' + sd.gap + ' м, ' + sd.cols + ' цвята');
+    await p15.screenshot({ path: path.join(OUT, 'settings-150.png') });
+    await p15.keyboard.press('Escape');
+
+    // Менюто на участък при 50%: полупрозрачно, с размазване; казва кой трак е под него и носи двете копчета.
+    await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = []; __gpxk.refresh(); const t = S.tracks.find(x => x.id === id), m = Core.pointAt(t, 1050); __gpxk.map.setView(m[0], m[1], 16); }, ids[0]);
+    await frame();
+    // Далеч от маркера на „Vtoro“ (по средата му, км 0,8) и малко на юг от „Pravo“ - кликът хваща „Pravo“.
+    const spot = await p15.evaluate(id => { const t = __gpxk.S.tracks.find(x => x.id === id), p = Core.pointAt(t, 1050), q = __gpxk.map.project(p[0], p[1]), b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + q.x, y: b.top + q.y + 2 }; }, ids[0]);
+    const menuOf = () => p15.evaluate(() => { const m = document.querySelector('#objMenu'), st = getComputedStyle(m);
+      const bg = st.backgroundColor, al = /rgba?\(([^)]+)\)/.exec(bg) ? /rgba?\(([^)]+)\)/.exec(bg)[1].split(/[ ,/]+/).filter(Boolean) : [], sl = /\/\s*([\d.]+)\s*\)/.exec(bg), a = al.length > 3 && !/color\(/.test(bg) ? +al[3] : sl ? +sl[1] : 1;
+      return { open: !m.hidden, kind: m.dataset.kind, title: document.querySelector('#omTitle').textContent, sub: document.querySelector('#omSub').textContent, note: document.querySelector('#omNote').textContent,
+        btns: [...m.querySelectorAll('#omBtns button')].map(b => b.dataset.omk + ':' + b.textContent.trim()), bg, alpha: a, blur: st.backdropFilter || st.webkitBackdropFilter }; });
+    await p15.mouse.click(spot.x, spot.y);
+    await p15.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    const om = await menuOf();
+    check(om.open && om.kind === 'seg' && Math.abs(om.alpha - 0.5) < 0.06 && /blur\(4px\)/.test(om.blur), tag + 'менюто на участъка е 50% прозрачно с размазване 4 px: ' + om.bg + ' / ' + om.blur);
+    check(/^Под него минава „Vtoro(\.gpx)?“ · \d/.test(om.note) && om.btns.includes('del:Изтрий участъка') && om.btns.includes('delUnder:Изтрий и трака под него'), tag + 'менюто казва какво е отдолу („' + om.note + '“) и носи двете копчета: ' + om.btns.join(' | '));
+    await p15.screenshot({ path: path.join(OUT, 'menu-under-150.png') });
+    const delsOf = () => p15.evaluate(() => __gpxk.S.tracks.map(t => (t.dels || []).map(d => Math.round(d.a) + '-' + Math.round(d.b)).join(',')));
+    await p15.click('#objMenu [data-omk="del"]');
+    const t1 = await p15.textContent('#toast'), d1 = await delsOf();
+    check(d1[0] && !d1[1] && /под него остава „Vtoro(\.gpx)?“/.test(t1), tag + '„Изтрий участъка“ маха само участъка, съобщението казва какво остава: ' + t1 + ' ' + JSON.stringify(d1));
+    await p15.click('#undoBtn');
+    check(JSON.stringify(await delsOf()) === JSON.stringify(['', '', '', '', '']), tag + '„Отмени“ го връща');
+    await p15.mouse.click(spot.x, spot.y);
+    await p15.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    await p15.click('#objMenu [data-omk="delUnder"]');
+    const t2 = await p15.textContent('#toast'), d2 = await delsOf();
+    check(d2[0] && d2[1] && /и тракът под него \(„Vtoro(\.gpx)?“/.test(t2), tag + '„Изтрий и трака под него“ маха и двете минавания: ' + JSON.stringify(d2));
+    await p15.click('#undoBtn');
+    check(JSON.stringify(await delsOf()) === JSON.stringify(['', '', '', '', '']), tag + '„Отмени“ връща и двете');
+
+    // Прозрачността се сменя от „Настройки“ и важи веднага; остава след презареждане.
+    await p15.click('#setBtn');
+    await p15.evaluate(() => { const r = document.querySelector('#setAlpha'); r.value = '0'; r.dispatchEvent(new Event('input', { bubbles: true })); });
+    await p15.keyboard.press('Escape');
+    await p15.mouse.click(spot.x, spot.y);
+    await p15.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    const om0 = await menuOf();
+    check(om0.alpha > 0.97 && !/blur\([1-9]/.test(om0.blur), tag + 'прозрачност 0% - плътно меню без размазване: ' + om0.bg);
+    await p15.keyboard.press('Escape');
+
+    // Самозатваряне: изтрит участък от 60 м (между двете пресичания) в маршрута - дупката се затваря сама, без пръстен.
+    await p15.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), t = S.tracks.find(x => x.id === id);
+      r.items = [{ type: 'part', trackId: id, a: 0, b: Core.prep(t).len, rev: false }]; __gpxk.refresh(); const m = Core.pointAt(t, 1730); __gpxk.map.setView(m[0], m[1], 17); }, ids[0]);
+    await frame();
+    const shortSec = await p15.evaluate(id => { const s = __gpxk.A.byTrack[id].find(x => x.kind === 'part' && x.len < 100); const t = __gpxk.S.tracks.find(x => x.id === id), p = Core.pointAt(t, (s.a + s.b) / 2), q = __gpxk.map.project(p[0], p[1]), b = document.querySelector('#map').getBoundingClientRect();
+      return { x: b.left + q.x + 0.5, y: b.top + q.y, len: Math.round(s.len) }; }, ids[0]);
+    const delShort = async () => { await p15.mouse.click(shortSec.x, shortSec.y); await p15.waitForFunction(() => !document.querySelector('#objMenu').hidden); await p15.click('#objMenu [data-omk="del"]'); await frame(); };
+    await delShort();
+    const ac = await p15.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); return { gaps: __gpxk.G.gaps.length, rings: (__gpxk.ui.gapRings || []).length, auto: (__gpxk.ui.autoClosed || []).map(o => Math.round(o.d)), count: __gpxk.G.count,
+      items: r.items.map(i => i.type + (i.autoClose ? '*' : '')), toast: document.querySelector('#toast').textContent, arrowsOnLink: (__gpxk.ui.arrows || []).filter(o => !o.no).length }; });
+    check(ac.gaps === 0 && ac.rings === 0 && ac.auto.length === 1 && ac.auto[0] >= 55 && ac.auto[0] <= 70 && ac.items.join(',') === 'part,draw*,part' && ac.count === 2, tag + 'изтрит участък от ' + shortSec.len + ' м: дупката се затваря сама (тънка прекъсната линия, ' + ac.auto[0] + ' м), не е част: ' + JSON.stringify(ac.items));
+    check(/затворена сама/.test(ac.toast) && ac.arrowsOnLink === 0, tag + 'съобщението го казва, а по връзката няма стрелки: ' + ac.toast);
+    const gx = await p15.evaluate(() => { const G = __gpxk.G; let mx = 0; for (let i = 1; i < G.pts.length; i++) mx = Math.max(mx, U.hav(G.pts[i - 1][0], G.pts[i - 1][1], G.pts[i][0], G.pts[i][1])); return Math.round(mx); });
+    check(gx >= 55 && gx <= 70, tag + 'затворената дупка влиза в маршрута (и в .gpx) като права отсечка от ' + gx + ' м');
+    await p15.click('#undoBtn');
+    // Праг 0 („никога“): същото изтриване оставя дупката с пръстена.
+    await p15.click('#setBtn');
+    await p15.click('#dlgSettings [data-settab="gaps"]');
+    await p15.fill('#setGap', '0');
+    await p15.keyboard.press('Escape');
+    await delShort();
+    const ac0 = await p15.evaluate(() => ({ gaps: __gpxk.G.gaps.length, auto: (__gpxk.ui.autoClosed || []).length, set: JSON.parse(localStorage.getItem('gpxk.settings')) }));
+    check(ac0.gaps === 1 && ac0.auto === 0 && ac0.set.gap === 0 && ac0.set.alpha === 0, tag + 'праг 0: дупката остава с пръстена; настройките са в gpxk.settings: ' + JSON.stringify(ac0.set));
+    await p15.click('#undoBtn');
+
+    // Цвят от „Настройки“: важи веднага на картата и остава след презареждане; „Нулирай цветовете“ го връща.
+    await p15.click('#setBtn');
+    await p15.click('#dlgSettings [data-settab="colors"]');
+    await p15.evaluate(() => { const i = document.querySelector('#setColors [data-setcol="route-a"]'); i.value = '#ff00ff'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+    await p15.keyboard.press('Escape');
+    await frame();
+    const colPx = () => p15.evaluate(() => { const G = __gpxk.G, m = __gpxk.map, cv = document.querySelector('.map-canvas'), cx = cv.getContext('2d'), k = cv.width / cv.getBoundingClientRect().width; let n = 0;
+      G.pts.forEach(p => { const q = m.project(p[0], p[1]); if (q.x < 0 || q.y < 0 || q.x >= m.w || q.y >= m.h) return; const d = cx.getImageData(Math.round(q.x * k), Math.round(q.y * k), 1, 1).data; if (d[0] > 220 && d[1] < 60 && d[2] > 220) n++; }); return n; });
+    check(await colPx() > 5, tag + 'цветът на част А е сменен веднага на картата');
+    await p15.reload();
+    await p15.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    await frame();
+    const kept = await p15.evaluate(() => ({ a: getComputedStyle(document.documentElement).getPropertyValue('--app-route-a').trim(), set: __gpxk.SET }));
+    check(kept.a === '#ff00ff' && kept.set.alpha === 0 && kept.set.gap === 0, tag + 'след презареждане цветът и настройките остават: ' + JSON.stringify(kept));
+    await p15.click('#setBtn');
+    await p15.click('#dlgSettings [data-settab="colors"]');
+    await p15.click('#setColorsReset');
+    const rs = await p15.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-route-a').trim());
+    check(rs === '#1d3f9e', tag + '„Нулирай цветовете“ връща цвета на темата: ' + rs);
+    await p15.click('#setReset');
+    check(await p15.evaluate(() => __gpxk.SET.alpha === 50 && __gpxk.SET.gap === 100 && document.querySelector('#setAlpha').value === '50'), tag + '„Връщане по подразбиране“: 50% и 100 м');
+    await p15.keyboard.press('Escape');
+
+    // „Проверка за дубликати“: не се вижда, докато има маркиран дубликат; след изчистването се появява и отчита.
+    await p15.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = []; __gpxk.refresh(); });
+    const dcOf = () => p15.evaluate(() => ({ btn: !document.querySelector('#dupCheckBtn').hidden, res: document.querySelector('#dupCheckRes').hidden ? null : document.querySelector('#dupCheckRes').textContent.replace(/\s+/g, ' ').trim(),
+      rows: [...document.querySelectorAll('#dupCheckRes [data-dc]')].map(b => b.textContent.trim()), pend: __gpxk.A.pend.length, row: document.querySelector('#dupCheckBtn').previousElementSibling.id }));
+    const dc0 = await dcOf();
+    check(!dc0.btn && dc0.pend === 1 && dc0.row === 'cleanBtn', tag + 'при маркиран дубликат „Проверка за дубликати“ не се вижда (стои до „Изчисти преди сглобяване“)');
+    await p15.evaluate(() => document.querySelector('#cleanBtn').click());
+    const dc1 = await dcOf();
+    check(dc1.btn && dc1.pend === 0 && dc1.res === null, tag + 'след „Изчисти преди сглобяване“ копчето се появява');
+    await p15.evaluate(() => document.querySelector('#dupCheckBtn').click());
+    const dc2 = await dcOf();
+    check(/^Остана 1 застъпване без маркер/.test(dc2.res || '') && dc2.rows.length === 1 && /^Kuso(\.gpx)? · км\s0,\d\s[-–]\s0,\d · \d+\sм · под него „Pravo(\.gpx)?“$/.test(dc2.rows[0]), tag + 'проверката намира късото застъпване без маркер: ' + dc2.rows.join(' | '));
+    await p15.evaluate(() => document.querySelector('#dupCheckRes [data-dc]').click());
+    check(await p15.evaluate(() => !!__gpxk.ui.dcHl && __gpxk.ui.dcHl.trackId === __gpxk.S.tracks[2].id), tag + 'клик на реда показва мястото на картата');
+    // Износ с неминала проверка - минава, с предупреждение.
+    const [dl1] = await Promise.all([p15.waitForEvent('download'), p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click())]);
+    await p15.waitForFunction(() => /Изнесени|изнесена|колекция/i.test(document.querySelector('#toast').textContent));
+    const w1 = await p15.textContent('#toast');
+    check(!!dl1 && /Внимание: проверката за дубликати намери 1 застъпване без маркер/.test(w1), tag + 'износът минава с предупреждение: ' + w1);
+    // Махнатото застъпване (Kuso се скрива) - резултатът пада; нова проверка: „Няма останали дубликати“.
+    await p15.evaluate(() => { const c = document.querySelector('#tracksList li[data-track="' + __gpxk.S.tracks[2].id + '"] input[data-tr="vis"]'); c.checked = false; c.dispatchEvent(new Event('change', { bubbles: true })); });
+    await p15.waitForFunction(() => !__gpxk.A.byTrack[__gpxk.S.tracks[2].id]);
+    const dcH = await dcOf();
+    check(dcH.res === null && dcH.btn, tag + 'след промяна по колекцията старият резултат пада');
+    await p15.evaluate(() => document.querySelector('#dupCheckBtn').click());
+    const dc3 = await dcOf();
+    check(dc3.res === 'Няма останали дубликати.' && !dc3.rows.length, tag + 'без късото застъпване: ' + dc3.res);
+    const [dl2] = await Promise.all([p15.waitForEvent('download'), p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click())]);
+    await frame();
+    const w2 = await p15.textContent('#toast');
+    check(!!dl2 && !/Внимание/.test(w2), tag + 'след минала проверка износът е без предупреждение: ' + w2);
+
+    // 390 px: лентата се събира и с колелцето, менюто и „Настройки“ стоят в екрана.
+    await p15.setViewportSize({ width: 390, height: 844 });
+    await frame();
+    const bf = await p15.evaluate(barFits);
+    const g390 = await p15.evaluate(() => { const r = document.querySelector('#setBtn').getBoundingClientRect(); return r.width > 0 && r.right <= innerWidth; });
+    check(!bf.length && g390, tag + '390 px: лентата се събира, колелцето се вижда' + (bf.length ? ': ' + bf.join(' ') : ''));
+    await p15.click('#setBtn');
+    const s390 = await p15.evaluate(() => { const r = document.querySelector('#dlgSettings').getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; });
+    check(s390, tag + '390 px: „Настройки“ се събират в екрана');
+    await p15.screenshot({ path: path.join(OUT, 'settings-390.png') });
+    await p15.keyboard.press('Escape');
+    check(!e15.length, tag + 'конзолата е чиста' + (e15.length ? ': ' + e15.join(' | ') : ''));
+    await c15.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));

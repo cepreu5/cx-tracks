@@ -47,6 +47,7 @@
     <button class="btn" data-act="save" data-i18n="act.save" data-i18n-title="bar.save.title" title="Свали .gpx и запиши маршрута в „Записани маршрути“">Запази</button>
     <label class="chk bar-chk" id="labelsChk" data-i18n-title="bar.labels.title" title="Имената и номерата на пътищата върху сателитните снимки"><input type="checkbox" id="labelsToggle" checked> <span data-i18n="bar.labels">Имена</span></label>
     <button class="btn lang-btn" type="button" data-act="lang" id="langBtn" data-i18n-title="lang.btn.title" data-i18n-aria="lang.btn.aria" title="Език на интерфейса" aria-label="Език на интерфейса" aria-haspopup="dialog"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></svg><span id="langCode" data-i18n="lang.code">БГ</span></button>
+    <button class="btn ico set-btn" type="button" data-act="settings" id="setBtn" data-i18n-title="set.h" data-i18n-aria="set.h" title="Настройки" aria-label="Настройки" aria-haspopup="dialog"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
   </div>
   <div class="bar-row tools" id="tools">
     <div class="seg" role="group" data-i18n-aria="mode.aria" aria-label="Режим">
@@ -122,8 +123,7 @@
     <b data-i18n="empty.t">Тук ще се появи маршрутът</b>
     <p data-i18n="empty.p">Няма заредени тракове. Зареди колекция от файл или добави отделни .gpx.</p>
     <div class="row">
-      <button class="btn pri" data-act="load-collection" data-i18n="act.loadColl">Зареди колекция</button>
-      <button class="btn" data-act="add-tracks" data-i18n="act.addGpx">Добави .gpx</button>
+      <button class="btn pri" data-act="add-tracks" data-i18n="act.addAny">Добави .gpx или колекция</button>
     </div>
   </div>
   <div id="tip" class="tip" hidden></div>
@@ -136,6 +136,7 @@
   <div id="objMenu" class="objmenu" role="dialog" aria-labelledby="omTitle" hidden>
     <b id="omTitle" class="om-t"></b>
     <span id="omSub" class="om-sub muted small"></span>
+    <span id="omNote" class="om-note small"></span>
     <div id="omBtns" class="om-btns"></div>
     <button type="button" class="btn sm om-cancel" data-om="cancel" data-i18n="act.cancel">Отказ</button>
   </div>
@@ -230,7 +231,6 @@
         <div class="fold-b" id="tracksBody" hidden>
         <ul id="tracksList" class="rows tracks"></ul>
         <div class="row">
-          <button class="btn sm" data-act="load-collection" data-i18n="act.loadColl">Зареди колекция</button>
           <button class="btn sm" data-act="export-collection" data-i18n="act.exportColl">Изнеси колекцията</button>
         </div>
         </div>
@@ -244,7 +244,9 @@
         <p class="dups-sum small" id="dupsGaps" hidden></p>
         <div class="row">
           <button class="btn sm pri" data-act="clean-route" id="cleanBtn" data-i18n="dups.clean" data-i18n-title="dups.clean.title" title="Маха всички застъпени участъци, като от всяка група остава по едно копие (както клик върху маркер), и свързва направо отворените дупки до 500 м (по-дългите остават за чертане). &quot;Отмени&quot; връща всичко наведнъж." disabled>Изчисти преди сглобяване</button>
+          <button class="btn sm" data-act="dup-check" id="dupCheckBtn" data-i18n="dc.btn" data-i18n-title="dc.btn.title" title="Нова проверка по цялата колекция за застъпвания без маркер: под прага от 100 м, разминаване над отклонението, къс завой на косата." hidden>Проверка за дубликати</button>
         </div>
+        <div id="dupCheckRes" class="dupcheck" role="status" aria-live="polite" hidden></div>
         <p class="muted small"><span data-i18n="dups.note1">Участък, който минава по-близо от </span><b class="tolVal"></b><span data-i18n="dups.note2"> до вече приетото трасе, получава маркер по средата си. Числото в маркера казва колко застъпени участъка събира кликът; посочването (на телефон - задържането) осветява удвоения участък. Клик върху маркера маха застъпените участъци от маршрута и от картата, като остава едно копие; "Отмени" ги връща. Дупка, по-къса от отклонението, се затваря сама; по-дългата получава кехлибарен пръстен, който я свързва направо, ако е до 500 м. Отклонението се сменя с полето "Отклонение" в лентата.</span></p>
         </div>
       </section>
@@ -443,6 +445,31 @@
       <p class="muted small" id="langTrAbout" data-i18n="lang.tr.about">Вграденият в браузъра преводач превежда речника веднъж, на устройството, без външна услуга. Имената на маршрути, спирки, тракове и файлове не се превеждат.</p>
     </fieldset>
     <div class="row end"><button class="btn" value="close" id="langClose" data-i18n="act.close">Затвори</button></div>
+  </form>
+</dialog>
+
+<dialog id="dlgSettings" class="dlg dlg-sm">
+  <form method="dialog" id="setForm">
+    <h3 data-i18n="set.h">Настройки</h3>
+    <div class="seg set-tabs" role="tablist" data-i18n-aria="set.h" aria-label="Настройки">
+      <button type="button" role="tab" data-settab="menus" class="on" aria-selected="true" data-i18n="set.tab.menus">Менюта</button>
+      <button type="button" role="tab" data-settab="gaps" aria-selected="false" data-i18n="set.tab.gaps">Дупки</button>
+      <button type="button" role="tab" data-settab="colors" aria-selected="false" data-i18n="set.tab.colors">Цветове</button>
+    </div>
+    <section class="set-pane" data-setpane="menus" role="tabpanel">
+      <label class="set-row"><span data-i18n="set.alpha">Прозрачност на менютата</span><input type="range" id="setAlpha" min="0" max="100" step="5" value="50"><b class="num" id="setAlphaVal">50%</b></label>
+      <p class="muted small" data-i18n="set.alpha.note">Важи за трите менюта над картата: на разклонението, на участъка и на точката. Зад менюто има леко размазване (4 px), за да се четат буквите върху картата. 0% - плътно меню.</p>
+    </section>
+    <section class="set-pane" data-setpane="gaps" role="tabpanel" hidden>
+      <label class="set-row"><span data-i18n="set.gap">Затваряй сами дупките до</span><input type="text" id="setGap" class="num" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" value="100"><span data-i18n="unit.m">м</span></label>
+      <p class="muted small" data-i18n="set.gap.note">0 значи никога: всички дупки остават с пръстен и с двата бутона. Таван 500 м. Важи след махнат дубликат, махнато излишно разклонение и изтрит участък; затворената сама дупка е тънка прекъсната линия - в маршрута и в .gpx е, но не е част.</p>
+    </section>
+    <section class="set-pane" data-setpane="colors" role="tabpanel" hidden>
+      <div class="set-colors" id="setColors"></div>
+      <p><button type="button" class="btn sm" id="setColorsReset" data-i18n="set.col.reset">Нулирай цветовете</button></p>
+    </section>
+    <p class="muted small" data-i18n="set.note">Настройките са за това устройство: пазят се в браузъра и не пътуват с колекцията.</p>
+    <div class="row end"><button type="button" class="btn" id="setReset" data-i18n="set.reset">Връщане по подразбиране</button><span class="sp"></span><button class="btn pri" value="close" id="setClose" data-i18n="act.close">Затвори</button></div>
   </form>
 </dialog>
 

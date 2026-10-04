@@ -574,3 +574,41 @@ td .num, td.num { font-family: var(--app-mono); }
 .rings-list li { border-bottom: 1px solid var(--app-line); }
 .ring-row { display: flex; gap: 8px; align-items: center; padding: 8px 2px; font-size: 13px; cursor: pointer; }
 .ring-row input { flex-shrink: 0; }
+
+/* 1.5: менютата над картата са полупрозрачни (--menu-fill - колко от фона остава, от „Настройки“),
+   с леко размазване отзад, за да се четат буквите върху шосе и снимка. */
+.objmenu, .pointmenu {
+  background: color-mix(in srgb, var(--app-surface) var(--menu-fill, 50%), transparent);
+  -webkit-backdrop-filter: blur(var(--menu-blur, 4px));
+  backdrop-filter: blur(var(--menu-blur, 4px));
+}
+.objmenu .btn:not(.pri), .pointmenu .btn:not(.pri) { background: color-mix(in srgb, var(--app-surface) var(--menu-fill, 50%), transparent); }
+.objmenu .om-note { margin: -2px 0 4px; color: var(--app-warn); font-weight: 600; overflow-wrap: anywhere; }
+.objmenu .om-note:empty { display: none; }
+
+/* Зъбното колелце в лентата и прозорецът „Настройки“ */
+#bar .set-btn { flex-shrink: 0; padding: 4px 6px; min-width: 32px; }
+.set-btn .ico-svg { width: 18px; height: 18px; }
+.set-tabs { display: flex; margin-bottom: 12px; }
+.set-tabs button { flex: 1; }
+.set-pane { margin-bottom: 8px; }
+.set-pane p { margin: 6px 0 0; }
+.set-row { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.set-row > span:first-child { flex: 1; }
+.set-row input[type="range"] { width: 130px; accent-color: var(--app-accent); }
+.set-row b { min-width: 42px; text-align: right; }
+#setGap { width: 56px; text-align: right; font: inherit; font-family: var(--app-mono); padding: 4px 6px; border: 1px solid var(--app-line-strong); border-radius: var(--app-radius-sm); background: var(--app-surface); color: var(--app-ink); }
+.set-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 6px 10px; }
+.set-col { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--app-line); cursor: pointer; }
+.set-col input[type="color"] { width: 30px; height: 24px; padding: 0; border: 1px solid var(--app-line-strong); border-radius: var(--app-radius-sm); background: none; cursor: pointer; }
+.set-col.changed span { font-weight: 600; }
+#dlgSettings > form > p.muted { margin: 4px 0 12px; }
+
+/* „Проверка за дубликати“: резултатът под копчето */
+.dupcheck { margin: 8px 0 0; padding: 8px 10px; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); background: var(--app-surface-2); }
+.dupcheck p { margin: 0; }
+.dupcheck .dc-ok { color: var(--app-ok); font-weight: 600; }
+.dupcheck .dc-warn { color: var(--app-warn); font-weight: 600; }
+.dc-list { margin: 6px 0 0; padding-left: 20px; max-height: 40vh; overflow: auto; }
+.dc-list li { padding: 2px 0; }
+.dc-list .linkbtn { text-align: left; font-family: inherit; }

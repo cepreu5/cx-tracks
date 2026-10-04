@@ -653,4 +653,44 @@ I18N.add({
   'lang.tr.fail': ['Преводът не стана - интерфейсът се връща към речника.', 'The translation failed - the interface goes back to the dictionary.']
 });
 
+/* ---- 1.5: един бутон за зареждане, трак под участъка, самозатваряне, „Настройки“, „Проверка за дубликати“ ---- */
+I18N.add({
+  'act.addAny': ['Добави .gpx или колекция', 'Add .gpx or collection'],
+  'om.under': ['Под него минава „{name}“ · {len}', 'Below it runs “{name}” · {len}'],
+  'om.underSelf': ['Под него минава пак „{name}“ · {len}', 'Below it “{name}” runs again · {len}'],
+  'om.delUnder': ['Изтрий и трака под него', 'Delete it and the track below'],
+  'om.delUnder.title': ['Изтрий участъка и трака под него', 'Delete the stretch and the track below it'],
+  'msg.segDelLeft': ['Участъкът е изтрит ({len}); под него остава „{name}“. "Отмени" го връща.', 'The stretch is deleted ({len}); “{name}” stays below it. “Undo” brings it back.'],
+  'msg.segDelUnder': ['Изтрити са участъкът ({len}) и тракът под него („{name}“, {len2}). "Отмени" връща и двата.', 'The stretch ({len}) and the track below it (“{name}”, {len2}) are deleted. “Undo” brings both back.'],
+  'msg.autoClosed.1': ['Малка дупка (до {max}) е затворена сама.', 'A small gap (up to {max}) closed by itself.'],
+  'msg.autoClosed.n': ['{n} малки дупки (до {max}) са затворени сами.', '{n} small gaps (up to {max}) closed by themselves.'],
+  'set.h': ['Настройки', 'Settings'],
+  'set.tab.menus': ['Менюта', 'Menus'],
+  'set.tab.gaps': ['Дупки', 'Gaps'],
+  'set.tab.colors': ['Цветове', 'Colours'],
+  'set.alpha': ['Прозрачност на менютата', 'Menu transparency'],
+  'set.alpha.note': ['Важи за трите менюта над картата: на разклонението, на участъка и на точката. Зад менюто има леко размазване (4 px), за да се четат буквите върху картата. 0% - плътно меню.', 'Applies to the three menus over the map: junction, stretch and point. A light blur (4 px) behind the menu keeps the letters readable over the map. 0% - a solid menu.'],
+  'set.gap': ['Затваряй сами дупките до', 'Close gaps by themselves up to'],
+  'set.gap.note': ['0 значи никога: всички дупки остават с пръстен и с двата бутона. Таван 500 м. Важи след махнат дубликат, махнато излишно разклонение и изтрит участък; затворената сама дупка е тънка прекъсната линия - в маршрута и в .gpx е, но не е част.', '0 means never: every gap keeps its ring and both buttons. Maximum 500 m. Applies after a removed duplicate, a removed extra junction and a deleted stretch; a gap closed by itself is a thin dashed line - it is in the route and the .gpx, but it is not a part.'],
+  'set.col.track': ['трак {n}', 'track {n}'],
+  'set.col.a': ['част А', 'part A'],
+  'set.col.b': ['част Б', 'part B'],
+  'set.col.casing': ['кант', 'casing'],
+  'set.col.reset': ['Нулирай цветовете', 'Reset colours'],
+  'set.reset': ['Връщане по подразбиране', 'Restore defaults'],
+  'set.note': ['Настройките са за това устройство: пазят се в браузъра и не пътуват с колекцията.', 'Settings belong to this device: they stay in the browser and do not travel with the collection.'],
+  'dc.btn': ['Проверка за дубликати', 'Check for duplicates'],
+  'dc.btn.title': ['Нова проверка по цялата колекция за застъпвания без маркер: под прага от 100 м, разминаване над отклонението, къс завой на косата.', 'A fresh check of the whole collection for overlaps without a marker: under the 100 m threshold, drifting apart beyond the tolerance, a short hairpin turn.'],
+  'dc.none': ['Няма останали дубликати.', 'No duplicates left.'],
+  'dc.found.1': ['Остана {n} застъпване без маркер - клик на реда го показва на картата:', '{n} overlap without a marker is left - click the row to see it on the map:'],
+  'dc.found.n': ['Останаха {n} застъпвания без маркер - клик на ред го показва на картата:', '{n} overlaps without a marker are left - click a row to see it on the map:'],
+  'dc.row': ['{name} · {km} · {len} · под него „{with}“', '{name} · {km} · {len} · “{with}” below it'],
+  'dc.rowSelf': ['{name} · {km} · {len} · минава пак по себе си', '{name} · {km} · {len} · runs over itself again'],
+  'msg.collPend.1': ['Внимание: остава {n} маркиран дубликат.', 'Warning: {n} marked duplicate is left.'],
+  'msg.collPend.n': ['Внимание: остават {n} маркирани дубликата.', 'Warning: {n} marked duplicates are left.'],
+  'msg.collNoCheck': ['Внимание: „Проверка за дубликати“ не е пускана след последната промяна.', 'Warning: “Check for duplicates” has not been run since the last change.'],
+  'msg.collLeft.1': ['Внимание: проверката за дубликати намери {n} застъпване без маркер.', 'Warning: the duplicate check found {n} overlap without a marker.'],
+  'msg.collLeft.n': ['Внимание: проверката за дубликати намери {n} застъпвания без маркер.', 'Warning: the duplicate check found {n} overlaps without a marker.']
+});
+
 I18N.start();
