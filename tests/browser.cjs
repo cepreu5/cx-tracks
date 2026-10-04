@@ -22,9 +22,9 @@ const server = http.createServer((req, res) => {
 let failures = 0;
 function check(ok, msg) { console.log((ok ? 'OK   ' : 'FAIL ') + msg); if (!ok) failures++; }
 // Изпълняват се в страницата.
-// Групата горе вляво ("↓", "Лента", "Следене") срещу реда горе вдясно: първото копче е на реда, групата не застъпва реда.
+// Групата горе вляво ("Лента", "Следене"; 1.6: без "↓") срещу реда горе вдясно: първото копче е на реда, групата не застъпва реда.
 function handleRow() {
-  const f = document.querySelector('#toPanelBtn').getBoundingClientRect(), a = document.querySelector('.maptl').getBoundingClientRect(), b = document.querySelector('.mapctl.tr').getBoundingClientRect();
+  const f = document.querySelector('#barHandle').getBoundingClientRect(), a = document.querySelector('.maptl').getBoundingClientRect(), b = document.querySelector('.mapctl.tr').getBoundingClientRect();
   return { sameRow: f.top < b.bottom && b.top < f.bottom, xOverlap: !(a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top), info: Math.round(a.left) + '-' + Math.round(a.right) + ' / ' + Math.round(b.left) + '-' + Math.round(b.right) + ' px, y ' + Math.round(a.top) + '/' + Math.round(b.top) };
 }
 function vis(sel) {
@@ -51,7 +51,7 @@ function rotState() {
 // Копчето "Следене / Стоп" върху картата: видимо, текст, състояние и място спрямо "Лента" и контролите вдясно.
 function fabState() {
   const b = document.querySelector('#followMapBtn'), r = b.getBoundingClientRect(), t = document.querySelector('.mapctl.tr').getBoundingClientRect();
-  const hit = h => !(r.right <= h.left || h.right <= r.left || r.bottom <= h.top || h.bottom <= r.top), h = document.querySelector('#barHandle').getBoundingClientRect(), d = document.querySelector('#toPanelBtn').getBoundingClientRect();
+  const hit = h => !(r.right <= h.left || h.right <= r.left || r.bottom <= h.top || h.bottom <= r.top), h = document.querySelector('#barHandle').getBoundingClientRect(), d = h;
   return { shown: r.width > 0 && getComputedStyle(b).display !== 'none', text: b.textContent.trim(), pressed: b.getAttribute('aria-pressed'), label: b.getAttribute('aria-label'), danger: b.classList.contains('danger'),
     left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top),
     overTr: !(r.right <= t.left || t.right <= r.left || r.bottom <= t.top || t.bottom <= r.top), overHandle: hit(h) || hit(d), afterHandle: r.left >= h.right - 0.5 || r.top >= h.bottom - 0.5 };
@@ -103,19 +103,21 @@ function barFits() {
   // оставя менютата, newContext({ rings: true }) - списъка.
   // От 1.3.1 „Части в маршрута“ и „Тракове-източници“ са свити при първо пускане; досегашните проверки тръгват
   // с двата панела отворени, newContext({ folds: true }) - с истинските начални стойности.
+  // От 1.6 клик върху маркер на дубликат отваря меню; досегашните проверки го отговарят с „Затвори направо“ (днешния
+  // клик), newContext({ dupMenu: true }) оставя менюто.
   browser.newContext = async (o = {}) => {
-    const { splash, menus, rings, folds, ...rest } = o;
+    const { splash, menus, rings, folds, dupMenu, ...rest } = o;
     const c = await rawContext(Object.assign({ locale: 'bg-BG' }, rest));
     if (!folds) await c.addInitScript(() => { try { if (localStorage.getItem('gpxk.fold') == null) localStorage.setItem('gpxk.fold', JSON.stringify({ parts: true, tracks: true })); } catch (e) { /* */ } });
     if (!splash) await c.addInitScript(() => { try { if (localStorage.getItem('gpxk.splash') == null) localStorage.setItem('gpxk.splash', 'true'); } catch (e) { /* */ } });
     if (!rings) await c.addInitScript(() => { addEventListener('DOMContentLoaded', () => { const d = document.getElementById('dlgRings'); if (d) new MutationObserver(() => { if (d.open) document.getElementById('ringsKeep').click(); }).observe(d, { attributes: true, attributeFilter: ['open'] }); }); });
-    if (!menus) {
+    if (!menus || !dupMenu) {
       const rawPage = c.newPage.bind(c);
       c.newPage = async () => {
         const pg = await rawPage(), click = pg.mouse.click.bind(pg.mouse);
         pg.mouse.click = async (x, y, opt) => {
           await click(x, y, opt);
-          await pg.evaluate(() => { const m = document.querySelector('#objMenu'); if (m && !m.hidden && m.dataset.kind === 'seg') m.querySelector('#omBtns button').click(); }).catch(() => {});
+          await pg.evaluate(k => { const m = document.querySelector('#objMenu'); if (m && !m.hidden && k.includes(m.dataset.kind)) m.querySelector('#omBtns button').click(); }, [menus ? '' : 'seg', dupMenu ? '' : 'dup']).catch(() => {});
         };
         return pg;
       };
@@ -618,8 +620,8 @@ function barFits() {
   const fab380 = await page.evaluate(fabState);
   check(fab380.shown && !fab380.overTr && !fab380.overHandle, 'на 380 px "Следене" върху картата не застъпва нищо: ' + JSON.stringify(fab380));
   // 1.1.5: редица, когато се събират вляво от реда горе вдясно (8 px запас), иначе стълбичка.
-  const st2 = await page.evaluate(tlFit), st2ok = st2.n === 3 && !st2.over && (st2.need <= st2.room - 1 ? st2.row : st2.need > st2.room + 1 ? st2.col : st2.row || st2.col);
-  check(await page.evaluate(() => document.body.classList.contains('bar-hidden')) && await page.isVisible('#barHandle') && st2ok, 'на 380 px: лентата скрита, "↓", "Лента" и "Следене" са ' + (st2.row ? 'в редица' : 'в стълбичка') + ', както им стига мястото: ' + JSON.stringify(st2));
+  const st2 = await page.evaluate(tlFit), st2ok = st2.n === 2 && !st2.over && (st2.need <= st2.room - 1 ? st2.row : st2.need > st2.room + 1 ? st2.col : st2.row || st2.col);
+  check(await page.evaluate(() => document.body.classList.contains('bar-hidden')) && await page.isVisible('#barHandle') && st2ok, 'на 380 px: лентата скрита, "Лента" и "Следене" (1.6: без "↓") са ' + (st2.row ? 'в редица' : 'в стълбичка') + ', както им стига мястото: ' + JSON.stringify(st2));
   await page.screenshot({ path: path.join(OUT, 'bar-hidden-380.png') });
   await page.click('#barHandle');
   check(await page.evaluate(() => !document.body.classList.contains('bar-hidden') && document.querySelector('#barHandle').dataset.dir === 'up'), 'на 380 px табчето връща лентата, стрелкичката сочи нагоре');
@@ -694,11 +696,12 @@ function barFits() {
   // 1.1.4: радар, кръглата "Лента", "↓" на картата, "Отмени" горе вдясно, "Точки" без дума, по-широко име.
   function tl114() {
     const R = s => document.querySelector(s).getBoundingClientRect(), hit = (p, q) => q.width > 0 && !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top);
-    const kids = [...document.querySelector('.maptl').children].map(e => e.id), d = R('#toPanelBtn'), h = R('#barHandle'), f = R('#followMapBtn'), bar = R('#bar'), tr = R('.mapctl.tr');
+    // 1.6: горнолявата "↓" я няма - нейната роля е на плаващата стрелка долу вдясно; групата е "Лента" и "Следене".
+    const kids = [...document.querySelector('.maptl').children].map(e => e.id), h = R('#barHandle'), d = h, f = R('#followMapBtn'), bar = R('#bar'), tr = R('.mapctl.tr');
     const hb = document.querySelector('#barHandle'), u = document.querySelector('#undoBtn'), sat = document.querySelector('.seg.base [data-base="sat"]');
     return { kids: kids.join(','), dir: hb.dataset.dir, arr: hb.querySelector('.bt-arr').getAttribute('d'), squares: hb.querySelectorAll('svg rect').length, round: [d, h].every(r => Math.round(r.width) === 36 && Math.round(r.height) === 36) && getComputedStyle(hb).borderRadius === '50%',
-      hText: hb.textContent.trim(), dText: document.querySelector('#toPanelBtn').textContent.trim(), dSvg: !!document.querySelector('#toPanelBtn svg'),
-      row: d.right <= h.left && Math.abs(d.top - h.top) < 1, col: d.bottom <= h.top && Math.abs(d.left - h.left) < 1, fShown: f.width > 0, fAfter: f.left >= h.right - 0.5 || f.top >= h.bottom - 0.5,
+      hText: hb.textContent.trim(), dText: '', dSvg: !!document.querySelector('#toTopBtn svg'), noTl: !document.querySelector('#toPanelBtn, .maptl [data-act="to-panel"]'),
+      row: f.left >= h.right - 0.5 && Math.abs(f.top + f.height / 2 - h.top - h.height / 2) < 1, col: f.top >= h.bottom - 0.5 && Math.abs(f.left - h.left) < 1, fShown: f.width > 0, fAfter: f.left >= h.right - 0.5 || f.top >= h.bottom - 0.5,
       below: d.top >= bar.bottom - 0.5 || bar.bottom <= 0, overTr: [d, h, f].some(r => hit(r, tr)), inScreen: [d, h].every(r => r.left >= 0 && r.right <= innerWidth),
       radar: sat.querySelectorAll('svg circle').length === 3 && !sat.querySelector('svg rect') && sat.textContent.trim() === '',
       undoPos: u.parentElement.classList.contains('tr') && u.previousElementSibling.classList.contains('base') && u.nextElementSibling.id === 'vtxChk', undoSvg: !!u.querySelector('svg') && u.textContent.trim() === '' && u.getAttribute('aria-label') === 'Отмени',
@@ -739,9 +742,9 @@ function barFits() {
     const A = await page.evaluate(tl114), FA = await page.evaluate(tlFit), wn = w + ' px' + (pts ? ' (с точки)' : '');
     check(FA.vtx === !!pts, 'на ' + wn + ' квадратчето „Точки“ ' + (pts ? 'е' : 'не е') + ' в реда вдясно');
     check(tlOk(FA), 'на ' + wn + ' при отворена лента групата горе вляво е ' + fitTxt(FA));
-    check(A.kids === 'toPanelBtn,barHandle,followMapBtn' && A.round && A.dSvg && A.dText === '' && A.hText === '' && A.squares === 3 && (FA.row ? A.row : A.col) && A.below && !A.overTr && A.inScreen,
-      'на ' + wn + ' горе вляво: "↓", после кръглата "Лента" (три квадратчета), ' + (FA.row ? 'в редица' : 'в стълбичка') + ', под лентата, не застъпват реда вдясно: ' + JSON.stringify({ kids: A.kids, row: A.row, col: A.col, below: A.below }));
-    check(A.dir === 'up' && /12 13l3\.2 3\.2/.test(A.arr) && A.fShown && A.fAfter && A.noBarFollow && A.fText && Math.abs(A.fW - A.pW) <= 1 && FA.n === 3,
+    check(A.kids === 'barHandle,followMapBtn' && A.noTl && A.round && A.dSvg && A.dText === '' && A.hText === '' && A.squares === 3 && (FA.row ? A.row : A.col) && A.below && !A.overTr && A.inScreen,
+      'на ' + wn + ' горе вляво (1.6: без "↓"): кръглата "Лента" (три квадратчета) и "Следене", ' + (FA.row ? 'в редица' : 'в стълбичка') + ', под лентата, не застъпват реда вдясно: ' + JSON.stringify({ kids: A.kids, row: A.row, col: A.col, below: A.below }));
+    check(A.dir === 'up' && /12 13l3\.2 3\.2/.test(A.arr) && A.fShown && A.fAfter && A.noBarFollow && A.fText && Math.abs(A.fW - A.pW) <= 1 && FA.n === 2,
       'на ' + w + ' px при отворена лента стрелкичката сочи нагоре, текстовото "Следене" (' + A.fW + ' px, колкото текстовото копче под профила) е на картата след "Лента", а в лентата го няма');
     if (w === 320) check(FA.col, 'на 320 px групата с текстовото "Следене" пада в стълбичка: ' + JSON.stringify(FA));
     check(A.radar && A.undoPos && A.undoSvg && A.undoH && A.undoOn && !A.vtxWord, 'на ' + w + ' px горе вдясно: радар на мястото на сателита, "Отмени" със стрелка между основите и „Точки“, „Точки“ без дума: ' + JSON.stringify({ radar: A.radar, undo: A.undoPos, h: A.undoH, word: A.vtxWord }));
@@ -750,15 +753,18 @@ function barFits() {
     await page.waitForFunction(() => document.querySelector('#bar').getBoundingClientRect().bottom <= 0 && document.querySelector('.maptl').getBoundingClientRect().top < 30, null, { timeout: 3000 }).catch(() => {});
     await settle();
     const B = await page.evaluate(tl114), FB = await page.evaluate(tlFit);
-    check(tlOk(FB) && FB.n === 3, 'на ' + wn + ' при скрита лента групата горе вляво (с "Следене") е ' + fitTxt(FB));
+    check(tlOk(FB) && FB.n === 2, 'на ' + wn + ' при скрита лента групата горе вляво (с "Следене") е ' + fitTxt(FB));
     check(B.dir === 'down' && /19\.4l3\.2-3\.2/.test(B.arr) && B.fShown && B.fAfter && B.kids === A.kids && (FB.row ? B.row : B.col) && !B.overTr && B.inScreen,
       'на ' + wn + ' при скрита лента стрелкичката се обръща надолу, "Следене" излиза след "Лента" ' + (FB.row ? '(вдясно)' : '(отдолу)') + ', нищо не застъпва реда вдясно');
     await page.click('#barHandle');
     await page.waitForFunction(() => document.querySelector('#bar').getBoundingClientRect().top >= 0, null, { timeout: 3000 }).catch(() => {});
     check(await page.evaluate(() => !document.body.classList.contains('bar-hidden') && document.querySelector('#barHandle').dataset.dir === 'up'), 'на ' + w + ' px кръглата "Лента" връща лентата');
-    await page.click('#toPanelBtn');
+    // 1.6: най-горе плаващата стрелка сочи надолу и води до числата под картата (ролята на махнатата "↓").
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+    await page.waitForFunction(() => document.querySelector('#toTopBtn').dataset.dir === 'down');
+    await page.click('#toTopBtn');
     const pt = await page.waitForFunction(() => Math.abs(document.querySelector('#panel').getBoundingClientRect().top) < 2 && window.scrollY > 100, null, { timeout: 4000 }).then(() => 0, () => page.evaluate(() => document.querySelector('#panel').getBoundingClientRect().top));
-    check(pt === 0, 'на ' + w + ' px "↓" стига до текстовата част под картата (' + Math.round(pt) + ')');
+    check(pt === 0, 'на ' + w + ' px стрелката долу вдясно (най-горе сочи надолу) стига до текстовата част под картата (' + Math.round(pt) + ')');
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     if (pts) { await page.click('#undoBtn'); await page.click('#undoBtn'); }
   }
@@ -802,6 +808,8 @@ function barFits() {
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+  // 1.6: надписът следва мястото - долу стрелката сочи нагоре (събитието за скрола идва в следващия кадър).
+  await page.waitForFunction(() => document.querySelector('#toTopBtn').dataset.dir === 'up', null, { timeout: 3000 }).catch(() => {});
   const sy0 = await page.evaluate(() => window.scrollY);
   check(sy0 > 300 && await page.evaluate(() => document.querySelector('#toTopBtn').getAttribute('aria-label') === 'Най-горе на страницата'), 'стрелката нагоре е с надпис на български; страницата е свалена до ' + Math.round(sy0) + ' px');
   await page.screenshot({ path: path.join(OUT, 'totop-390-bottom.png') });
@@ -1107,14 +1115,14 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.5.0' && await p5.isVisible('#appVersion') && /^Версия 1\.5\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.6.0' && await p5.isVisible('#appVersion') && /^Версия 1\.6\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.5.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.6.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
   const btns5 = () => p5.evaluate(() => ({ nov: document.querySelector('#clearTracksBtn').disabled, izt: document.querySelector('#clearPartsBtn').disabled,
-    novIn: !!document.querySelector('#tracksCard > .card-head #clearTracksBtn') && !!document.querySelector('#tracksCard > .card-head [data-act="add-tracks"]'), iztIn: !!document.querySelector('#partsCard > .card-head #clearPartsBtn'),
+    novIn: !!document.querySelector('#tracksCard > .card-head #clearTracksBtn') && !!document.querySelector('#tracksCard > .card-head #clearNamesBtn'), iztIn: !!document.querySelector('#partsCard > .card-head #clearPartsBtn'),
     novT: document.querySelector('#clearTracksBtn').textContent, iztT: document.querySelector('#clearPartsBtn').textContent,
     danger: !!document.querySelector('#clearTracksBtn.danger, #clearPartsBtn.danger') }));
   let b5 = await btns5();
@@ -1163,11 +1171,15 @@ function barFits() {
   f5 = await foldSt();
   check(f5.every(f => !f.open), 'свити и след следващо презареждане');
   // 1.3.1: копчетата в заглавията на свитите „Части в маршрута“ и „Тракове-източници“ работят.
-  await p5.click('#tracksCard > .card-head [data-act="add-tracks"]');
-  const imp5 = await p5.evaluate(() => document.querySelector('#dlgImport').open);
-  await p5.keyboard.press('Escape');
+  // 1.6: „Добави тракове“ в заглавието стана „Изтрий имената“; „Отмени“ връща имената.
+  const nm5 = () => p5.evaluate(() => __gpxk.S.tracks.map(t => t.name).join('|'));
+  const nm5a = await nm5();
+  await p5.click('#tracksCard > .card-head [data-act="clear-names"]');
+  const nm5b = await nm5();
   f5 = await foldSt();
-  check(imp5 && !f5[3].open && f5[3].aria === 'false', '1.3.1: „Добави тракове“ в заглавието на свитите тракове отваря внасянето, панелът остава свит');
+  check(nm5b === 'Трак 1|Трак 2|Трак 3' && !f5[3].open && f5[3].aria === 'false', '1.3.1/1.6: „Изтрий имената“ в заглавието на свитите тракове работи (' + nm5b + '), панелът остава свит');
+  await p5.click('#undoBtn');
+  check(await nm5() === nm5a, '„Отмени“ връща имената: ' + nm5a);
   // "Изтрий": махат се частите, траковете остават; "Отмени" ги връща.
   const rs5 = () => p5.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId);
     return { tracks: S.tracks.map(t => t.id + ':' + t.pts.length + ':' + JSON.stringify(t.dels || [])).join('|'), nTracks: S.tracks.length, items: JSON.stringify(r.items), n: r.items.length,
@@ -2820,7 +2832,7 @@ function barFits() {
     // Празният екран: едно копче, прозорецът приема и .gpx, и колекция; долното „Зареди колекция“ го няма.
     const em = await p15.evaluate(() => ({ btns: [...document.querySelectorAll('#empty button')].map(b => b.dataset.act + ':' + b.textContent.trim()), load: document.querySelectorAll('[data-act="load-collection"]').length,
       exp: document.querySelectorAll('#tracksCard [data-act="export-collection"]').length, add: document.querySelectorAll('#tracksCard [data-act="add-tracks"]').length }));
-    check(em.btns.length === 1 && em.btns[0] === 'add-tracks:Добави .gpx или колекция' && em.load === 0 && em.exp === 1 && em.add === 1, tag + 'празният екран има едно копче „Добави .gpx или колекция“, „Зареди колекция“ го няма никъде, „Изнеси колекцията“ остава: ' + JSON.stringify(em));
+    check(em.btns.length === 1 && em.btns[0] === 'add-tracks:Добави .gpx или колекция' && em.load === 0 && em.exp === 1 && em.add === 0, tag + 'празният екран има едно копче „Добави .gpx или колекция“, „Зареди колекция“ го няма никъде, „Изнеси колекцията“ остава (1.6: „Добави тракове“ в панела стана „Изтрий имената“): ' + JSON.stringify(em));
     await p15.click('#empty [data-act="add-tracks"]');
     check(await p15.evaluate(() => document.querySelector('#dlgImport').open && /\.json/.test(document.querySelector('#fileInput').accept)), tag + 'копчето отваря прозореца, който приема .gpx и колекция (.json)');
     // Синтетични тракове: P (2 км на изток), B върху P (маркер), Q - късо съвпадение с P без маркер, X1/X2 пресичат P на 60 м едно от друго.
@@ -2969,18 +2981,22 @@ function barFits() {
     check(await p15.evaluate(() => __gpxk.SET.alpha === 50 && __gpxk.SET.gap === 100 && document.querySelector('#setAlpha').value === '50'), tag + '„Връщане по подразбиране“: 50% и 100 м');
     await p15.keyboard.press('Escape');
 
-    // „Проверка за дубликати“: не се вижда, докато има маркиран дубликат; след изчистването се появява и отчита.
+    // „Проверка за дубликати“ (1.6: винаги видима, с брояч): при маркиран дубликат казва колко са; без маркер отчита остатъка.
     await p15.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId); r.items = []; __gpxk.refresh(); });
     const dcOf = () => p15.evaluate(() => ({ btn: !document.querySelector('#dupCheckBtn').hidden, res: document.querySelector('#dupCheckRes').hidden ? null : document.querySelector('#dupCheckRes').textContent.replace(/\s+/g, ' ').trim(),
-      rows: [...document.querySelectorAll('#dupCheckRes [data-dc]')].map(b => b.textContent.trim()), pend: __gpxk.A.pend.length, row: document.querySelector('#dupCheckBtn').previousElementSibling.id }));
+      rows: [...document.querySelectorAll('#dupCheckRes [data-dc]')].map(b => b.textContent.trim()), pend: __gpxk.A.pend.length, row: document.querySelector('#dupCheckBtn').previousElementSibling.id, cnt: document.querySelector('#dcCount').textContent }));
     const dc0 = await dcOf();
-    check(!dc0.btn && dc0.pend === 1 && dc0.row === 'cleanBtn', tag + 'при маркиран дубликат „Проверка за дубликати“ не се вижда (стои до „Изчисти преди сглобяване“)');
-    await p15.evaluate(() => document.querySelector('#cleanBtn').click());
+    check(dc0.btn && dc0.pend === 1 && dc0.row === 'cleanBtn' && dc0.cnt === 'остава 1 маркиран', tag + '1.6: при маркиран дубликат „Проверка за дубликати“ се вижда и казва „' + dc0.cnt + '“ (стои до „Изчисти преди сглобяване“)');
+    // Маркерът на „Vtoro“: клик → „Затвори направо“ (Kuso остава - не е до маркера).
+    await p15.evaluate(id => { const t = __gpxk.S.tracks.find(x => x.id === id), m = Core.pointAt(t, 600); __gpxk.map.setView(m[0], m[1], 15); }, ids[1]);
+    await frame();
+    const mk15 = await p15.evaluate(() => { const o = __gpxk.ui.markers[0], b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + o.x, y: b.top + o.y }; });
+    await p15.mouse.click(mk15.x, mk15.y);
     const dc1 = await dcOf();
-    check(dc1.btn && dc1.pend === 0 && dc1.res === null, tag + 'след „Изчисти преди сглобяване“ копчето се появява');
+    check(dc1.btn && dc1.pend === 0 && dc1.res === null && dc1.cnt === '1 застъпване', tag + 'след махането на маркера копчето остава, броячът казва „' + dc1.cnt + '“');
     await p15.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const dc2 = await dcOf();
-    check(/^Остана 1 застъпване без маркер/.test(dc2.res || '') && dc2.rows.length === 1 && /^Kuso(\.gpx)? · км\s0,\d\s[-–]\s0,\d · \d+\sм · под него „Pravo(\.gpx)?“$/.test(dc2.rows[0]), tag + 'проверката намира късото застъпване без маркер: ' + dc2.rows.join(' | '));
+    check(/Остана 1 застъпване без маркер/.test(dc2.res || '') && /не е консистентна/.test(dc2.res) && dc2.rows.length === 1 && /^Kuso(\.gpx)? · км\s0,\d\s[-–]\s0,\d · \d+\sм · под него „Pravo(\.gpx)?“$/.test(dc2.rows[0]), tag + 'проверката намира късото застъпване без маркер: ' + dc2.rows.join(' | '));
     await p15.evaluate(() => document.querySelector('#dupCheckRes [data-dc]').click());
     check(await p15.evaluate(() => !!__gpxk.ui.dcHl && __gpxk.ui.dcHl.trackId === __gpxk.S.tracks[2].id), tag + 'клик на реда показва мястото на картата');
     // Износ с неминала проверка - минава, с предупреждение.
@@ -2995,7 +3011,7 @@ function barFits() {
     check(dcH.res === null && dcH.btn, tag + 'след промяна по колекцията старият резултат пада');
     await p15.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const dc3 = await dcOf();
-    check(dc3.res === 'Няма останали дубликати.' && !dc3.rows.length, tag + 'без късото застъпване: ' + dc3.res);
+    check(/Няма останали дубликати\./.test(dc3.res || '') && /колекцията е консистентна/.test(dc3.res) && !dc3.rows.length && dc3.cnt === '0 застъпвания', tag + 'без късото застъпване: ' + dc3.res);
     const [dl2] = await Promise.all([p15.waitForEvent('download'), p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click())]);
     await frame();
     const w2 = await p15.textContent('#toast');
@@ -3014,6 +3030,176 @@ function barFits() {
     await p15.keyboard.press('Escape');
     check(!e15.length, tag + 'конзолата е чиста' + (e15.length ? ': ' + e15.join(' | ') : ''));
     await c15.close();
+  }
+
+  // ---- 1.6: чиста колекция - маркерът пита, цялата споделена отсечка, чистене на застъпванията без маркер и на малките дупки,
+  // видимата проверка с брояч, една стрелка, „Изтрий имената“, двата езика. Синтетичната колекция tests/fixtures/chista-kolekcia.json:
+  // „Синтетичен А“ (3 км на изток) и „Синтетичен Б“ - маркиран дубликат 660 м на 8 м, с краища по 60 м на 22 м (под маркера не
+  // влизат), късо застъпване 60 м без маркер и две пресичания на 60 м, между които участъкът на А е изтрит (малка дупка). ----
+  {
+    const tag = '1.6: ';
+    const c16 = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true, menus: true, dupMenu: true });
+    const p16 = await c16.newPage();
+    const e16 = [];
+    p16.on('pageerror', e => e16.push('pageerror: ' + e.message));
+    p16.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) e16.push('console: ' + m.text()); });
+    await p16.goto(url);
+    await p16.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    await p16.click('#empty [data-act="add-tracks"]');
+    await p16.setInputFiles('#fileInput', path.join(ROOT, 'tests', 'fixtures', 'chista-kolekcia.json'));
+    await p16.waitForFunction(() => __gpxk.S.tracks.length === 2 && !/Чета файл/.test(document.querySelector('#importMsg').textContent));
+    await p16.keyboard.press('Escape');
+    await p16.waitForFunction(() => !document.querySelector('#dlgImport').open && !document.querySelector('#dlgRings').open);
+    const frame = () => p16.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // Състоянието: трите условия по ядрото, решенията по траковете, затворените дупки на картата, броячът и разклоненията по А.
+    const st = () => p16.evaluate(() => { const S = __gpxk.S, vt = S.tracks.filter(t => t.visible !== false), A = S.tracks.find(t => t.id === 'syn-a'), r = s => Math.round(s);
+      return { pend: __gpxk.A.pend.length, pendIv: __gpxk.A.pend.map(s => [s.trackId, r(s.a), r(s.b)]), lo: Core.leftoverOverlaps(vt, S.tol).map(x => [x.trackId, r(x.a), r(x.b)]), holes: Core.trackHoles(vt, S.tol, 100).map(h => [h.trackId, r(h.a), r(h.b), r(h.d)]),
+        skips: S.tracks.map(t => (t.skips || []).map(x => [r(x.a), r(x.b)])), dels: S.tracks.map(t => (t.dels || []).map(x => [r(x.a), r(x.b)])), joins: (__gpxk.ui.joins || []).map(j => [j.trackId, r(j.d)]),
+        cnt: document.querySelector('#dcCount').textContent, clean: document.querySelector('#dupCheckBtn').classList.contains('dc-clean'), btn: !document.querySelector('#dupCheckBtn').hidden,
+        jA: __gpxk.A.junctions.map(j => r(Core.nearestOnTrack(A, j.lat, j.lon).d)).sort((p, q) => p - q), toast: document.querySelector('#toast').textContent,
+        res: document.querySelector('#dupCheckRes').hidden ? null : document.querySelector('#dupCheckRes').textContent.replace(/\s+/g, ' ').trim(), rows: [...document.querySelectorAll('#dupCheckRes [data-dc]')].map(b => b.textContent.trim()),
+        names: S.tracks.map(t => t.name).join('|'), mode: __gpxk.ui.mode }; });
+    const s0 = await st();
+    check(s0.pend === 1 && s0.holes.length === 1 && s0.holes[0][0] === 'syn-a' && s0.holes[0][3] >= 55 && s0.holes[0][3] <= 65 && s0.btn && s0.cnt === 'остава 1 маркиран' && !s0.clean,
+      tag + 'фикстурата: 1 маркиран дубликат, 1 отворена малка дупка (' + JSON.stringify(s0.holes) + '); копчето за проверка се вижда и казва „' + s0.cnt + '“');
+    // Проверката при маркиран дубликат: колко са маркирани, какво остава след тях, дупките, „не е консистентна“.
+    await p16.evaluate(() => document.querySelector('#dupCheckBtn').click());
+    const s1 = await st();
+    check(/остават маркирани 1/.test(s1.res) && /след изчистването им 1 застъпване/.test(s1.res) && /отворени малки дупки 1/.test(s1.res) && /не е консистентна/.test(s1.res) && s1.rows.length === 1 && /^Синтетичен Б · км 2,\d\s[-–]\s2,\d · \d+\sм · под него „Синтетичен А“$/.test(s1.rows[0]),
+      tag + 'проверката при маркиран дубликат: ' + s1.res);
+    await p16.evaluate(() => { if (document.querySelector('#dupsFoldBody').hidden) document.querySelector('#dupsCard .fold-t').click(); });
+    await p16.locator('#dupsCard').screenshot({ path: path.join(OUT, 'check-160.png') });
+
+    // Трите условия: „Изчисти преди сглобяване“ маха дубликата с цялата отсечка, късото застъпване без маркер и затваря малката дупка.
+    await p16.evaluate(() => document.querySelector('#cleanBtn').click());
+    await frame();
+    const s2 = await st();
+    check(s2.pend === 0, tag + 'условие 1 - няма дублирани тракове (маркирани: ' + s2.pend + ')');
+    check(s2.lo.length === 0, tag + 'условие 2 - няма покрити един върху друг тракове, които не се отчитат: ' + JSON.stringify(s2.lo));
+    check(s2.holes.length === 0 && s2.joins.length === 1 && s2.joins[0][0] === 'syn-a' && s2.joins[0][1] >= 55 && s2.joins[0][1] <= 65, tag + 'условие 3 - няма незатворени дупки: затворена е дупката от ' + (s2.joins[0] || [])[1] + ' м (тънка прекъсната линия)');
+    check(s2.skips[1].length === 2 && s2.skips[1][0][0] < 300 && s2.skips[1][0][1] > 1070 && s2.skips[1][1][0] > 2250 && s2.skips[1][1][1] < 2330 && !s2.skips[0].length,
+      tag + 'махнати са цялата споделена отсечка на Б (маркерът беше ' + s0.pendIv[0].slice(1).join('-') + ' м) и късото застъпване: ' + JSON.stringify(s2.skips));
+    check(/Махнато застъпване без маркер: 1\./.test(s2.toast) && /Затворена малка дупка в колекцията: 1\./.test(s2.toast), tag + 'съобщението казва какво е изчистено: ' + s2.toast);
+    check(s2.cnt === '0 застъпвания' && s2.clean, tag + 'броячът след изчистването: „' + s2.cnt + '“');
+    await p16.evaluate(() => document.querySelector('#dupCheckBtn').click());
+    const s3 = await st();
+    check(/колекцията е консистентна/.test(s3.res) && /Няма останали дубликати\./.test(s3.res) && !s3.rows.length, tag + 'проверката: ' + s3.res);
+    check(!s2.jA.some(d => d > 840 && d < 1560) && s2.jA.filter(d => Math.abs(d - 805) < 40).length === 1 && s2.jA.filter(d => Math.abs(d - 1595) < 40).length === 1,
+      tag + 'по една точка на разклоняване в двата края на изтритата отсечка, вътре в нея - нито една: ' + JSON.stringify(s2.jA));
+    await p16.screenshot({ path: path.join(OUT, 'clean-160.png') });
+    await p16.locator('#dupsCard').screenshot({ path: path.join(OUT, 'check-clean-160.png') });
+    await p16.click('#undoBtn');
+    await frame();
+    const s4 = await st();
+    check(s4.pend === 1 && s4.holes.length === 1 && !s4.joins.length && !s4.skips[1].length, tag + '„Отмени“ връща всичко наведнъж');
+
+    // Маркерът пита: меню с „Затвори направо“ и „Затвори с чертане“ (и „Отказ“).
+    const toMarker = async () => {
+      await p16.evaluate(() => { const t = __gpxk.S.tracks.find(x => x.id === 'syn-b'), s = __gpxk.A.pend[0], m = Core.pointAt(t, (s.a + s.b) / 2); __gpxk.map.setView(m[0], m[1], 15); });
+      await frame();
+      return p16.evaluate(() => { const o = __gpxk.ui.markers[0], b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + o.x, y: b.top + o.y }; });
+    };
+    const menu = () => p16.evaluate(() => { const m = document.querySelector('#objMenu'), r = m.getBoundingClientRect(); return { open: !m.hidden, kind: m.dataset.kind, title: document.querySelector('#omTitle').textContent, sub: document.querySelector('#omSub').textContent,
+      note: document.querySelector('#omNote').textContent, btns: [...m.querySelectorAll('#omBtns button')].map(b => b.dataset.omk + ':' + b.textContent.trim()), cancel: m.querySelector('.om-cancel').textContent.trim(), inScreen: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight }; });
+    let mk = await toMarker();
+    await p16.mouse.click(mk.x, mk.y);
+    await p16.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    const m1 = await menu();
+    check(m1.kind === 'dup' && /^Дубликат · \d+\sм$/.test(m1.title) && /^Синтетичен Б · \d+\s?\d*–\d+\s?\d*\sм$/.test(m1.sub) && /^Под него минава „Синтетичен А“ · \d+\sм$/.test(m1.note) && m1.cancel === 'Отказ' &&
+      JSON.stringify(m1.btns) === JSON.stringify(['dupClose:Затвори направо · под него остава трак', 'dupDraw:Затвори с чертане · маха и трака отдолу']), tag + 'клик върху маркера отваря менюто: ' + [m1.title, m1.sub, m1.note].join(' / ') + ' · ' + m1.btns.join(' | '));
+    check((await st()).pend === 1, tag + 'кликът не маха нищо, докато не е избрано');
+    await p16.screenshot({ path: path.join(OUT, 'dup-menu-160.png') });
+    await p16.click('#objMenu [data-om="cancel"]');
+    check(!(await menu()).open && (await st()).pend === 1, tag + '„Отказ“ затваря менюто, маркерът остава');
+    // „Затвори направо“: маха и копието, и остатъка от споделената отсечка - в участъка остава точно един трак.
+    await p16.mouse.click(mk.x, mk.y);
+    await p16.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    await p16.click('#objMenu [data-omk="dupClose"]');
+    await frame();
+    const s5 = await st();
+    check(s5.pend === 0 && s5.skips[1].length === 1 && s5.skips[1][0][0] < 300 && s5.skips[1][0][1] > 1070 && !s5.lo.some(x => x[1] < 1100),
+      tag + '„Затвори направо“ маха цялата споделена отсечка ' + s5.skips[1][0].join('-') + ' м (маркерът: ' + s0.pendIv[0].slice(1).join('-') + ' м), там не остава застъпване: ' + JSON.stringify(s5.lo));
+    check(!s5.jA.some(d => d > 840 && d < 1560) && s5.jA.filter(d => Math.abs(d - 805) < 40).length === 1, tag + 'след маркера - една точка на разклоняване в края, тракът не се появява пак в участъка: ' + JSON.stringify(s5.jA));
+    check(/затворена сама/.test(s5.toast) && s5.joins.length === 1 && s5.holes.length === 0 && s5.cnt === '1 застъпване', tag + 'самозатварянето важи и в етапа „колекция“ (без маршрут): ' + s5.toast + ' · брояч „' + s5.cnt + '“');
+    await p16.click('#undoBtn');
+    // „Затвори с чертане“: маха и трака отдолу, мястото остава за чертане.
+    mk = await toMarker();
+    await p16.mouse.click(mk.x, mk.y);
+    await p16.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    await p16.click('#objMenu [data-omk="dupDraw"]');
+    const s6 = await st();
+    check(s6.pend === 0 && s6.skips[1].length === 1 && s6.dels[0].some(x => x[0] < 830 && x[1] > 1570) && s6.mode === 'add' && /тракът под него \(„Синтетичен А“\)/.test(s6.toast),
+      tag + '„Затвори с чертане“ маха копието и трака отдолу (' + JSON.stringify(s6.dels[0]) + '), режимът е „Добави“: ' + s6.toast);
+    await p16.click('#undoBtn');
+    await p16.click('[data-mode="select"]');
+    check((await st()).pend === 1, tag + '„Отмени“ връща и двете');
+
+    // „Изтрий имената“: Трак 1, Трак 2 по реда в панела; .gpx на трака излиза с първоначалното име.
+    const cn = await p16.evaluate(() => ({ btn: !!document.querySelector('#tracksCard > .card-head #clearNamesBtn'), text: document.querySelector('#clearNamesBtn').textContent.trim(), add: document.querySelectorAll('#tracksCard [data-act="add-tracks"]').length, bar: !!document.querySelector('#bar [data-act="add-tracks"]') }));
+    check(cn.btn && cn.text === 'Изтрий имената' && cn.add === 0 && cn.bar, tag + '„Добави тракове“ в панела стана „Изтрий имената“ (горе в лентата „Добави“ остава): ' + JSON.stringify(cn));
+    await p16.click('#clearNamesBtn');
+    const nm = await p16.evaluate(() => ({ names: [...document.querySelectorAll('#tracksList li .t')].map(e => e.firstChild.textContent.trim()), tips: [...document.querySelectorAll('#tracksList li .t')].map(e => e.title), toast: document.querySelector('#toast').textContent }));
+    check(nm.names.join('|') === 'Трак 1|Трак 2' && nm.tips.join('|') === 'Синтетичен А|Синтетичен Б' && /Трак 1, 2/.test(nm.toast), tag + 'имената в панела: ' + nm.names.join(', ') + ' (подсказката пази първоначалните: ' + nm.tips.join(', ') + ')');
+    const [dlT] = await Promise.all([p16.waitForEvent('download'), p16.click('#tracksList li:first-child [data-tr="gpx"]')]);
+    const gx = fs.readFileSync(await dlT.path(), 'utf8');
+    check(/<name>Синтетичен А<\/name>/.test(gx) && !/Трак 1/.test(gx) && !/trak/i.test(dlT.suggestedFilename()), tag + '.gpx на трака е с първоначалното име: ' + dlT.suggestedFilename());
+    await p16.click('#undoBtn');
+    check((await st()).names === 'Синтетичен А|Синтетичен Б', tag + '„Отмени“ връща имената');
+
+    // Една плаваща стрелка долу вдясно: най-горе сочи надолу (към числата), другаде - нагоре; горнолявата я няма.
+    for (const [w, h] of [[1280, 800], [390, 844]]) {
+      await p16.setViewportSize({ width: w, height: h });
+      await p16.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+      await p16.waitForFunction(() => document.querySelector('#toTopBtn').dataset.dir === 'down');
+      const ar = () => p16.evaluate(() => { const b = document.querySelector('#toTopBtn'), r = b.getBoundingClientRect(); return { dir: b.dataset.dir, label: b.getAttribute('aria-label'), n: document.querySelectorAll('[data-act="to-top"], [data-act="to-panel"]').length,
+        old: !!document.querySelector('#toPanelBtn'), rot: getComputedStyle(b.querySelector('svg')).transform, right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom), sy: Math.round(scrollY) }; });
+      const a0 = await ar();
+      check(a0.n === 1 && !a0.old && a0.right === 56 && a0.bottom === 26 && a0.label === 'Към числата под картата', tag + w + ' px: една стрелка долу вдясно, горнолявата я няма; най-горе сочи надолу: ' + JSON.stringify(a0));
+      await p16.click('#toTopBtn');
+      await p16.waitForFunction(() => Math.abs(document.querySelector('#panel').getBoundingClientRect().top) < 2 && document.querySelector('#toTopBtn').dataset.dir === 'up', null, { timeout: 4000 }).catch(() => {});
+      const a1 = await ar();
+      check(a1.dir === 'up' && a1.label === 'Най-горе на страницата' && a1.sy > 100 && a1.rot !== a0.rot, tag + w + ' px: стрелката води до числата под картата и се обръща нагоре: ' + JSON.stringify({ dir: a1.dir, sy: a1.sy }));
+      await p16.click('#toTopBtn');
+      await p16.waitForFunction(() => window.scrollY === 0 && document.querySelector('#toTopBtn').dataset.dir === 'down', null, { timeout: 4000 }).catch(() => {});
+      const a2 = await ar();
+      check(a2.sy === 0 && a2.dir === 'down', tag + w + ' px: от долу връща най-горе и пак сочи надолу');
+      await p16.screenshot({ path: path.join(OUT, 'arrow-160-' + w + '.png') });
+    }
+    // 390 px: менюто на маркера е в екрана.
+    mk = await toMarker();
+    await p16.mouse.click(mk.x, mk.y);
+    await p16.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    const m390 = await menu();
+    check(m390.kind === 'dup' && m390.inScreen, tag + '390 px: менюто на маркера се събира в екрана');
+    await p16.screenshot({ path: path.join(OUT, 'dup-menu-160-390.png') });
+    await p16.click('#objMenu [data-om="cancel"]');
+    await p16.setViewportSize({ width: 1280, height: 800 });
+
+    // Двата езика: всеки нов низ има и български, и английски; на английски менюто, броячът, копчето и стрелката сменят думите.
+    const keys = ['om.dup', 'om.span', 'om.dupClose', 'om.dupClose.title', 'om.dupDraw', 'om.dupDraw.title', 'msg.dupDraw', 'msg.cleanedOvl.1', 'msg.cleanedOvl.n', 'msg.cleanedHoles.1', 'msg.cleanedHoles.n', 'dups.clean.title', 'dc.btn.title',
+      'dc.nMarked.1', 'dc.nMarked.n', 'dc.nOvl.1', 'dc.nOvl.n', 'dc.nHoles.1', 'dc.nHoles.n', 'dc.marked', 'dc.after', 'dc.overlaps', 'dc.openHoles', 'dc.ok', 'dc.notOk', 'dc.foundAfter.1', 'dc.foundAfter.n', 'dc.toastMarked.1', 'dc.toastMarked.n',
+      'dc.holes.1', 'dc.holes.n', 'msg.collHoles.1', 'msg.collHoles.n', 'tracks.clearNames', 'tracks.clearNames.title', 'tr.auto', 'msg.namesCleared.1', 'msg.namesCleared.n', 'topanel', 'totop'];
+    const miss = await p16.evaluate(ks => ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1] && !/^\{/.test(e[0]); }), keys);
+    check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
+    await p16.evaluate(() => { I18N.setPref('en'); window.scrollTo({ top: 0, behavior: 'instant' }); });
+    await frame();
+    mk = await toMarker();
+    await p16.mouse.click(mk.x, mk.y);
+    await p16.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    const mEn = await menu();
+    await p16.click('#objMenu [data-om="cancel"]');
+    const en = await p16.evaluate(() => ({ cnt: document.querySelector('#dcCount').textContent, btn: document.querySelector('#dupCheckBtn').textContent.replace(/\s+/g, ' ').trim(), names: document.querySelector('#clearNamesBtn').textContent.trim(), arrow: document.querySelector('#toTopBtn').getAttribute('aria-label') }));
+    check(/^Duplicate · \d+\sm$/.test(mEn.title) && JSON.stringify(mEn.btns) === JSON.stringify(['dupClose:Close directly · a track stays below', 'dupDraw:Close by drawing · removes the track below too']) && mEn.cancel === 'Cancel' && /^Below it runs “Синтетичен А”/.test(mEn.note),
+      tag + 'на английски менюто на маркера: ' + mEn.title + ' · ' + mEn.btns.join(' | '));
+    check(en.cnt === '1 marked left' && en.btn === 'Check for duplicates 1 marked left' && en.names === 'Clear names' && en.arrow === 'To the figures below the map', tag + 'на английски броячът, копчетата и стрелката: ' + JSON.stringify(en));
+    await p16.evaluate(() => document.querySelector('#cleanBtn').click());
+    const tEn = await p16.textContent('#toast');
+    check(/Overlap without a marker removed: 1\./.test(tEn) && /Small gap closed in the collection: 1\./.test(tEn) && await p16.textContent('#dcCount') === '0 overlaps', tag + 'на английски съобщението след изчистването: ' + tEn);
+    await p16.click('#undoBtn');
+    await p16.evaluate(() => I18N.setPref('bg'));
+    check(await p16.textContent('#dcCount') === 'остава 1 маркиран', tag + 'обратно на български');
+    check(!e16.length, tag + 'конзолата е чиста' + (e16.length ? ': ' + e16.join(' | ') : ''));
+    await c16.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));

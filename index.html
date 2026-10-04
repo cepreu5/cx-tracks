@@ -80,13 +80,12 @@
 </header>
 
 <!-- Стрелката нагоре: плаващо копче, заковано за екрана (не за картата), винаги видимо; връща най-горе -->
-<button class="btn ico totop-btn totop-fab" type="button" data-act="to-top" id="toTopBtn" data-i18n-title="totop" data-i18n-aria="totop" title="Най-горе на страницата" aria-label="Най-горе на страницата"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5.5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
+<button class="btn ico totop-btn totop-fab" type="button" data-act="to-top" id="toTopBtn" data-dir="up" data-i18n-title="totop" data-i18n-aria="totop" title="Най-горе на страницата" aria-label="Най-горе на страницата"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 19V5.5M5.5 11.5 12 5l6.5 6.5"/></svg></button>
 
 <section id="mapwrap" class="mapwrap" data-i18n-aria="map.aria" aria-label="Карта">
   <div id="map" class="map"></div>
   <!-- Горе вляво: "↓" към числата, кръглата "Лента" (скрива и връща лентата, стрелкичката сочи накъде) и текстовото "Следене / Стоп" - винаги тук, лентата го няма -->
   <div class="maptl">
-    <button id="toPanelBtn" class="btn ico round-fab" type="button" data-act="to-panel" data-i18n-title="topanel" data-i18n-aria="topanel" title="Към числата под картата" aria-label="Към числата под картата"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 5v13.5M5.5 12.5 12 19l6.5-6.5"/></svg></button>
     <button id="barHandle" class="btn ico round-fab bar-toggle" type="button" data-act="toggle-bar" data-dir="up" aria-expanded="true" data-i18n-aria="bar.hide" data-i18n-title="bar.hide" aria-label="Скрий горната лента" title="Скрий горната лента"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3.4" width="6" height="6" rx="1.2"/><rect x="9" y="3.4" width="6" height="6" rx="1.2"/><rect x="15" y="3.4" width="6" height="6" rx="1.2"/><path class="bt-arr" d="M12 19.4V13M8.8 16.2 12 13l3.2 3.2"/></svg></button>
     <button id="followMapBtn" class="btn follow-btn follow-fab" type="button" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
   </div>
@@ -224,7 +223,7 @@
         <div class="card-head">
           <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="tracksBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="tracks.h">Тракове-източници</span> <span class="num muted" id="tracksCount">(0)</span></button></h2>
           <span class="head-acts">
-            <button class="btn sm" data-act="add-tracks" data-i18n="act.addTracks">Добави тракове</button>
+            <button class="btn sm" data-act="clear-names" id="clearNamesBtn" data-i18n="tracks.clearNames" data-i18n-title="tracks.clearNames.title" title="Дава на всички тракове служебни имена Трак 1, 2, … по реда в панела. Първоначалните имена остават в .gpx файловете. &quot;Отмени&quot; ги връща." disabled>Изтрий имената</button>
             <button class="btn sm" data-act="clear-tracks" id="clearTracksBtn" data-i18n-title="tracks.clear.title" data-i18n="tracks.clear" title="Махни всички тракове и маршрута от тях. &quot;Отмени&quot; връща всичко." disabled>Нов</button>
           </span>
         </div>
@@ -244,7 +243,7 @@
         <p class="dups-sum small" id="dupsGaps" hidden></p>
         <div class="row">
           <button class="btn sm pri" data-act="clean-route" id="cleanBtn" data-i18n="dups.clean" data-i18n-title="dups.clean.title" title="Маха всички застъпени участъци, като от всяка група остава по едно копие (както клик върху маркер), и свързва направо отворените дупки до 500 м (по-дългите остават за чертане). &quot;Отмени&quot; връща всичко наведнъж." disabled>Изчисти преди сглобяване</button>
-          <button class="btn sm" data-act="dup-check" id="dupCheckBtn" data-i18n="dc.btn" data-i18n-title="dc.btn.title" title="Нова проверка по цялата колекция за застъпвания без маркер: под прага от 100 м, разминаване над отклонението, къс завой на косата." hidden>Проверка за дубликати</button>
+          <button class="btn sm" data-act="dup-check" id="dupCheckBtn" data-i18n-title="dc.btn.title" title="Трите условия за готова колекция: маркирани дубликати, застъпвания без маркер (под прага от 100 м, разминаване над отклонението, къс завой на косата) и отворени малки дупки. Броячът е на живо; копчето показва списъка."><span data-i18n="dc.btn">Проверка за дубликати</span> <span class="dc-n num" id="dcCount"></span></button>
         </div>
         <div id="dupCheckRes" class="dupcheck" role="status" aria-live="polite" hidden></div>
         <p class="muted small"><span data-i18n="dups.note1">Участък, който минава по-близо от </span><b class="tolVal"></b><span data-i18n="dups.note2"> до вече приетото трасе, получава маркер по средата си. Числото в маркера казва колко застъпени участъка събира кликът; посочването (на телефон - задържането) осветява удвоения участък. Клик върху маркера маха застъпените участъци от маршрута и от картата, като остава едно копие; "Отмени" ги връща. Дупка, по-къса от отклонението, се затваря сама; по-дългата получава кехлибарен пръстен, който я свързва направо, ако е до 500 м. Отклонението се сменя с полето "Отклонение" в лентата.</span></p>

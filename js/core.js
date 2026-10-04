@@ -193,6 +193,24 @@
       });
 
       var sections = [];
+      /* 1.6: махнатото извън намерен дубликат (краищата на споделената отсечка, застъпване без маркер) също не се
+         чертае и не е част: обикновеният участък се дели, покритото от t.skips е 'dup' без withId. */
+      var offSk = mergeIv(t.skips || []);
+      function offPart(s) {
+        var cov = offSk.map(function (x) { return { a: Math.max(s.a, x.a), b: Math.min(s.b, x.b) }; }).filter(function (x) { return x.b - x.a > 1; });
+        if (!cov.length) return [s];
+        var out = [], pos = s.a;
+        function put(kind, a, b) {
+          if (b - a <= 0.5) return;
+          var o = {};
+          for (var kk in s) o[kk] = s[kk];
+          o.kind = kind; o.a = a; o.b = b; o.len = b - a; o.key = t.id + ':' + Math.round(a);
+          out.push(o);
+        }
+        cov.forEach(function (x) { put('part', pos, x.a); put('dup', x.a, x.b); pos = x.b; });
+        put('part', pos, s.b);
+        return out;
+      }
       pieces.forEach(function (pc) {
         // Поредици от точки вътре в отрязъка.
         var idx = [];
@@ -245,7 +263,7 @@
             trackId: t.id, kind: r.v ? 'dup' : 'part', a: bb[0], b: bb[1], len: bb[1] - bb[0],
             key: t.id + ':' + Math.round(bb[0])
           };
-          if (!r.v) { sections.push(s); return; }
+          if (!r.v) { offPart(s).forEach(function (x) { sections.push(x); }); return; }
           var counts = new Map();
           for (var k = r.k0; k <= r.k1; k++) {
             var mt = mT[idx[k]];
@@ -274,6 +292,17 @@
         sections.push({ trackId: t.id, kind: 'del', a: de.a, b: de.b, len: de.b - de.a, key: t.id + ':del:' + Math.round(de.a) });
       });
       sections.sort(function (p, q) { return p.a - q.a; });
+      // Съседни махнати парчета (дубликатът и краищата на отсечката му) са един махнат участък - wide: краят му е
+      // там, където траковете се разделят, и findJunctions не го мести навътре.
+      sections = sections.reduce(function (acc, x) {
+        var l = acc[acc.length - 1];
+        if (l && l.kind === 'dup' && x.kind === 'dup' && Math.abs(x.a - l.b) < 1) {
+          if (l.withId == null || x.withId == null) l.wide = true;
+          if (l.withId == null && x.withId != null) { l.withId = x.withId; l.withA = x.withA; l.withB = x.withB; l.dir = x.dir; }
+          l.b = Math.max(l.b, x.b); l.len = l.b - l.a;
+        } else acc.push(x);
+        return acc;
+      }, []);
       gaps.forEach(function (g) { sections.push(g); (g.closed ? result.closedGaps : result.gaps).push(g); });
       result.byTrack[t.id] = sections;
       sections.forEach(function (s) { if (s.kind === 'dup') result.dups.push(s); });
@@ -348,7 +377,7 @@
     var reach = Math.max(100, 4 * tol) - 10; // по-навътре остатъкът след клик би бил нов дубликат
     anyDup.forEach(function (d) {
       var t = byId[d.trackId], o = byId[d.withId];
-      if (!t || !o) return;
+      if (!t || !o || d.wide) return;
       var ps = partsOf(d.trackId);
       var ends = [['a', 'b', 1], ['b', 'a', -1]].map(function (c) {
         return { c: c, p: ps.filter(function (x) { return Math.abs(x[c[1]] - d[c[0]]) < 1; })[0] };
@@ -667,9 +696,12 @@
      който върви в рамките на отклонението по поне 40% от участъка. Маркер не е нужен: под прага
      minDup, при разминаване над отклонението и при къс завой на косата (lag) analyze не маркира нищо,
      а линията пак си е там. Изтритото (dels) и махнатото (skips) не се брои - не се вижда.
-     Връща [{trackId, a, b, len, self}] - отрязъкът от другия трак под участъка, най-дългият първи. */
+     Връща [{trackId, a, b, len, self}] - отрязъкът от другия трак под участъка, най-дългият първи.
+     opt (1.6, по избор): {share - друг дял вместо UNDER_SHARE, parallel - броят се само успоредните отсечки,
+     без пресичанията} - за дупките в колекцията. */
   var UNDER_SHARE = 0.4;
-  function underTracks(t, a, b, tracks, tol) {
+  function underTracks(t, a, b, tracks, tol, opt) {
+    var share = opt && opt.share, par = opt && opt.parallel, cosMax = Math.cos(SELF_ANGLE * Math.PI / 180);
     tol = Math.max(ROUTE_GAP, 1.5 * (tol == null ? 20 : tol));
     prep(t);
     if (b < a) { var tmp = a; a = b; b = tmp; }
@@ -708,18 +740,20 @@
       }
       if (!segs.length) return;
       var hit = 0, lo = Infinity, hi = -Infinity;
-      samples.forEach(function (s) {
+      samples.forEach(function (s, si) {
         var sx = s[1] * kx, sy = s[0] * ky, bd = Infinity, bdd = null;
+        var s0 = samples[Math.max(0, si - 1)], s1 = samples[Math.min(n, si + 1)], vx = (s1[1] - s0[1]) * kx, vy = (s1[0] - s0[0]) * ky, vl = Math.hypot(vx, vy) || 1;
         segs.forEach(function (j) {
           var p = o.pts[j], q = o.pts[j + 1];
           var px = p[1] * kx, py = p[0] * ky, dx = q[1] * kx - px, dy = q[0] * ky - py, l2 = dx * dx + dy * dy;
+          if (par && l2 && Math.abs((vx * dx + vy * dy) / (vl * Math.sqrt(l2))) < cosMax) return;
           var f = l2 ? Math.max(0, Math.min(1, ((sx - px) * dx + (sy - py) * dy) / l2)) : 0;
           var d = Math.hypot(px + f * dx - sx, py + f * dy - sy), along = c[j] + f * (c[j + 1] - c[j]);
           if (d < bd && !off(along)) { bd = d; bdd = along; }
         });
         if (bd <= tol) { hit++; lo = Math.min(lo, bdd); hi = Math.max(hi, bdd); }
       });
-      if (hit / samples.length < UNDER_SHARE || hi - lo < 1) return;
+      if (hit / samples.length < (share || UNDER_SHARE) || hi - lo < 1) return;
       out.push({ trackId: o.id, a: lo, b: hi, len: hi - lo, self: self });
     });
     out.sort(function (p, q) { return q.len - p.len; });
@@ -803,6 +837,156 @@
       flush();
     });
     return out;
+  }
+
+  /* 1.6: цялата споделена отсечка около участъка sec ({a, b} по трака t): докъдето тракът keepId (по
+     подразбиране sec.withId) върви на до jt от t, успоредно и видимо. Маркерът покрива само частта под
+     отклонението, а краищата (между tol и jt) остават - след махането те „връщат“ трака в участъка и дават
+     второ разклонение. Затова махането (клик върху маркера, „Изчисти преди сглобяване“) взема цялата отсечка.
+     Същият трак (минал втори път) се гледа само на поне SELF_SEP*jt по трака от мястото. Връща {a, b}. */
+  var STRETCH_STEP = 5;
+  function dupStretch(t, sec, tracks, tol, keepId) {
+    var jt = Math.max(ROUTE_GAP, 1.5 * (tol == null ? 20 : tol)), cosMax = Math.cos(SELF_ANGLE * Math.PI / 180);
+    var lo = Math.min(sec.a, sec.b), hi = Math.max(sec.a, sec.b);
+    if (keepId == null) keepId = sec.withId;
+    var o = (tracks || []).filter(function (x) { return x && x.id === keepId && x.pts && x.pts.length > 1; })[0];
+    if (!o) return { a: lo, b: hi };
+    prep(t); prep(o);
+    var self = o === t || o.id === t.id, kx = Math.cos(t.pts[0][0] * U.RAD) * MPD, ky = MPD, oc = o._cum;
+    function hidden(tr, d) {
+      if (isCut(tr, d)) return true;
+      var sk = tr.skips || [];
+      for (var k = 0; k < sk.length; k++) if (d > sk[k].a + 0.5 && d < sk[k].b - 0.5) return true;
+      return false;
+    }
+    function near(d) {
+      var p = pointAt(t, d), px = p[1] * kx, py = p[0] * ky;
+      var p0 = pointAt(t, Math.max(0, d - 5)), p1 = pointAt(t, Math.min(t.len, d + 5));
+      var vx = (p1[1] - p0[1]) * kx, vy = (p1[0] - p0[0]) * ky, vl = Math.hypot(vx, vy) || 1;
+      for (var j = 0; j < o.pts.length - 1; j++) {
+        var a = o.pts[j], b = o.pts[j + 1], ax = a[1] * kx, ay = a[0] * ky, dx = b[1] * kx - ax, dy = b[0] * ky - ay;
+        if (Math.min(ax, ax + dx) - jt > px || Math.max(ax, ax + dx) + jt < px || Math.min(ay, ay + dy) - jt > py || Math.max(ay, ay + dy) + jt < py) continue;
+        var l2 = dx * dx + dy * dy, f = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+        if (Math.hypot(ax + f * dx - px, ay + f * dy - py) > jt) continue;
+        var along = oc[j] + f * (oc[j + 1] - oc[j]);
+        if (self && Math.abs(along - d) < SELF_SEP * jt) continue;
+        if (hidden(o, along)) continue;
+        if (l2 && Math.abs((vx * dx + vy * dy) / (vl * Math.sqrt(l2))) < cosMax) continue;
+        return true;
+      }
+      return false;
+    }
+    function walk(from, dir) {
+      // Къс преход (до jt) без съвпадение - косият завой между отклонението и jt - не прекъсва отсечката.
+      var end = from, miss = 0, maxMiss = Math.ceil(jt / STRETCH_STEP);
+      for (var d = from + dir * STRETCH_STEP; d >= 0 && d <= t.len; d += dir * STRETCH_STEP) {
+        if (hidden(t, d)) break;
+        if (near(d)) { end = d; miss = 0; } else if (++miss > maxMiss) break;
+      }
+      // Остатък до края на трака, по-къс от стъпката, отива с отсечката.
+      if (dir < 0 && end < STRETCH_STEP && near(0)) end = 0;
+      if (dir > 0 && t.len - end < STRETCH_STEP && near(t.len)) end = t.len;
+      return end;
+    }
+    return { a: walk(lo, -1), b: walk(hi, 1) };
+  }
+
+  /* 1.6: малките дупки в колекцията - самозатварянето важи и преди да има маршрут. Дупка е отвор вътре в трак
+     (изтрито - dels, или махнато - skips), който не е покрит от друг видим трак (или от другото минаване на
+     същия): под него на поне HOLE_COVER от дължината не лежи нищо. Махнат дубликат не е дупка - отдолу стои
+     копието, което остава. Краят на трака не е дупка. Права до max метра между двата края.
+     Затворената дупка е t.joins ({a, b} - краищата по трака): чертае се като тънка прекъсната линия и пътува
+     с колекцията. Връща [{trackId, a, b, d, from, to}] - отворените, в реда на траковете. */
+  var HOLE_COVER = 0.8;
+  function holeIv(t) {
+    prep(t);
+    return mergeIv(offIv(t).concat(t.skips || []).map(function (x) { return { a: Math.max(0, x.a), b: Math.min(t.len, x.b) }; })
+      .filter(function (x) { return x.b - x.a > 0; }))
+      .filter(function (x) { return x.a > 1 && x.b < t.len - 1; });
+  }
+  function joined(t, h) { return (t.joins || []).some(function (j) { return Math.abs(j.a - h.a) <= 1 && Math.abs(j.b - h.b) <= 1; }); }
+  // Затворените дупки на трака, които още отговарят на отвор (след „Отмени“ старите не се чертаят).
+  function liveJoins(t) {
+    if (!t.joins || !t.joins.length) return [];
+    var hs = holeIv(t);
+    return t.joins.filter(function (j) { return hs.some(function (h) { return Math.abs(j.a - h.a) <= 1 && Math.abs(j.b - h.b) <= 1; }); });
+  }
+  function trackHoles(tracks, tol, max) {
+    max = max == null ? AUTO_GAP_DEF : +max;
+    var live = (tracks || []).filter(function (t) { return t && t.pts && t.pts.length > 1; }), out = [];
+    live.forEach(function (t) {
+      holeIv(t).forEach(function (h) {
+        if (joined(t, h)) return;
+        var p = pointAt(t, h.a), q = pointAt(t, h.b), d = U.hav(p[0], p[1], q[0], q[1]);
+        if (d > max) return;
+        if (underTracks(t, h.a, h.b, live, tol, { share: HOLE_COVER, parallel: true }).length) return;
+        out.push({ trackId: t.id, a: h.a, b: h.b, d: d, from: p, to: q });
+      });
+    });
+    return out;
+  }
+  // Затваря малките дупки (до max м; 0 = никога): t.joins. Връща затворените.
+  function closeHoles(tracks, tol, max) {
+    max = autoGapMax(max);
+    if (!max) return [];
+    var hs = trackHoles(tracks, tol, max);
+    hs.forEach(function (h) {
+      var t = tracks.filter(function (x) { return x.id === h.trackId; })[0];
+      t.joins = (t.joins || []).concat([{ a: h.a, b: h.b }]);
+    });
+    return hs;
+  }
+
+  /* 1.6: чистене на колекцията в реда на CX - дубликатите (по правилото на маркера, с цялата споделена отсечка),
+     после застъпванията без маркер (по-късното копие, пак цялата отсечка), после малките дупки. Мени траковете
+     (skips, joins). opts: {order, drop, max (праг за дупките), onSkip(trackId, a, b), dupsOnly, noJoin}.
+     Връща {dups, overlaps, joined, removed: [{trackId, a, b}]}. */
+  function cleanCollection(tracks, tol, opts) {
+    opts = opts || {};
+    var order = opts.order || tracks.map(function (t) { return t.id; }), out = { dups: 0, overlaps: 0, joined: 0, removed: [] };
+    function byId(id) { return tracks.filter(function (t) { return t.id === id; })[0]; }
+    function skip(id, iv) {
+      var t = byId(id); if (!t) return;
+      t.skips = mergeIv((t.skips || []).concat([{ a: iv.a, b: iv.b }]));
+      out.removed.push({ trackId: id, a: iv.a, b: iv.b });
+      if (opts.onSkip) opts.onSkip(id, iv.a, iv.b);
+    }
+    for (var pass = 0; pass < 5; pass++) {
+      var r = analyze(tracks, tol, { drop: opts.drop || [] });
+      if (!r.pend.length) break;
+      dupGroups(r.pend, order).forEach(function (cl) {
+        cl.secs.forEach(function (s) { var t = byId(s.trackId); if (t) { skip(s.trackId, dupStretch(t, s, tracks, tol, cl.keep)); out.dups++; } });
+      });
+    }
+    if (!opts.dupsOnly) {
+      for (pass = 0; pass < 5; pass++) {
+        var lo = leftoverOverlaps(tracks, tol);
+        if (!lo.length) break;
+        lo.forEach(function (x) { var t = byId(x.trackId); if (t) { skip(x.trackId, dupStretch(t, x, tracks, tol, x.withId)); out.overlaps++; } });
+      }
+    }
+    if (!opts.noJoin) out.joined = closeHoles(tracks, tol, opts.max == null ? AUTO_GAP_DEF : opts.max).length;
+    return out;
+  }
+
+  /* 1.6: трите условия за готова колекция - да няма маркирани дубликати, застъпвания без маркер и отворени малки
+     дупки. Докато има маркери, застъпванията и дупките са тези, които остават след махането им (пробно, върху
+     копия - траковете не се пипат). opts: {order, drop, max}. Връща {marked, overlaps: [...], holes: [...], ok, after}. */
+  function collectionCheck(tracks, tol, opts) {
+    opts = opts || {};
+    var live = (tracks || []).filter(function (t) { return t && t.pts && t.pts.length > 1; });
+    live.forEach(prep);
+    var r = analyze(live, tol, { drop: opts.drop || [] }), marked = r.pend.length, ts = live;
+    var max = autoGapMax(opts.max == null ? AUTO_GAP_DEF : opts.max);
+    if (marked) {
+      ts = live.map(function (t) {
+        return { id: t.id, pts: t.pts, _cum: t._cum, len: t.len, breaks: t.breaks, dels: t.dels, openGaps: t.openGaps,
+          skips: (t.skips || []).slice(), joins: (t.joins || []).slice() };
+      });
+      cleanCollection(ts, tol, { order: opts.order, drop: opts.drop, dupsOnly: true, noJoin: true });
+    }
+    var overlaps = leftoverOverlaps(ts, tol), holes = trackHoles(ts, tol, max || AUTO_GAP_DEF);
+    return { marked: marked, overlaps: overlaps, holes: holes, after: !!marked, ok: !marked && !overlaps.length && !holes.length };
   }
 
   /* "Изтрий разклонението" - маршрутът в точката j (fork от routeForks или null):
@@ -1356,7 +1540,8 @@
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
     trackBounds: trackBounds, overlap: overlap, ROUTE_GAP: ROUTE_GAP, LINK_MIN: LINK_MIN, DUP_BRIDGE: DUP_BRIDGE,
     routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe, probeK: probeK, PROBE: PROBE, SELF_ANGLE: SELF_ANGLE,
-    redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, closeSmallGaps: closeSmallGaps, autoGapMax: autoGapMax, AUTO_GAP_DEF: AUTO_GAP_DEF, AUTO_GAP_MAX: AUTO_GAP_MAX, underTracks: underTracks, leftoverOverlaps: leftoverOverlaps, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
+    redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, closeSmallGaps: closeSmallGaps, autoGapMax: autoGapMax, AUTO_GAP_DEF: AUTO_GAP_DEF, AUTO_GAP_MAX: AUTO_GAP_MAX, underTracks: underTracks, leftoverOverlaps: leftoverOverlaps,
+    dupStretch: dupStretch, trackHoles: trackHoles, closeHoles: closeHoles, liveJoins: liveJoins, cleanCollection: cleanCollection, collectionCheck: collectionCheck, HOLE_COVER: HOLE_COVER, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: function (tol) { return Math.max(ROUTE_GAP, 1.5 * (tol || 20)); }
