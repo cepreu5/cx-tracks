@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="bg" data-app-mode="light">
+<html lang="bg" data-app-mode="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -7,15 +7,18 @@
 <meta name="application-name" content="CX Tracks">
 <meta name="apple-mobile-web-app-title" content="CX Tracks">
 <meta name="description" data-i18n-content="meta.desc" content="CX Tracks: сглобяване на нов маршрут от записани GPX тракове: дубликати, части, изрязване, износ като .gpx и картина за офлайн.">
-<meta name="theme-color" content="#f6f3ec">
+<meta name="theme-color" content="#171614">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='none' stroke='%232b5fd9' stroke-width='2.5'/%3E%3C/svg%3E">
 <script>
   // Режимът се слага преди стиловете, за да няма премигване.
   (function () {
     var m = null;
     try { m = JSON.parse(localStorage.getItem('gpxk.mode')); } catch (e) { /* няма запис */ }
-    if (m !== 'light' && m !== 'dark') m = 'light';
+    // 1.8: без запазен избор (първо пускане, „Връщане по подразбиране“) - тъмна тема; запазеният избор се уважава.
+    if (m !== 'light' && m !== 'dark') m = 'dark';
     document.documentElement.setAttribute('data-app-mode', m);
+    var tc = document.querySelector('meta[name="theme-color"]');
+    if (tc) tc.setAttribute('content', m === 'dark' ? '#171614' : '#f6f3ec');
     // Началният екран е само за първото пускане на устройството.
     var seen = false;
     try { seen = !!JSON.parse(localStorage.getItem('gpxk.splash')); } catch (e) { /* няма запис */ }
@@ -457,7 +460,7 @@
     </div>
     <section class="set-pane" data-setpane="menus" role="tabpanel">
       <label class="set-row"><span data-i18n="set.alpha">Прозрачност на менютата</span><input type="range" id="setAlpha" min="0" max="100" step="5" value="50"><b class="num" id="setAlphaVal">50%</b></label>
-      <p class="muted small" data-i18n="set.alpha.note">Важи за трите менюта над картата: на разклонението, на участъка и на точката. Зад менюто има леко размазване (4 px), за да се четат буквите върху картата. 0% - плътно меню.</p>
+      <p class="muted small" data-i18n="set.alpha.note">Важи за трите менюта над картата: на разклонението, на участъка и на точката. При 50% тракът под менюто се вижда, а буквите се четат. 0% - плътно меню.</p>
     </section>
     <section class="set-pane" data-setpane="gaps" role="tabpanel" hidden>
       <label class="set-row"><span data-i18n="set.gap">Затваряй сами дупките до</span><input type="text" id="setGap" class="num" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" value="100"><span data-i18n="unit.m">м</span></label>

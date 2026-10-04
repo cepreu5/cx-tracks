@@ -37,6 +37,9 @@
     return Math.max(300, median(steps) * 8);
   }
 
+  /* 1.8: удълженото с ръка („Удължи/Скъси“) - t.ext [{a, b}]: дългата отсечка там е начертана, не загубен сигнал. */
+  function handSeg(t, a, b) { return (t.ext || []).some(function (x) { return a >= x.a - 0.5 && b <= x.b + 0.5; }); }
+
   // Изтритите участъци (t.dels: "Изтрий участъка" и потвърденото изрязване) не са живо трасе.
   function offIv(t) { return t.dels || []; }
   function liveIntervals(t) {
@@ -155,7 +158,7 @@
       var cut = new Uint8Array(n);
       for (i = 0; i < n; i++) cut[i] = isCut(t, c[i]) ? 1 : 0;
       var gapAt = new Uint8Array(n); // отсечката i..i+1 е дупка
-      for (i = 0; i < n - 1; i++) if (brk[i + 1] || c[i + 1] - c[i] > gl) gapAt[i] = 1;
+      for (i = 0; i < n - 1; i++) if (brk[i + 1] || c[i + 1] - c[i] > gl && !handSeg(t, c[i], c[i + 1])) gapAt[i] = 1;
       function segOk(j) { return !cut[j] && !cut[j + 1] && !gapAt[j]; }
 
       var dup = new Uint8Array(n), mT = new Array(n), mD = new Float64Array(n);
@@ -223,9 +226,16 @@
           var last = runs[runs.length - 1];
           if (last && last.v === v) { last.k1 = k; } else runs.push({ v: v, k0: k, k1: k });
         });
+        // Границата между две поредици - по средата между върховете. 1.8: на начертана с ръка отсечка (t.ext) точката до
+        // друга линия покрива само до tol от себе си - иначе дълга права, пусната върху трак, би била дубликат.
+        function mid(j0, j1) {
+          var m = (c[j0] + c[j1]) / 2;
+          if (!handSeg(t, c[j0], c[j1])) return m;
+          return dup[j1] && !dup[j0] ? Math.max(m, c[j1] - tol) : dup[j0] && !dup[j1] ? Math.min(m, c[j0] + tol) : m;
+        }
         function bounds(r, ri) {
-          var a = ri === 0 ? pc[0] : (c[idx[r.k0 - 1]] + c[idx[r.k0]]) / 2;
-          var b = ri === runs.length - 1 ? pc[1] : (c[idx[r.k1]] + c[idx[r.k1 + 1]]) / 2;
+          var a = ri === 0 ? pc[0] : mid(idx[r.k0 - 1], idx[r.k0]);
+          var b = ri === runs.length - 1 ? pc[1] : mid(idx[r.k1], idx[r.k1 + 1]);
           return [a, b];
         }
         function merge() {
@@ -351,6 +361,9 @@
     return out.map(function (d) { return Math.max(a, Math.min(b, d)); });
   }
 
+  // 1.8: най-близкото място само в [a,b] на трака (за скъсяването - по същото парче).
+  function nearestIn(t, a, b, lat, lon) { prep(t); return nearestInRange(t, a, b, lat, lon, Math.cos(lat * U.RAD) * MPD, MPD); }
+
   // Пресичане на две отсечки: връща дела по първата или null.
   function segCross(ax, ay, bx, by, cx, cy, dx, dy) {
     var rx = bx - ax, ry = by - ay, sx = dx - cx, sy = dy - cy;
@@ -419,6 +432,10 @@
         cand.push(q);
       });
     });
+    // 1.8: разклонение, сложено с ръка („Удължи/Скъси“ пуснато върху трак): истински връх в трака (t.hj) - винаги точка.
+    live.forEach(function (t) {
+      (t.hj || []).forEach(function (h) { var q = [h[0], h[1], null]; q.src = 'hand'; cand.push(q); });
+    });
     // 2. Край на приет участък при приет участък от друг трак.
     live.forEach(function (t) {
       partsOf(t.id).forEach(function (p) {
@@ -485,8 +502,8 @@
     var js = [];
     cand.forEach(function (q) {
       var m = js.filter(function (j) { return U.hav(j.lat, j.lon, q[0], q[1]) <= jt; })[0];
-      if (m) { if (q.src !== 'cross') m.cross = false; if (q.src === 'self') m.self = true; return; }
-      js.push({ lat: q[0], lon: q[1], keep: q.keep || null, cross: q.src === 'cross', self: q.src === 'self' });
+      if (m) { if (q.src !== 'cross') m.cross = false; if (q.src === 'self') m.self = true; if (q.src === 'hand') m.hand = true; return; }
+      js.push({ lat: q[0], lon: q[1], keep: q.keep || null, cross: q.src === 'cross', self: q.src === 'self', hand: q.src === 'hand' });
     });
     // Изтритите разклонения ("Изтрий разклонението") не се връщат: там тракът не се реже.
     js = js.filter(function (j) { return !dropped(drop, j); });
@@ -573,7 +590,7 @@
 
   /* Излишните пръстени - предложение след зареждане, нищо не се маха само:
      'cross' - траковете само се пресичат, нито един приет участък не свършва в точката (няма избор);
-     'near' - на по-малко от NEAR_J метра по същия трак от друг пръстен: предлага се вторият.
+     'near' - на по-малко от NEAR_J метра по същия трак от друг пръстен: предлага се вторият (не и сложеният с ръка, 1.8).
      Всеки: {j, why, trackId, d (м по трака), dist (м до другия пръстен при 'near')}. */
   var NEAR_J = 40;
   function redundantJunctions(junctions, tracksById, tol) {
@@ -591,7 +608,8 @@
       var l = (byT[id] || []).sort(function (p, q) { return p.d - q.d; });
       for (var i = 1; i < l.length; i++) {
         var P = l[i - 1], N = l[i], dd = N.d - P.d;
-        if (P.j === N.j || dd >= NEAR_J || seen[P.j.key] || seen[N.j.key]) continue;
+        // 1.8: сложеното с ръка разклонение не е излишно.
+        if (P.j === N.j || dd >= NEAR_J || seen[P.j.key] || seen[N.j.key] || N.j.hand) continue;
         out.push({ j: N.j, why: 'near', trackId: id, d: N.d, dist: dd });
         seen[N.j.key] = 1;
       }
@@ -785,7 +803,7 @@
     var info = live.map(function (t, ti) {
       var c = t._cum, gl = gapLimit(t), gap = new Uint8Array(t.pts.length);
       for (var j = 0; j < t.pts.length - 1; j++) {
-        if (c[j + 1] - c[j] > gl || (t.breaks || []).indexOf(j + 1) >= 0) { gap[j] = 1; continue; }
+        if (c[j + 1] - c[j] > gl && !handSeg(t, c[j], c[j + 1]) || (t.breaks || []).indexOf(j + 1) >= 0) { gap[j] = 1; continue; }
         if (hidden(t, c[j]) && hidden(t, c[j + 1])) continue;
         var p = t.pts[j], q = t.pts[j + 1];
         var ix0 = Math.floor(Math.min(p[1], q[1]) * kx / cell), ix1 = Math.floor(Math.max(p[1], q[1]) * kx / cell);
@@ -991,7 +1009,7 @@
     var max = autoGapMax(opts.max == null ? AUTO_GAP_DEF : opts.max);
     if (marked) {
       ts = live.map(function (t) {
-        return { id: t.id, pts: t.pts, _cum: t._cum, len: t.len, breaks: t.breaks, dels: t.dels, openGaps: t.openGaps,
+        return { id: t.id, pts: t.pts, _cum: t._cum, len: t.len, breaks: t.breaks, dels: t.dels, openGaps: t.openGaps, ext: t.ext,
           skips: (t.skips || []).slice(), joins: (t.joins || []).slice() };
       });
       cleanCollection(ts, tol, { order: opts.order, drop: opts.drop, dupsOnly: true, noJoin: true });
@@ -1075,7 +1093,8 @@
 
   /* 1.7: отворените краища на колекцията - краищата на видимите парчета от траковете (началото и краят на трака,
      краищата на изтритото), които не са свързани (t.joins, t.links), не лягат върху друга линия като краищата на
-     махнат дубликат и не са до tol от друга видима линия. Връща [{trackId, d, pt}]. */
+     махнат дубликат и не са до tol от друга видима линия. Връща [{trackId, d, pt, side}]; side (1.8) - 'a', ако видимото
+     парче започва от края (началото на трака), 'b', ако свършва в него (краят на трака). */
   function openEnds(tracks, tol) {
     var live = (tracks || []).filter(function (t) { return t && t.pts && t.pts.length > 1; }), out = [];
     live.forEach(prep);
@@ -1085,11 +1104,11 @@
         .filter(function (x) { return x.b - x.a > 0; })), pos = 0, ends = [];
       off.forEach(function (x) { if (x.a - pos > 1) ends.push(pos, x.a); pos = Math.max(pos, x.b); });
       if (t.len - pos > 1) ends.push(pos, t.len);
-      ends.forEach(function (e) {
+      ends.forEach(function (e, ei) {
         if (links.some(function (l) { return l.trackId === t.id && Math.abs(l.a - e) <= 1 || l.toId === t.id && Math.abs(l.b - e) <= 1; })) return;
         if (se.some(function (x) { return x.trackId === t.id && Math.abs(x.d - e) <= 1; })) return;
         if (nearestLive(live, t, e, tl, tol)) return;
-        out.push({ trackId: t.id, d: e, pt: pointAt(t, e) });
+        out.push({ trackId: t.id, d: e, pt: pointAt(t, e), side: ei % 2 ? 'b' : 'a' });
       });
     });
     return out;
@@ -1115,6 +1134,119 @@
     }
     t1.links = (t1.links || []).concat([{ a: e1.d, to: t2.id, b: e2.d, pts: vs }]);
     return { len: len, kind: 'link' };
+  }
+
+  /* 1.8 „Удължи/Скъси“: свободният край на трака се влачи с ръка. Удължаването слага нови истински върхове в t.pts (не
+     е връзка, затова LINK_MAX не важи), скъсяването маха върховете, през които минава. Видимото парче, което свършва в
+     края, е side 'b' (новото е след края по трака) или 'a' (новото е преди него). Скритото отвъд края (изтрито,
+     махнато) остава скрито: интервалът, който започва в края, тръгва от новия край, а скокът дотам лежи в него.
+     Новото е в t.ext ({a, b} - r.span), за да не е дупка в записа. Всяка функция връща {pts, map, f, end}: новите точки, старият номер на връх -> новият (-1 - махнат), f(d, bias) -
+     старо разстояние -> ново (bias > 0 - началото на интервал, < 0 - краят му; в самия край решава накъде е) и новия край. */
+  function liveParts(t) {
+    prep(t);
+    var off = mergeIv(offIv(t).concat(t.skips || []).map(function (x) { return { a: Math.max(0, x.a), b: Math.min(t.len, x.b) }; })
+      .filter(function (x) { return x.b - x.a > 0; })), pos = 0, out = [];
+    off.forEach(function (x) { if (x.a - pos > 1) out.push([pos, x.a]); pos = Math.max(pos, x.b); });
+    if (t.len - pos > 1) out.push([pos, t.len]);
+    return out;
+  }
+  // Парчето, на което d е край (или вътре в него).
+  function partAt(t, d) {
+    return liveParts(t).filter(function (p) { return d >= p[0] - 1 && d <= p[1] + 1; })[0] || null;
+  }
+  var EDGE_EPS = 0.05;
+  function vtx(p) { return [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6, p[2] == null ? null : p[2]]; }
+  // Делят върховете на трака около d: преди (oc < d), връх точно в d (или -1), след.
+  function around(t, d) {
+    prep(t);
+    var c = t._cum, lo = [], hi = [], at = -1;
+    for (var i = 0; i < c.length; i++) {
+      if (Math.abs(c[i] - d) <= EDGE_EPS && at < 0) at = i;
+      else if (c[i] < d) lo.push(i); else hi.push(i);
+    }
+    return { lo: lo, at: at, hi: hi };
+  }
+  function build(t, parts) {
+    var pts = [], map = t.pts.map(function () { return -1; });
+    parts.forEach(function (x) {
+      if (typeof x === 'number') { map[x] = pts.length; pts.push(t.pts[x]); } else pts.push(x);
+    });
+    return { pts: pts, map: map, cum: U.cumulative(pts) };
+  }
+  // ext - новите върхове от края навън ([[lat, lon]], както са дадени - краят ляга точно във върха на друг трак), последният е новият край.
+  function extendEnd(t, e, side, ext) {
+    var s = around(t, e), c = t._cum, E = s.at >= 0 ? s.at : vtx(pointAt(t, e)), nv = (ext || []).map(function (p) { return [p[0], p[1], p[2] == null ? null : p[2]]; });
+    var r, nE, nX, f;
+    if (side === 'b') {
+      r = build(t, s.lo.concat([E]).concat(nv).concat(s.hi));
+      nE = r.cum[s.lo.length]; nX = r.cum[s.lo.length + nv.length];
+      var oR = s.hi.length ? c[s.hi[0]] : null, nR = s.hi.length ? r.cum[s.lo.length + nv.length + 1] : null;
+      f = function (d, bias) {
+        if (!isFinite(d)) return d;
+        if (d < e - EDGE_EPS || d <= e + EDGE_EPS && !(bias > 0)) return Math.min(d, e) * (e ? nE / e : 1);
+        if (oR == null) return nX;
+        if (d < oR) return nX + Math.max(0, d - e) / ((oR - e) || 1) * (nR - nX);
+        return nR + (d - oR);
+      };
+      r.end = nX; r.span = { a: nE, b: nX };
+    } else {
+      r = build(t, s.lo.concat(nv.slice().reverse()).concat([E]).concat(s.hi));
+      nX = r.cum[s.lo.length]; nE = r.cum[s.lo.length + nv.length];
+      var oL = s.lo.length ? c[s.lo[s.lo.length - 1]] : null, nL = s.lo.length ? r.cum[s.lo.length - 1] : null;
+      f = function (d, bias) {
+        if (!isFinite(d)) return d;
+        if (d > e + EDGE_EPS || d >= e - EDGE_EPS && !(bias < 0)) return nE + Math.max(0, d - e);
+        if (oL == null) return nX;
+        if (d > oL) return nL + (d - oL) / ((e - oL) || 1) * (nX - nL);
+        return d;
+      };
+      r.end = nX; r.span = { a: nX, b: nE };
+    }
+    r.f = f;
+    return r;
+  }
+  // Скъсяване: от края e до d2 по същото парче; върховете между тях падат, в d2 става връх (новият край).
+  function trimEnd(t, e, side, d2) {
+    prep(t);
+    var c = t._cum, lo = Math.min(e, d2), hi = Math.max(e, d2), s2 = around(t, d2), P2 = s2.at >= 0 ? s2.at : vtx(pointAt(t, d2));
+    var before = [], after = [];
+    for (var i = 0; i < c.length; i++) {
+      if (i === s2.at) continue;
+      if (c[i] < lo - EDGE_EPS) before.push(i); else if (c[i] > hi + EDGE_EPS) after.push(i);
+    }
+    var r = build(t, before.concat([P2]).concat(after)), n2 = r.cum[before.length];
+    var oA = after.length ? c[after[0]] : null, nA = after.length ? r.cum[before.length + 1] : null;
+    var oB = before.length ? c[before[before.length - 1]] : null, nB = before.length ? r.cum[before.length - 1] : null;
+    r.f = function (d) {
+      if (!isFinite(d)) return d;
+      if (d >= lo && d <= hi) return n2;
+      if (d > hi) {
+        if (oA == null) return n2;
+        if (d < oA) return n2 + (d - hi) / ((oA - hi) || 1) * (nA - n2);
+        return nA + (d - oA);
+      }
+      if (oB == null) return 0;
+      if (d > oB) return nB + (d - oB) / ((lo - oB) || 1) * (n2 - nB);
+      return d;
+    };
+    r.end = n2;
+    return r;
+  }
+  // Истински връх в трака на разстояние d (в точката p, ако е дадена): връх на до 0,5 м се ползва, иначе се вмъква нов.
+  // Разстоянията почти не се менят. r.i - номерът на върха, r.pt - точката му (там се слага краят при разклонение).
+  function insertVertex(t, d, p) {
+    prep(t);
+    var c = t._cum, best = -1, r;
+    for (var i = 0; i < c.length; i++) if (Math.abs(c[i] - d) <= 0.5 && (best < 0 || Math.abs(c[i] - d) < Math.abs(c[best] - d))) best = i;
+    if (best >= 0) {
+      r = build(t, t.pts.map(function (x, k) { return k; }));
+      r.f = function (x) { return x; }; r.i = best; r.pt = t.pts[best];
+      return r;
+    }
+    var s = around(t, d), q = vtx(p ? [p[0], p[1], pointAt(t, d)[2]] : pointAt(t, d));
+    r = build(t, s.lo.concat([q]).concat(s.hi));
+    r.f = remapper(t.pts, r.pts, r.map); r.i = s.lo.length; r.pt = q;
+    return r;
   }
 
   /* 1.7: „Местене“ и „Махане“ пипат върховете на трака. Новите точки сменят разстоянията по трака: remapper дава
@@ -1741,6 +1873,7 @@
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: joinTol, nearestLive: nearestLive, skipEnds: skipEnds, collectionLinks: collectionLinks, openEnds: openEnds, addLink: addLink,
-    remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX
+    remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX,
+    liveParts: liveParts, partAt: partAt, JOIN_MIN: JOIN_MIN, extendEnd: extendEnd, trimEnd: trimEnd, insertVertex: insertVertex, nearestInRange: nearestIn
   };
 })();

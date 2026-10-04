@@ -1119,3 +1119,94 @@ console.log('общ участък OK');
   assert.ok(fb(500) > 500 + 10 && Math.abs(fb(50) - 50) < 0.01 && fb(2000) > 2000 + 10, '1.7: преместен връх удължава трака след него: 500 -> ' + fb(500).toFixed(1));
   console.log('1.7 колекцията: отворени краища, връзки до 500 м, изрязване със свързване, маршрут по връзката, .gpx, върхове: OK');
 })();
+
+// ---- 1.8: „Удължи/Скъси“ - свободният край расте с нови върхове, пуснат върху трак прави разклонение (истински връх в
+// чуждия трак), върху чужд край свързва двата трака, назад скъсява; без тавана на връзките ----
+(function () {
+  var lat0 = 42.6, lon0 = 24.8, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
+  function xy(x, y) { return [lat0 + y / ky, lon0 + x / kx]; }
+  function poly(v) {
+    var o = [xy(v[0][0], v[0][1]).concat([500])];
+    for (var i = 1; i < v.length; i++) { var a = v[i - 1], b = v[i], k = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10));
+      for (var j = 1; j <= k; j++) o.push(xy(a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k).concat([500])); }
+    return o;
+  }
+  function X(p) { return Math.round((p[1] - lon0) * kx); }
+  function Y(p) { return Math.round((p[0] - lat0) * ky); }
+  function apply(t, r) { t.pts = r.pts; delete t._cum; Core.prep(t); }
+  // Свободните краища носят коя страна е: 'a' - началото на видимото парче, 'b' - краят му.
+  var P = { id: 'P', pts: poly([[0, 0], [2000, 0]]) }, W = { id: 'W', pts: poly([[1003, 900], [1003, 300]]) }, cs = [P, W];
+  var oe = Core.openEnds(cs, 20).map(function (e) { return e.trackId + Math.round(e.d) + e.side; }).join(',');
+  assert.strictEqual(oe, 'P0a,P2000b,W0a,W600b', '1.8: свободните краища и страната им: ' + oe);
+  // Удължаване на края (b) с връх на 855 м - нов истински връх, без тавана от 500 м.
+  Core.prep(P);
+  var n0 = P.pts.length, r1 = Core.extendEnd(P, P.len, 'b', [xy(2855, 0)]);
+  apply(P, r1);
+  assert.ok(P.pts.length === n0 + 1 && Math.abs(P.len - 2855) < 1 && Math.abs(r1.end - 2855) < 1 && X(P.pts[P.pts.length - 1]) === 2855, '1.8: краят расте с нов връх на 855 м (над тавана на връзките): ' + Math.round(P.len));
+  assert.ok(Math.abs(r1.f(1000, 1) - 1000) < 0.01 && Math.abs(r1.f(2000, -1) - 2000) < 0.01 && Math.abs(r1.f(2000, 1) - 2855) < 1, '1.8: разстоянията до стария край не се менят; интервал, който започва в края, тръгва от новия');
+  // Удължаване на началото (a): всичко по трака се измества с новата дължина.
+  var r2 = Core.extendEnd(P, 0, 'a', [xy(-100, 0), xy(-100, 100)]);
+  apply(P, r2);
+  assert.ok(Math.abs(P.len - 3055) < 1 && Math.abs(r2.end) < 0.01 && Math.abs(r2.f(1000, 1) - 1200) < 1 && Math.abs(r2.f(0, 1) - 200) < 1 && X(P.pts[0]) === -100 && Y(P.pts[0]) === 100,
+    '1.8: началото расте с два върха (200 м), старото 1000 м е вече 1200 м: ' + Math.round(r2.f(1000, 1)));
+  // Скъсяване назад: върховете, през които минава, падат; краят е в новото място.
+  Core.prep(P);
+  var n1 = P.pts.length, r3 = Core.trimEnd(P, P.len, 'b', 2700);
+  apply(P, r3);
+  assert.ok(Math.abs(P.len - 2700) < 1 && P.pts.length === n1 && X(P.pts[P.pts.length - 1]) === 2500 && Math.abs(r3.end - 2700) < 1 && Math.abs(r3.f(2900) - 2700) < 1, '1.8: краят се скъсява до 2700 м (x 2500): връхът на 855 м пада, новият край е връх: ' + P.pts.length + ' точки');
+  var r4 = Core.trimEnd(P, 0, 'a', 400);
+  apply(P, r4);
+  assert.ok(Math.abs(P.len - 2300) < 1 && X(P.pts[0]) === 200 && Math.abs(r4.f(1000) - 600) < 1, '1.8: началото се скъсява с 400 м - падат двата добавени върха и първите 200 м от заредените: ' + X(P.pts[0]));
+  // Свободен край при изтрито (вътре в трака): скритото остава скрито, а новото е видимо.
+  var D = { id: 'D', pts: poly([[0, 500], [2000, 500]]), dels: [{ a: 800, b: 1200 }] };
+  Core.prep(D);
+  var r5 = Core.extendEnd(D, 800, 'b', [xy(800, 600)]);
+  apply(D, r5);
+  D.dels = D.dels.map(function (x) { return { a: r5.f(x.a, 1), b: r5.f(x.b, -1) }; });
+  var lp = Core.liveParts(D).map(function (p) { return p.map(Math.round).join('-'); }).join(' ');
+  assert.ok(lp === '0-900 ' + Math.round(D.dels[0].b) + '-' + Math.round(D.len) && Math.abs(D.len - 2000 - 100 - (Math.hypot(10, 100) - 10)) < 1,
+    '1.8: краят при изтритото расте, изтритото започва от новия край и скокът назад е скрит: ' + lp);
+  var r6 = Core.trimEnd(D, 900, 'b', 600);
+  apply(D, r6);
+  D.dels = D.dels.map(function (x) { return { a: r6.f(x.a, 1), b: r6.f(x.b, -1) }; });
+  assert.strictEqual(Core.liveParts(D).map(function (p) { return Math.round(p[0]) + '-' + Math.round(p[1]); })[0], '0-600', '1.8: скъсено при изтритото - видимото свършва на 600 м');
+  // Вмъкнат връх: разстоянията не се менят; връх на до 0,5 м се ползва.
+  Core.prep(W);
+  var Q = { id: 'Q', pts: poly([[0, 0], [2000, 0]]) };
+  Core.prep(Q);
+  var q0 = Q.pts.length, iv = Core.insertVertex(Q, 1003);
+  apply(Q, iv);
+  assert.ok(Q.pts.length === q0 + 1 && X(Q.pts[iv.i]) === 1003 && Math.abs(Q.len - 2000) < 0.01 && Math.abs(iv.f(1500) - 1500) < 0.01, '1.8: вмъкнат истински връх на 1003 м, дължината е същата');
+  assert.strictEqual(Core.insertVertex(Q, 1003.2).i, iv.i, '1.8: връх на до 0,5 м се ползва, не се вмъква втори');
+  // Разклонение с ръка: краят на W (600 м, на 300 м от Q) отива до вмъкнатия връх в Q; анализът вижда точката и не я маха.
+  Q.hj = [iv.pt.slice(0, 2)];
+  var rW = Core.extendEnd(W, W.len, 'b', [iv.pt]);
+  apply(W, rW);
+  W.ext = [rW.span];
+  assert.ok(Math.abs(rW.span.a - 600) < 0.01 && Math.abs(rW.span.b - 900) < 0.01, '1.8: удълженото е в t.ext (600-900 м)');
+  var cj = [Q, W], aj = Core.analyze(cj, 20), byJ = { Q: Q, W: W };
+  var jh = aj.junctions.filter(function (j) { return U.hav(j.lat, j.lon, iv.pt[0], iv.pt[1]) < 1; })[0];
+  assert.ok(jh && jh.hand && jh.branches.length === 3 && aj.byTrack.Q.filter(function (s) { return s.kind === 'part'; }).length === 2, '1.8: разклонението е точно във вмъкнатия връх, Q е на два клона, W - трети');
+  assert.ok(!Core.redundantJunctions(aj.junctions, byJ, 20).some(function (x) { return x.j === jh; }), '1.8: сложеното с ръка разклонение не е излишно');
+  assert.strictEqual(Core.openEnds(cj, 20).map(function (e) { return e.trackId + Math.round(e.d); }).join(','), 'Q0,Q2000,W0', '1.8: краят на W вече не е свободен');
+  var W0 = { id: 'W', pts: W.pts }, gW = Core.analyze([Q, W0], 20).byTrack.W.filter(function (s) { return s.kind === 'gap'; });
+  assert.ok(gW.length === 1 && !Core.analyze(cj, 20).byTrack.W.some(function (s) { return s.kind === 'gap'; }), '1.8: 300 м начертани не са дупка в записа (без t.ext биха били)');
+  // Без t.hj същото място пак е разклонение (краят лежи на линията), но не е с ръка.
+  delete Q.hj;
+  var jn = Core.analyze(cj, 20).junctions.filter(function (j) { return U.hav(j.lat, j.lon, iv.pt[0], iv.pt[1]) < 25; })[0];
+  assert.ok(jn && !jn.hand, '1.8: без записа точката е обикновено разклонение');
+  Q.hj = [iv.pt.slice(0, 2)];
+  // Сложеното с ръка разклонение е разклонение и след изтрито с „Изтрий разклонението“ място наблизо - докато самото не е изтрито.
+  var dropAt = Core.junctionPlace(jh);
+  assert.ok(!Core.analyze(cj, 20, { drop: [dropAt] }).junctions.some(function (j) { return U.hav(j.lat, j.lon, iv.pt[0], iv.pt[1]) < 1; }), '1.8: изтритото с „Изтрий разклонението“ не се връща');
+  // Свързване: краят на V отива точно в началото на Z - двата края вече не са свободни, а линията е една.
+  var V = { id: 'V', pts: poly([[0, -800], [1000, -800]]) }, Z = { id: 'Z', pts: poly([[1855, -800], [3000, -800]]) }, vz = [V, Z];
+  Core.prep(V);
+  var rv = Core.extendEnd(V, V.len, 'b', [Z.pts[0]]);
+  apply(V, rv);
+  V.ext = [rv.span];
+  assert.ok(Math.abs(V.len - 1855) < 1 && !Core.openEnds(vz, 20).some(function (e) { return e.trackId === 'V' && e.d > 1 || e.trackId === 'Z' && e.d < 1; }), '1.8: свързване на 855 м - V свършва точно в началото на Z, двата края не са свободни');
+  var gv = Core.routeGeometry({ items: [{ type: 'part', trackId: 'V', a: 0, b: V.len }, { type: 'part', trackId: 'Z', a: 0, b: Core.prep(Z).len }] }, { V: V, Z: Z }, Core.analyze(vz, 20));
+  assert.ok(!gv.gaps.length && Math.abs(gv.len - 3000) < 2, '1.8: маршрутът V + Z минава без дупка: ' + Math.round(gv.len) + ' м');
+  console.log('1.8 „Удължи/Скъси“: страните на краищата, удължаване без таван, скъсяване, изтритото, вмъкнат връх, разклонение с ръка, свързване: OK');
+})();
