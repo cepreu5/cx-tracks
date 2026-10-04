@@ -2647,7 +2647,7 @@ function barFits() {
     // Над 500 м: кликът не свързва, дупката остава, съобщението казва защо.
     await pe.mouse.click(longR.x, longR.y);
     let e2 = await est();
-    check(e2.gaps.length === 2 && e2.items === e1.items && e2.undo === e1.undo && /^Дупката е \d+ м - над 500 м не се свързва направо\. Затвори я с чертаене/.test(e2.toast), tag + 'клик върху пръстена на дупка над 500 м: остава отворена · ' + e2.toast);
+    check(e2.gaps.length === 2 && e2.items === e1.items && e2.undo === e1.undo && /^Дупката е \d+\sм - над 500\sм не се свързва направо\. Затвори я с чертаене/.test(e2.toast), tag + 'клик върху пръстена на дупка над 500 м: остава отворена · ' + e2.toast);
     // До 500 м: кликът свързва направо (като „Свържи направо“), „Отмени“ я връща.
     await pe.mouse.click(shortR.x, shortR.y);
     e2 = await est();
@@ -2670,7 +2670,7 @@ function barFits() {
         return m.dist < 12 && A.byTrack[t.id].some(s => s.kind === 'part' && m.d > s.a && m.d < s.b); }).map(t => t.name).join()); });
     check(e3.pend === 0 && e3.marks === 0 && JSON.stringify(kept) === '["EL.gpx","EL.gpx"]', tag + 'изчистване: маркери не остават, от всяка група остава едно копие (' + kept + ')');
     check(e3.gaps.length === 1 && e3.gaps[0] > 500 && e3.bridges === 1, tag + 'изчистване: дупката от 60 м е свързана, тази над 500 м остава отворена ' + JSON.stringify(e3.gaps));
-    check(new RegExp('^Махнати застъпени тракове: ' + pendBefore + ' · свързани дупки: 1\\. "Отмени" връща всичко\\. 1 дупка над 500 м остава отворена - затвори я с чертаене\\.$').test(e3.toast), tag + 'съобщението: ' + e3.toast);
+    check(new RegExp('^Махнати застъпени тракове: ' + pendBefore + ' · свързани дупки: 1\\. "Отмени" връща всичко\\. 1 дупка над 500\\sм остава отворена - затвори я с чертаене\\.$').test(e3.toast), tag + 'съобщението: ' + e3.toast);
     check(e3.undo === e2.undo + 1, tag + 'цялото изчистване е един отпечатък за „Отмени“ (' + e2.undo + ' -> ' + e3.undo + ')');
     if (true) { await pe.setViewportSize({ width: 1280, height: 800 }); await pe.screenshot({ path: path.join(OUT, 'clean-14-1280.png'), fullPage: false }); }
     await pe.click('#undoBtn');
