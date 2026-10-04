@@ -283,16 +283,24 @@ function barFits() {
   await page.click('[data-act="undo"]');
   check(await page.evaluate(() => (__gpxk.S.tracks[0].dels || []).length === 0), '"Отмени" връща изрязването');
 
-  // Чертане: точка в края на маршрута.
+  // Чертани точки в маршрута. 1.7: „Добавяне“ пипа колекцията - клик не слага парче в маршрута; чертаното в маршрута
+  // (старите маршрути, „Начертай“ при дупката) се слага тук направо.
+  const itemsBefore = await page.evaluate(() => JSON.stringify(__gpxk.S.routes.find(r => r.id === __gpxk.S.curId).items));
   await page.click('[data-mode="add"]');
   await page.mouse.click(700, 500);
-  check(await page.evaluate(() => __gpxk.S.routes.find(r => r.id === __gpxk.S.curId).items.some(i => i.type === 'draw' && i.pts.length === 1)), 'Добавяне: клик слага точка');
+  check(await page.evaluate(b => JSON.stringify(__gpxk.S.routes.find(r => r.id === __gpxk.S.curId).items) === b && __gpxk.ui.addPts.length === 1, itemsBefore), '1.7 Добавяне: клик слага точка в колекцията, маршрутът не е пипнат');
+  await page.click('[data-mode="select"]');
+  const drawAt = xy => page.evaluate(xy => { const m = __gpxk.map, r = __gpxk.S.routes.find(r => r.id === __gpxk.S.curId), mr = document.querySelector('#map').getBoundingClientRect();
+    let it = r.items.find(i => i.type === 'draw'); if (!it) r.items.push(it = { type: 'draw', pts: [] });
+    xy.forEach(q => { const p = m.unproject(q[0] - mr.left, q[1] - mr.top); it.pts.push({ lat: Math.round(p.lat * 1e6) / 1e6, lon: Math.round(p.lon * 1e6) / 1e6, name: '' }); }); __gpxk.refresh(); }, xy);
+  await drawAt([[700, 500]]);
+  check(await page.evaluate(() => __gpxk.S.routes.find(r => r.id === __gpxk.S.curId).items.some(i => i.type === 'draw' && i.pts.length === 1)), 'чертана точка в маршрута');
   // Ключ „Точки“: скрива кръгчетата и номерата на чертаните точки, избраната остава, скритите се хващат.
   const draws = () => page.evaluate(() => { const r = __gpxk.S.routes.find(r => r.id === __gpxk.S.curId), i = r.items.findIndex(i => i.type === 'draw'); return { idx: i, n: i < 0 ? 0 : r.items[i].pts.length, pts: i < 0 ? [] : r.items[i].pts.map(p => ({ lat: p.lat, lon: p.lon })) }; });
   const vtxNow = () => page.evaluate(() => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => res((__gpxk.ui.vtx || []).map(v => ({ sel: v.sel, label: v.label, x: Math.round(v.x), y: Math.round(v.y) })))))));
   const vtc = await page.evaluate(() => { const e = document.querySelector('#vtxToggle'), l = e && e.closest('label'), r = l && l.getBoundingClientRect(); return e ? { checked: e.checked, type: e.type, text: l.textContent.trim(), label: e.getAttribute('aria-label'), ring: !!l.querySelector('svg circle'), inCorner: !!e.closest('.mapctl.tr'), w: r.width } : null; });
   check(vtc && vtc.type === 'checkbox' && vtc.checked && !/Точки/.test(vtc.text) && vtc.ring && vtc.label === 'Точки' && vtc.inCorner && vtc.w > 0, 'ключ „Точки“ горе вдясно на картата, без дума (чавка и пръстен с номер), включен по подразбиране: ' + JSON.stringify(vtc));
-  await page.mouse.click(760, 470); await page.mouse.click(820, 520);
+  await drawAt([[760, 470], [820, 520]]);
   let dr = await draws();
   check(dr.n === 3, 'Добавяне: три чертани точки (' + dr.n + ')');
   await page.evaluate(p => { const m = __gpxk.map; m.setView(p.lat, p.lon, 16); m.redraw(); }, dr.pts[1]);
@@ -730,9 +738,9 @@ function barFits() {
     await page.setViewportSize({ width: w, height: 800 });
     if (pts) {
       await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-      await page.click('[data-mode="add"]');
-      await page.evaluate(() => { const m = __gpxk.map; for (const q of [[150, 450], [200, 500]]) m.opts.onClick(Object.assign({ x: q[0], y: q[1] }, m.unproject(q[0], q[1]))); });
-      await page.click('[data-mode="select"]');
+      // 1.7: „Добавяне“ пипа колекцията - чертаните точки в маршрута се слагат направо.
+      await page.evaluate(() => { const m = __gpxk.map, r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId);
+        r.items.push({ type: 'draw', injected: true, pts: [[150, 450], [200, 500]].map(q => { const p = m.unproject(q[0], q[1]); return { lat: p.lat, lon: p.lon, name: '' }; }) }); __gpxk.refresh(); });
     }
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
     await page.waitForFunction(() => document.querySelector('#bar').getBoundingClientRect().top >= 0 && !document.body.classList.contains('bar-hidden'), null, { timeout: 3000 }).catch(() => {});
@@ -766,7 +774,7 @@ function barFits() {
     const pt = await page.waitForFunction(() => Math.abs(document.querySelector('#panel').getBoundingClientRect().top) < 2 && window.scrollY > 100, null, { timeout: 4000 }).then(() => 0, () => page.evaluate(() => document.querySelector('#panel').getBoundingClientRect().top));
     check(pt === 0, 'на ' + w + ' px стрелката долу вдясно (най-горе сочи надолу) стига до текстовата част под картата (' + Math.round(pt) + ')');
     await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-    if (pts) { await page.click('#undoBtn'); await page.click('#undoBtn'); }
+    if (pts) await page.evaluate(() => { const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); r.items = r.items.filter(i => !i.injected); __gpxk.refresh(); });
   }
   if (hadParts) await page.click('#undoBtn');
   // Промяна след плана 17: „Точки“ се вижда само докато на картата има чертани точки; отметката не се губи.
@@ -1088,15 +1096,20 @@ function barFits() {
     r.items = [{ type: 'part', trackId: T[0].id, a: a.a, b: a.b, rev: false }, { type: 'part', trackId: T[2].id, a: c.a, b: c.b, rev: false }]; __gpxk.refresh(); });
   s4 = await st4();
   check(s4.gaps === 1 && s4.auto === 0 && s4.openRows.length === 1 && s4.openRows[0].length === 2 && s4.closedRows.length === 0, 'дупка от 25 м между LA и LC (над отклонението) остава дупка с двата бутона');
-  // Ръчна връзка, без избрана дупка: клик в "Добавяне" между края на LA и началото на LC.
-  const mid4 = await p4.evaluate(() => { const T = __gpxk.S.tracks, e = T[0].pts[T[0].pts.length - 1], s = T[2].pts[0]; __gpxk.map.setView((e[0] + s[0]) / 2, (e[1] + s[1]) / 2, 18); return __gpxk.map.project((e[0] + s[0]) / 2, (e[1] + s[1]) / 2); });
+  // 1.7: ръчна връзка - две точки в „Добавяне“ между края на LA и началото на LC стават връзка в колекцията;
+  // маршрутът не се пипа, а минава по нея.
+  const mid4 = await p4.evaluate(() => { const T = __gpxk.S.tracks, e = T[0].pts[T[0].pts.length - 1], s = T[2].pts[0], m = __gpxk.map; m.setView((e[0] + s[0]) / 2, (e[1] + s[1]) / 2, 18);
+    const r = document.querySelector('#map').getBoundingClientRect(); return [0.3, 0.7].map(f => { const q = m.project(e[0] + f * (s[0] - e[0]), e[1] + f * (s[1] - e[1])); return { x: r.left + q.x, y: r.top + q.y }; }); });
   await p4.click('[data-mode="add"]');
-  await p4.mouse.click(mid4.x, mid4.y);
+  await p4.mouse.click(mid4[0].x, mid4[0].y);
+  await p4.mouse.click(mid4[1].x, mid4[1].y);
   await p4.click('[data-mode="select"]');
   s4 = await st4();
-  check(JSON.stringify(s4.items) === '[0,"draw",2]' && s4.gaps === 0, 'ръчната връзка влиза между двете части, не в края: ' + JSON.stringify(s4.items));
+  const lk4 = await p4.evaluate(() => { const T = __gpxk.S.tracks; return { links: (T[0].links || []).map(l => [l.to === T[2].id, Math.round(l.a) === Math.round(T[0].len), Math.round(l.b)]), coll: __gpxk.G.items.filter(g => g.coll).length, rows: [...document.querySelectorAll('#partsList li.coll')].map(l => l.textContent.trim()) }; });
+  check(JSON.stringify(s4.items) === '[0,2]' && s4.gaps === 0 && lk4.links.length === 1 && lk4.links[0][0] && lk4.links[0][1] && lk4.links[0][2] === 0 && lk4.coll === 1,
+    '1.7 две точки в дупката стават връзка в колекцията (край на LA - начало на LC), маршрутът не е пипнат и минава по нея: ' + JSON.stringify([s4.items, lk4]));
   check(s4.firstPart === 'part' && s4.lastPart === 'part' && s4.startOn < 0.5 && s4.endOn < 0.5, 'с ръчна връзка "Старт" и "Край" остават върху трак: ' + JSON.stringify([s4.startOn, s4.endOn]));
-  check(s4.count === 2 && s4.sParts === '2' && s4.linkRows.length === 1 && /^връзка · \d+ м · между частите/.test(s4.linkRows[0]), 'връзката не е част: "Части" = ' + s4.sParts + ', ред ' + JSON.stringify(s4.linkRows));
+  check(s4.count === 2 && s4.sParts === '2' && lk4.rows.length === 1 && /^връзка от колекцията · \d+\sм/.test(lk4.rows[0]), 'връзката не е част: "Части" = ' + s4.sParts + ', ред ' + JSON.stringify(lk4.rows));
   await p4.evaluate(() => { const G = __gpxk.G, b = U.boundsOf([G.pts]); __gpxk.map.setView((b.s + b.n) / 2, (b.w + b.e) / 2, 15); });
   await p4.screenshot({ path: path.join(OUT, 'link-drawn-1280.png') });
   await p4.setViewportSize({ width: 390, height: 800 });
@@ -1115,9 +1128,9 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.6.0' && await p5.isVisible('#appVersion') && /^Версия 1\.6\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.7.0' && await p5.isVisible('#appVersion') && /^Версия 1\.7\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.6.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.7.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -2544,7 +2557,8 @@ function barFits() {
         return [0.25, 0.45].map(f => { const p = Core.pointAt(t, t.len * f); return __gpxk.map.project(p[0], p[1]); }); });
       for (const q of kp) await pk.evaluate(q => { const m = __gpxk.map; m.opts.onClick(Object.assign({ x: q.x, y: q.y }, m.unproject(q.x, q.y))); }, q);
       const box = await pk.evaluate(() => ({ t: document.querySelector('#cutText').textContent, s: document.querySelector('#cutSub').textContent, ok: !document.querySelector('[data-act="cut-ok"]').disabled }));
-      check(title === 'Две точки по трака махат част от него. „Отмени“ я връща.' && /^Изрязване: км 1,\d - 2,\d/.test(box.t) && /^\d+,\d\sкм се махат от трака завинаги\. „Отмени“ ги връща\.$/.test(box.s) && box.ok, tag + 'кутията за изрязване казва, че махането е завинаги: ' + JSON.stringify([title, box]));
+      // 1.7: изрязването маха и свързва двата края направо (до 500 м).
+      check(title === 'Две точки по трака махат частта между тях; тракът продължава с права връзка през махнатото (до 500 м). „Отмени“ я връща.' && /^Изрязване: км 1,\d - 2,\d/.test(box.t) && /^\d+,\d\sкм се махат от трака; двата края се свързват направо \(до 500\sм\)\. „Отмени“ ги връща\.$/.test(box.s) && box.ok, tag + 'кутията за изрязване казва какво се маха и че краищата се свързват: ' + JSON.stringify([title, box]));
       const before = await pk.evaluate(() => { const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); return { items: JSON.stringify(r.items), len: __gpxk.G.len, partsLen: r.items.reduce((a, it) => a + (it.type === 'part' ? Math.abs(it.b - it.a) : 0), 0) }; });
       await pk.click('[data-act="cut-ok"]');
       const st = () => pk.evaluate(() => { const S = __gpxk.S, A = __gpxk.A, t = S.tracks[0], r = S.routes.find(x => x.id === S.curId);
@@ -2555,7 +2569,7 @@ function barFits() {
       const k1 = await st();
       check(!k1.cuts && k1.d && k1.d.b - k1.d.a > 900 && !k1.cutSec && !k1.card, tag + 'изрязаното е изтрит участък (t.dels), не изрязване за връщане: ' + k1.dels);
       check(!k1.through && !k1.bad && k1.items !== before.items && k1.partsLen < before.partsLen - 900, tag + 'частта от маршрута губи отсечката (няма невалидна част): ' + k1.items);
-      check(/^Изрязани \d+,\d\sкм от KX\.gpx - махнати от картата, от трака и от маршрута\. „Отмени“ ги връща\.$/.test(k1.toast), tag + 'съобщението: ' + k1.toast);
+      check(/^Изрязани \d+,\d\sкм от KX\.gpx\. Краищата са на \d+\sм - над 500\sм връзка не се чертае, мястото остава открито\. „Отмени“ ги връща\.$/.test(k1.toast), tag + 'съобщението (краищата са над 500 м - без връзка): ' + k1.toast);
       check(/изтрити \d+,\d\sкм/.test(k1.row) && !/изрязани/.test(k1.row) && k1.scroll, tag + 'редът в „Тракове-източници“ носи само „изтрити“: ' + k1.row);
       if (W === 390) await pk.screenshot({ path: path.join(OUT, 'cut-132-390.png') });
       await pk.click('#undoBtn');
@@ -3065,7 +3079,7 @@ function barFits() {
     // Проверката при маркиран дубликат: колко са маркирани, какво остава след тях, дупките, „не е консистентна“.
     await p16.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const s1 = await st();
-    check(/остават маркирани 1/.test(s1.res) && /след изчистването им 1 застъпване/.test(s1.res) && /отворени малки дупки 1/.test(s1.res) && /не е консистентна/.test(s1.res) && s1.rows.length === 1 && /^Синтетичен Б · км 2,\d\s[-–]\s2,\d · \d+\sм · под него „Синтетичен А“$/.test(s1.rows[0]),
+    check(/остават маркирани 1/.test(s1.res) && /след изчистването им 3 застъпвания/.test(s1.res) && /отворени малки дупки 1/.test(s1.res) && /не е консистентна/.test(s1.res) && s1.rows.length === 3 && /^Синтетичен Б · км 2,\d\s[-–]\s2,\d · \d+\sм · под него „Синтетичен А“$/.test(s1.rows[2]) && s1.rows.slice(0, 2).every(x => /^Синтетичен Б · км [01],\d/.test(x)),
       tag + 'проверката при маркиран дубликат: ' + s1.res);
     await p16.evaluate(() => { if (document.querySelector('#dupsFoldBody').hidden) document.querySelector('#dupsCard .fold-t').click(); });
     await p16.locator('#dupsCard').screenshot({ path: path.join(OUT, 'check-160.png') });
@@ -3079,7 +3093,7 @@ function barFits() {
     check(s2.holes.length === 0 && s2.joins.length === 1 && s2.joins[0][0] === 'syn-a' && s2.joins[0][1] >= 55 && s2.joins[0][1] <= 65, tag + 'условие 3 - няма незатворени дупки: затворена е дупката от ' + (s2.joins[0] || [])[1] + ' м (тънка прекъсната линия)');
     check(s2.skips[1].length === 2 && s2.skips[1][0][0] < 300 && s2.skips[1][0][1] > 1070 && s2.skips[1][1][0] > 2250 && s2.skips[1][1][1] < 2330 && !s2.skips[0].length,
       tag + 'махнати са цялата споделена отсечка на Б (маркерът беше ' + s0.pendIv[0].slice(1).join('-') + ' м) и късото застъпване: ' + JSON.stringify(s2.skips));
-    check(/Махнато застъпване без маркер: 1\./.test(s2.toast) && /Затворена малка дупка в колекцията: 1\./.test(s2.toast), tag + 'съобщението казва какво е изчистено: ' + s2.toast);
+    check(/Махнати застъпвания без маркер: 3\./.test(s2.toast) && /Затворена малка дупка в колекцията: 1\./.test(s2.toast), tag + 'съобщението казва какво е изчистено: ' + s2.toast);
     check(s2.cnt === '0 застъпвания' && s2.clean, tag + 'броячът след изчистването: „' + s2.cnt + '“');
     await p16.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const s3 = await st();
@@ -3117,10 +3131,14 @@ function barFits() {
     await p16.click('#objMenu [data-omk="dupClose"]');
     await frame();
     const s5 = await st();
-    check(s5.pend === 0 && s5.skips[1].length === 1 && s5.skips[1][0][0] < 300 && s5.skips[1][0][1] > 1070 && !s5.lo.some(x => x[1] < 1100),
-      tag + '„Затвори направо“ маха цялата споделена отсечка ' + s5.skips[1][0].join('-') + ' м (маркерът: ' + s0.pendIv[0].slice(1).join('-') + ' м), там не остава застъпване: ' + JSON.stringify(s5.lo));
-    check(!s5.jA.some(d => d > 840 && d < 1560) && s5.jA.filter(d => Math.abs(d - 805) < 40).length === 1, tag + 'след маркера - една точка на разклоняване в края, тракът не се появява пак в участъка: ' + JSON.stringify(s5.jA));
-    check(/затворена сама/.test(s5.toast) && s5.joins.length === 1 && s5.holes.length === 0 && s5.cnt === '1 застъпване', tag + 'самозатварянето важи и в етапа „колекция“ (без маршрут): ' + s5.toast + ' · брояч „' + s5.cnt + '“');
+    // 1.7: „Затвори направо“ крие само покритото до прага (не цялата отсечка до jt); краищата на 22 м остават като застъпвания без маркер.
+    const land = await p16.evaluate(() => { const A = __gpxk.S.tracks.find(t => t.id === 'syn-a'), B = __gpxk.S.tracks.find(t => t.id === 'syn-b'), k = B.skips[0];
+      return [k.a, k.b].map(d => { const p = Core.pointAt(B, d); return Math.round(Core.nearestOnTrack(A, p[0], p[1]).d); }).sort((p, q) => p - q); });
+    check(s5.pend === 0 && s5.skips[1].length === 1 && s5.skips[1][0][0] >= s0.pendIv[0][1] - 20 && s5.skips[1][0][1] <= s0.pendIv[0][2] + 20 && s5.lo.filter(x => x[1] < 1100).length === 2,
+      tag + '1.7 „Затвори направо“ крие само покритото ' + s5.skips[1][0].join('-') + ' м (маркерът: ' + s0.pendIv[0].slice(1).join('-') + ' м); краищата на 22 м остават застъпвания без маркер: ' + JSON.stringify(s5.lo));
+    const inside = s5.jA.filter(d => d > 790 && d < 1610);
+    check(inside.length === 2 && Math.abs(inside[0] - land[0]) < 40 && Math.abs(inside[1] - land[1]) < 40, tag + 'по една точка на разклоняване в двата края - там, където махнатото ляга върху А (' + land.join(', ') + '): ' + JSON.stringify(s5.jA));
+    check(/затворена сама/.test(s5.toast) && s5.joins.length === 1 && s5.holes.length === 0 && s5.cnt === '3 застъпвания', tag + 'самозатварянето важи и в етапа „колекция“ (без маршрут): ' + s5.toast + ' · брояч „' + s5.cnt + '“');
     await p16.click('#undoBtn');
     // „Затвори с чертане“: маха и трака отдолу, мястото остава за чертане.
     mk = await toMarker();
@@ -3128,7 +3146,7 @@ function barFits() {
     await p16.waitForFunction(() => !document.querySelector('#objMenu').hidden);
     await p16.click('#objMenu [data-omk="dupDraw"]');
     const s6 = await st();
-    check(s6.pend === 0 && s6.skips[1].length === 1 && s6.dels[0].some(x => x[0] < 830 && x[1] > 1570) && s6.mode === 'add' && /тракът под него \(„Синтетичен А“\)/.test(s6.toast),
+    check(s6.pend === 0 && s6.skips[1].length === 1 && s6.dels[0].some(x => x[0] < 900 && x[1] > 1500) && s6.mode === 'add' && /тракът под него \(„Синтетичен А“\)/.test(s6.toast),
       tag + '„Затвори с чертане“ маха копието и трака отдолу (' + JSON.stringify(s6.dels[0]) + '), режимът е „Добави“: ' + s6.toast);
     await p16.click('#undoBtn');
     await p16.click('[data-mode="select"]');
@@ -3194,12 +3212,199 @@ function barFits() {
     check(en.cnt === '1 marked left' && en.btn === 'Check for duplicates 1 marked left' && en.names === 'Clear names' && en.arrow === 'To the figures below the map', tag + 'на английски броячът, копчетата и стрелката: ' + JSON.stringify(en));
     await p16.evaluate(() => document.querySelector('#cleanBtn').click());
     const tEn = await p16.textContent('#toast');
-    check(/Overlap without a marker removed: 1\./.test(tEn) && /Small gap closed in the collection: 1\./.test(tEn) && await p16.textContent('#dcCount') === '0 overlaps', tag + 'на английски съобщението след изчистването: ' + tEn);
+    check(/Overlaps without a marker removed: 3\./.test(tEn) && /Small gap closed in the collection: 1\./.test(tEn) && await p16.textContent('#dcCount') === '0 overlaps', tag + 'на английски съобщението след изчистването: ' + tEn);
     await p16.click('#undoBtn');
     await p16.evaluate(() => I18N.setPref('bg'));
     check(await p16.textContent('#dcCount') === 'остава 1 маркиран', tag + 'обратно на български');
     check(!e16.length, tag + 'конзолата е чиста' + (e16.length ? ': ' + e16.join(' | ') : ''));
     await c16.close();
+  }
+
+  // ---- 1.7: четирите режима пипат колекцията, не маршрута; изтрит дубликат не оставя празно място; връзка до 500 м;
+  // връзките излизат в .gpx като върхове в трака. Синтетика: tests/fixtures/chista-kolekcia.json и правите P, Q, R, T, V. ----
+  {
+    const tag = '1.7: ';
+    const c17 = await browser.newContext({ viewport: { width: 1280, height: 800 }, acceptDownloads: true, menus: true, dupMenu: true });
+    const p17 = await c17.newPage();
+    const e17 = [];
+    p17.on('pageerror', e => e17.push('pageerror: ' + e.message));
+    p17.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) e17.push('console: ' + m.text()); });
+    await p17.goto(url);
+    await p17.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    const frame = () => p17.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const scr = (lat, lon) => p17.evaluate(q => { const p = __gpxk.map.project(q[0], q[1]), r = document.querySelector('#map').getBoundingClientRect(); return { x: r.left + p.x, y: r.top + p.y }; }, [lat, lon]);
+    const items = () => p17.evaluate(() => JSON.stringify(__gpxk.S.routes.find(r => r.id === __gpxk.S.curId).items));
+
+    // Изтрит дубликат: крие се само покритото от оставащото копие, краищата лягат върху него, празно място не остава.
+    await p17.click('#empty [data-act="add-tracks"]');
+    await p17.setInputFiles('#fileInput', path.join(ROOT, 'tests', 'fixtures', 'chista-kolekcia.json'));
+    await p17.waitForFunction(() => __gpxk.S.tracks.length === 2 && !/Чета файл/.test(document.querySelector('#importMsg').textContent));
+    await p17.keyboard.press('Escape');
+    await p17.waitForFunction(() => !document.querySelector('#dlgImport').open && !document.querySelector('#dlgRings').open);
+    const pend0 = await p17.evaluate(() => { const s = __gpxk.A.pend[0]; return [Math.round(s.a), Math.round(s.b)]; });
+    const before = await items();
+    const mk = await p17.evaluate(() => { const t = __gpxk.S.tracks.find(x => x.id === 'syn-b'), s = __gpxk.A.pend[0], m = Core.pointAt(t, (s.a + s.b) / 2); __gpxk.map.setView(m[0], m[1], 15); });
+    await frame();
+    const mq = await p17.evaluate(() => { const o = __gpxk.ui.markers[0], b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + o.x, y: b.top + o.y }; });
+    await p17.mouse.click(mq.x, mq.y);
+    await p17.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+    await p17.click('#objMenu [data-omk="dupClose"]');
+    await frame();
+    const d1 = await p17.evaluate(() => {
+      const S = __gpxk.S, A = S.tracks.find(t => t.id === 'syn-a'), B = S.tracks.find(t => t.id === 'syn-b'), sk = B.skips[0], tol = S.tol;
+      // Всеки скрит метър има линия отдолу (А, без изтритото), до прага за дубликат.
+      let worst = 0;
+      for (let d = sk.a; d <= sk.b; d += 5) { const p = Core.pointAt(B, d), n = Core.nearestLive([A], null, 0, 200, tol, p); worst = Math.max(worst, n ? n.dist : 999); }
+      const ends = (__gpxk.ui.skipEnds || []).filter(e => e.trackId === 'syn-b').map(e => ({ d: Math.round(e.d), len: Math.round(e.dist * 10) / 10, onA: Math.round(Core.nearestOnTrack(A, e.to[0], e.to[1]).dist * 100) / 100, fromB: Math.round(Core.nearestOnTrack(B, e.from[0], e.from[1]).dist * 100) / 100, withA: e.withId === 'syn-a' }));
+      return { sk: B.skips.map(x => [Math.round(x.a), Math.round(x.b)]), worst: Math.round(worst * 10) / 10, tol, ends, joinsB: (B.joins || []).length, linksB: (B.links || []).length, mode: __gpxk.ui.mode, pend: __gpxk.A.pend.length };
+    });
+    check(d1.pend === 0 && d1.sk.length === 1 && d1.sk[0][0] >= pend0[0] - 20 && d1.sk[0][1] <= pend0[1] + 20 && d1.sk[0][0] > 300 && d1.sk[0][1] < 1070,
+      tag + 'изтритият дубликат крие само покритото от оставащото копие: ' + d1.sk[0].join('-') + ' м (маркерът ' + pend0.join('-') + ' м; в 1.6 - около 280-1090 м)');
+    check(d1.worst <= d1.tol, tag + 'под всеки скрит метър лежи оставащата линия: най-далечната точка е на ' + d1.worst + ' м (прагът е ' + d1.tol + ' м)');
+    check(d1.ends.length === 2 && d1.ends.every(e => e.withA && e.onA < 0.5 && e.fromB < 0.5 && e.len <= d1.tol) && d1.ends.map(e => e.d).join() === d1.sk[0].join(),
+      tag + 'двата края на махнатото лягат върху оставащата линия (продължение в цвета на трака): ' + JSON.stringify(d1.ends));
+    check(!d1.joinsB && !d1.linksB && d1.mode === 'select' && await items() === before, tag + 'след изтриването нищо не се свързва и не се чертае: Б няма връзки, режимът е „Избор“, маршрутът не е пипнат');
+    // Пикселите: около двата края линията не се къса - между края на Б и А по екрана няма празнина.
+    const gapPx = await p17.evaluate(() => {
+      const m = __gpxk.map, cv = document.querySelector('#map canvas'), ctx = cv.getContext('2d'), k = cv.width / cv.getBoundingClientRect().width, out = [];
+      (__gpxk.ui.skipEnds || []).forEach(e => {
+        const a = m.project(e.from[0], e.from[1]), b = m.project(e.to[0], e.to[1]); let miss = 0;
+        for (let f = 0; f <= 1; f += 0.1) { const x = (a.x + f * (b.x - a.x)) * k, y = (a.y + f * (b.y - a.y)) * k, px = ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data; if (px[3] === 0) miss++; }
+        out.push(miss);
+      });
+      return out;
+    }).catch(() => null);
+    if (gapPx) check(gapPx.every(n => n === 0), tag + 'по екрана продължението от края на Б до А е начертано: ' + JSON.stringify(gapPx));
+    await p17.screenshot({ path: path.join(OUT, 'dup-no-gap-170.png') });
+    await p17.click('#undoBtn');
+    check(await p17.evaluate(() => __gpxk.A.pend.length === 1 && !(__gpxk.S.tracks[1].skips || []).length), tag + '„Отмени“ връща дубликата');
+
+    // Колекция от прави: P (0-2000 м), Q (2060-3500 м), R (3580-5000 м), T (5450-6000 м), V (6550-7500 м) по една линия на изток.
+    await p17.evaluate(() => {
+      const lat0 = 42.6, lon0 = 24.8, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
+      const mk = (id, x0, x1, c) => { const pts = []; for (let x = x0; x <= x1 + 0.01; x += 10) pts.push([Math.round((lat0) * 1e6) / 1e6, Math.round((lon0 + x / kx) * 1e7) / 1e7, 500]); return { id, name: 'Права ' + id, title: 'Права ' + id, color: c, pts, breaks: [], wpts: [], dels: [], skips: [], joins: [], links: [], visible: true, created: Date.now() }; };
+      __gpxk.S.tracks.splice(0, __gpxk.S.tracks.length, mk('P', 0, 2000, 0), mk('Q', 2060, 3500, 1), mk('R', 3580, 5000, 2), mk('T', 5450, 6000, 3), mk('V', 6550, 7500, 4));
+      const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); r.items = [];
+      window.__x = x => [lat0, lon0 + x / kx];
+      __gpxk.reanalyze();
+    });
+    const at = async (x, z) => { await p17.evaluate(q => { const p = __x(q[0]); __gpxk.map.setView(p[0], p[1], q[1]); }, [x, z]); await frame(); };
+    const click = async x => { const p = await p17.evaluate(x => __x(x), x); const q = await scr(p[0], p[1]); await p17.mouse.click(q.x, q.y); };
+    const coll = () => p17.evaluate(() => { const S = __gpxk.S, r = Math.round, G = __gpxk.G, rt = S.routes.find(x => x.id === S.curId);
+      return { links: S.tracks.map(t => t.id + ':' + (t.links || []).map(l => l.to + '/' + r(l.a) + '-' + r(l.b) + '/' + (l.pts || []).length).join(',')).join(' '), joins: S.tracks.map(t => (t.joins || []).map(j => [r(j.a), r(j.b)])),
+        dels: S.tracks.map(t => (t.dels || []).map(j => [r(j.a), r(j.b)])), n: S.tracks.map(t => t.pts.length), items: rt.items.length, gLen: r(G.len), gPts: G.pts.length, pend: (__gpxk.ui.addPts || []).length,
+        ends: Core.openEnds(S.tracks, S.tol).map(e => e.trackId + r(e.d)), toast: document.querySelector('#toast').textContent, mode: __gpxk.ui.mode }; });
+    const c0 = await coll();
+    check(c0.ends.join() === 'P0,P2000,Q0,Q1440,R0,R1420,T0,T550,V0,V950' && c0.items === 0, tag + 'отворените краища на колекцията: ' + c0.ends.join(', '));
+    // „Добавяне“ с празен маршрут: две точки в дупката стават връзка в колекцията, не маршрут от две точки.
+    await at(2030, 16);
+    await p17.click('[data-mode="add"]');
+    await frame();
+    const av = await p17.evaluate(() => __gpxk.ui.addView);
+    check(av && av.ends >= 2, tag + 'в „Добавяне“ отворените краища са с кръгчета: ' + JSON.stringify(av));
+    await click(2015);
+    const c1 = await coll();
+    check(c1.pend === 1 && c1.items === 0 && c1.gPts === 0 && /Точка 1/.test(c1.toast), tag + 'първата точка чака втората, маршрутът е празен: ' + c1.toast);
+    await click(2045);
+    const c2 = await coll();
+    check(/P:Q\/2000-0\/0/.test(c2.links) && c2.items === 0 && c2.gPts === 0 && c2.pend === 0 && !c2.ends.includes('P2000') && !c2.ends.includes('Q0'),
+      tag + '„Добавяне“ с празен маршрут: двете точки станаха връзка в колекцията (P край - Q начало), маршрутът остава празен: ' + c2.links + ' · ' + c2.toast);
+    await p17.screenshot({ path: path.join(OUT, 'add-link-170.png') });
+    // Втората дупка се затваря отделно, без да пипа първата.
+    await at(3540, 16);
+    await click(3510); await click(3570);
+    const c3 = await coll();
+    check(/P:Q\/2000-0\/0/.test(c3.links) && /Q:R\/1440-0\/0/.test(c3.links) && c3.items === 0 && c3.gPts === 0, tag + 'втората дупка се затваря отделно, първата връзка не мръдва: ' + c3.links);
+    // Таван 500 м: на 450 м връзката се прави (с връх по средата), на 550 м - не.
+    await at(5225, 15);
+    await click(5005); await click(5225); await click(5445);
+    const c4 = await coll();
+    check(/R:T\/1420-0\/1/.test(c4.links), tag + 'връзка 450 м (под 500 м) през три точки: краищата прилепват, средната е връх: ' + c4.links);
+    await at(6275, 15);
+    await click(6005); await click(6545);
+    const c5 = await coll();
+    check(!/T:V/.test(c5.links) && c5.ends.includes('T550') && c5.ends.includes('V0') && /над 500\s?м връзка не се чертае/.test(c5.toast) && c5.pend === 0, tag + 'над 500 м връзка не се чертае (550 м): ' + c5.toast);
+    // „Изрязване“: махнатото се свързва направо, маршрутът не се пипа; над 500 м краищата остават открити.
+    await at(600, 15);
+    await p17.click('[data-mode="cut"]');
+    await click(500); await click(700);
+    await p17.click('[data-act="cut-ok"]');
+    const c6 = await coll();
+    check(JSON.stringify(c6.dels[0]) === '[[500,700]]' && JSON.stringify(c6.joins[0]) === '[[500,700]]' && c6.items === 0 && /права връзка/.test(c6.toast) && !c6.ends.some(e => /^P(500|700)$/.test(e)),
+      tag + '„Изрязване“ маха частта и свързва двата края направо (P 500-700 м), маршрутът не е пипнат: ' + c6.toast);
+    await at(2600, 14);
+    await p17.click('[data-mode="cut"]');
+    await click(2200); await click(3000);
+    await p17.click('[data-act="cut-ok"]');
+    const c7 = await coll();
+    check(c7.dels[1].length === 1 && !c7.joins[1].length && /над 500\s?м/.test(c7.toast), tag + '„Изрязване“ над 500 м: краищата остават открити: ' + c7.toast);
+    await p17.click('#undoBtn');
+    // „Местене“ и „Махане“ пипат върховете на траковете (отблизо) и на връзките.
+    await p17.click('[data-mode="move"]');
+    await at(1000, 17);
+    const tv = await p17.evaluate(() => __gpxk.ui.tvtx);
+    check(tv > 10, tag + 'в „Местене“ отблизо върховете на траковете се виждат: ' + tv);
+    const v0 = await p17.evaluate(() => __x(1000)), q0 = await scr(v0[0], v0[1]);
+    await p17.mouse.move(q0.x, q0.y); await p17.mouse.down(); await p17.mouse.move(q0.x + 10, q0.y + 15, { steps: 4 }); await p17.mouse.move(q0.x + 15, q0.y + 30, { steps: 4 }); await p17.mouse.up();
+    const mv = await p17.evaluate(() => { const P = __gpxk.S.tracks[0], j = P.joins[0], h = Core.liveJoins(P).length; Core.prep(P); return { lat: P.pts[100][0], lat0: P.pts[99][0], d: [Math.round(P.dels[0].a), Math.round(P.dels[0].b)], j: [Math.round(j.a), Math.round(j.b)], h, len: Math.round(P.len), la: Math.round(P.links[0].a), items: __gpxk.S.routes.find(r => r.id === __gpxk.S.curId).items.length }; });
+    check(mv.lat < mv.lat0 && mv.items === 0 && mv.h === 1 && mv.d.join() === '500,700' && mv.j.join() === '500,700' && mv.len > 2000 && mv.la === mv.len, tag + '„Местене“ мести връх на трака; изрязаното и връзката го следват по новите разстояния: ' + JSON.stringify(mv));
+    await p17.click('[data-mode="remove"]');
+    await at(1500, 17);
+    const n0 = (await coll()).n[0];
+    const v1 = await p17.evaluate(() => { const P = __gpxk.S.tracks[0]; return P.pts[150]; }), q1 = await scr(v1[0], v1[1]);
+    await p17.mouse.click(q1.x, q1.y);
+    const rm = await p17.evaluate(() => { const P = __gpxk.S.tracks[0]; Core.prep(P); return { n: P.pts.length, gap: Math.round(Core.slice(P, P._cum[148], P._cum[150]).length) }; });
+    check(rm.n === n0 - 1 && (await coll()).items === 0, tag + '„Махане“ маха връх на трака и свързва съседите му (' + n0 + ' -> ' + rm.n + ' точки)');
+    await at(5225, 17);
+    const lv = await p17.evaluate(() => __gpxk.S.tracks[2].links[0].pts[0]), q2 = await scr(lv[0], lv[1]);
+    await p17.mouse.click(q2.x, q2.y);
+    const c8 = await coll();
+    check(/R:T\/1420-0\/0/.test(c8.links), tag + '„Махане“ маха връх на връзката, връзката остава: ' + c8.links);
+    await p17.click('#undoBtn');
+    await p17.click('[data-mode="select"]');
+
+    // Износ: връзките са върхове в трака - една непрекъсната линия.
+    const [dl] = await Promise.all([p17.waitForEvent('download'), p17.click('#tracksList li:first-child [data-tr="gpx"]')]);
+    const gx = fs.readFileSync(await dl.path(), 'utf8');
+    const tp = [...gx.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"/g)].map(m => [+m[1], +m[2]]);
+    const ex = await p17.evaluate(tp => { const r = Math.round, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(42.6 * Math.PI / 180) * ky, xs = tp.map(p => r((p[1] - 24.8) * kx)); let jump = 0, at = null;
+      for (let i = 1; i < xs.length; i++) { const d = xs[i] - xs[i - 1]; if (d > jump) { jump = d; at = [xs[i - 1], xs[i]]; } }
+      return { n: tp.length, first: xs[0], last: xs[xs.length - 1], jump, at, mono: xs.every((x, i) => !i || x >= xs[i - 1]) }; }, tp);
+    check((gx.match(/<trkseg>/g) || []).length === 1 && ex.first === 0 && ex.last === 2060 && ex.jump >= 195 && ex.at.join() === '500,700',
+      tag + '.gpx на P е една линия: изрязаното е права между 500 и 700 м, а връзката към Q е последният връх (2060 м): ' + JSON.stringify(ex));
+    // Маршрут P + Q: минава по връзката от колекцията и в .gpx тя е върхове в трака.
+    await p17.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), P = S.tracks[0], Q = S.tracks[1]; Core.prep(P); Core.prep(Q);
+      r.items = [{ type: 'part', trackId: 'P', a: 700, b: P.len, rev: false }, { type: 'part', trackId: 'Q', a: 0, b: Q.len, rev: false }]; __gpxk.refresh(); });
+    const rg = await p17.evaluate(() => ({ gaps: __gpxk.G.gaps.length, coll: __gpxk.G.items.filter(g => g.coll).length }));
+    await p17.evaluate(() => document.querySelector('#bar [data-act="export-gpx"]').click());
+    await p17.waitForFunction(() => document.querySelector('#dlgName').open);
+    const [dr] = await Promise.all([p17.waitForEvent('download'), p17.press('#fileName', 'Enter')]);
+    const rx = fs.readFileSync(await dr.path(), 'utf8'), rp = [...rx.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"/g)].map(m => +m[2]);
+    const kx17 = Math.cos(42.6 * Math.PI / 180) * 6371008.8 * Math.PI / 180, rxs = rp.map(v => Math.round((v - 24.8) * kx17));
+    check(rg.gaps === 0 && rg.coll === 1 && (rx.match(/<trkseg>/g) || []).length === 1 && rxs.includes(2000) && rxs.includes(2060) && rxs.indexOf(2060) === rxs.indexOf(2000) + 1,
+      tag + 'маршрутът P + Q минава по връзката от колекцията, без дупка; в .gpx тя е върхове в трака: ' + JSON.stringify(rg));
+    // Проверката казва кога маршрутът може да се сглобява.
+    await p17.evaluate(() => document.querySelector('#dupCheckBtn').click());
+    const vr = await p17.evaluate(() => document.querySelector('#dupCheckRes .dc-verdict').textContent.replace(/\s+/g, ' ').trim());
+    check(/маршрутът (вече може да се сглобява|още не се сглобява)/.test(vr), tag + 'проверката казва и дали маршрутът може да се сглобява: ' + vr);
+    await p17.setViewportSize({ width: 390, height: 844 });
+    await p17.click('[data-mode="add"]');
+    await frame();
+    check(await p17.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tag + '390 px: без хоризонтален скрол');
+    await p17.screenshot({ path: path.join(OUT, 'add-170-390.png') });
+    await p17.click('[data-mode="select"]');
+    await p17.setViewportSize({ width: 1280, height: 800 });
+    // Двата езика.
+    const keys = ['mode.cut.title', 'mode.add.title', 'mode.move.title', 'mode.remove.title', 'msg.addColl', 'msg.addPt', 'msg.addNoEnds', 'msg.linkLong', 'msg.linked', 'msg.moveColl', 'msg.removeColl', 'msg.clickRemove', 'msg.grabPoint',
+      'msg.vtxMoved', 'msg.vtxRemoved', 'msg.vtxLast', 'msg.linkVtxRemoved', 'msg.linkRemoved', 'msg.cutJoined', 'msg.cutLong', 'cut.sub', 'parts.coll', 'dc.routeReady', 'dc.routeWait', 'om.dupClose.title', 'hint'];
+    const miss = await p17.evaluate(ks => ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }), keys);
+    check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
+    await p17.evaluate(() => I18N.setPref('en'));
+    const enT = await p17.getAttribute('[data-mode="add"]', 'title');
+    check(/link in the collection/.test(enT), tag + 'на английски: ' + enT);
+    await p17.evaluate(() => I18N.setPref('bg'));
+    check(!e17.length, tag + 'конзолата е чиста' + (e17.length ? ': ' + e17.join(' | ') : ''));
+    await c17.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));
