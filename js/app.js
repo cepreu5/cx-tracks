@@ -971,8 +971,10 @@
     var res = null;
     (G && G.forks || []).forEach(function (f) {
       if (res || f.atEnd || f.atStart) return;
+      // Примката е два клона с един участък: по който маршрутът вече върви, не е друг клон.
+      var on = [f.chosen, f.incoming].map(function (i) { return f.j.branches[i] && f.j.branches[i].key; });
       f.j.branches.forEach(function (br, bi) {
-        if (!res && br.key === sec.key && bi !== f.chosen && bi !== f.incoming) res = { fork: f, br: br };
+        if (!res && br.key === sec.key && on.indexOf(br.key) < 0) res = { fork: f, br: br };
       });
     });
     return res;
@@ -1373,7 +1375,8 @@
       if (bi === f.chosen || bi === f.incoming) return;
       var sec = { trackId: br.trackId, kind: 'part', a: br.a, b: br.b, len: br.len, key: br.key };
       if (f.atEnd && findItemFor(sec) >= 0) return;
-      btns.push({ key: 'go', label: T('om.go', { name: trackLabel(tb[br.trackId]), len: U.km(br.len) }),
+      // Примката се предлага в двете посоки - коя е коя, казва посоката на записа.
+      btns.push({ key: 'go', label: T(br.loop ? (br.from === 'a' ? 'om.goFwd' : 'om.goRev') : 'om.go', { name: trackLabel(tb[br.trackId]), len: U.km(br.len) }),
         run: f.atEnd ? function () { addPart(sec); } : function () { switchFork({ fork: f, br: br }); } });
     });
     // Близък трак (краищата на два трака на по-малко от отклонението) - само предложение.

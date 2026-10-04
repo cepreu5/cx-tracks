@@ -611,6 +611,8 @@ I18N.add({
   'om.delSeg': ['Изтрий участъка', 'Delete stretch'],
   'om.delJ': ['Изтрий разклонението', 'Delete junction'],
   'om.go': ['Продължи по {name} · {len}', 'Continue along {name} · {len}'],
+  'om.goFwd': ['Продължи по {name} · {len} · по посоката на записа', 'Continue along {name} · {len} · as recorded'],
+  'om.goRev': ['Продължи по {name} · {len} · срещу посоката на записа', 'Continue along {name} · {len} · against the recording'],
   'om.delNear': ['Изтрий близкия трак „{name}“ ({d})', 'Delete the nearby track “{name}” ({d})'],
   'tip.segMenu': ['Клик - меню: добави или изтрий', 'Click - menu: add or delete'],
   'tip.itemMenu': ['Клик - меню: махни от маршрута или изтрий участъка', 'Click - menu: remove from the route or delete the stretch'],

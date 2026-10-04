@@ -1107,9 +1107,9 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.4.1' && await p5.isVisible('#appVersion') && /^Версия 1\.4\.1 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.4.2' && await p5.isVisible('#appVersion') && /^Версия 1\.4\.2 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.4.1' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.4.2' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -2689,6 +2689,60 @@ function barFits() {
     await pe.screenshot({ path: path.join(OUT, 'clean-14-390-dark.png') });
     check(!ee.length, tag + 'конзолата е чиста' + (ee.length ? ': ' + ee.join(' | ') : ''));
     await ce.close();
+  }
+
+  // ---- 1.4.2: близалка - на далечния край примката е два клона; менюто на пръстена предлага само обратната посока ----
+  {
+    const tag = '1.4.2: ';
+    const cl = await browser.newContext({ viewport: { width: 1280, height: 800 }, menus: true });
+    const pl = await cl.newPage();
+    const el = [];
+    pl.on('pageerror', e => el.push('pageerror: ' + e.message));
+    pl.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) el.push('console: ' + m.text()); });
+    await pl.goto(url);
+    await pl.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    // Същата близалка като в tests/core.test.js: 700 м на изток, 150 м обща отсечка, примка, обратно по отсечката и на юг.
+    const la0 = 42.7, kyL = 111320, kxL = 111320 * Math.cos(la0 * Math.PI / 180), atL = (e, n) => [la0 + n / kyL, 24.6 + e / kxL];
+    const leg = (e0, n0, e1, n1) => { const k = Math.max(1, Math.round(Math.hypot(e1 - e0, n1 - n0) / 10)), p = []; for (let i = 1; i <= k; i++) { const q = atL(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k); p.push([q[0], q[1], 600]); } return p; };
+    const lolli = [[...atL(0, 0), 600]].concat(leg(0, 0, 700, 0), leg(700, 0, 850, 0), leg(850, 0, 1150, 300), leg(1150, 300, 1150, -300), leg(1150, -300, 850, 4), leg(850, 4, 700, 4), leg(700, 4, 700, -600));
+    await pl.setInputFiles('#fileInput', writeGpx('blizalka', lolli));
+    await pl.waitForFunction(() => __gpxk.S.tracks.length === 1);
+    await pl.evaluate(() => { const d = document.querySelector('#dlgImport'); if (d.open) d.close(); window.scrollTo(0, 0); });
+    const frameL = () => pl.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const c = atL(800, 0);
+    await pl.evaluate(a => __gpxk.map.setView(a[0], a[1], 17), c); await frameL();
+    // Дубликатът (обратното минаване) пада с клик върху маркера му.
+    await pl.waitForFunction(() => (__gpxk.ui.markers || []).length === 1);
+    const mk = await pl.evaluate(() => { const b = document.querySelector('#map').getBoundingClientRect(), o = __gpxk.ui.markers[0]; return { x: b.left + o.x, y: b.top + o.y }; });
+    await pl.mouse.click(mk.x, mk.y);
+    await pl.waitForFunction(() => __gpxk.A.pend.length === 0);
+    // Маршрутът от четирите оставащи части, в посоката на записа.
+    await pl.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), t = S.tracks[0];
+      r.items = __gpxk.A.byTrack[t.id].filter(s => s.kind === 'part').map(s => ({ type: 'part', trackId: t.id, a: s.a, b: s.b, rev: false })); __gpxk.refresh(); });
+    await frameL();
+    const lst = () => frameL().then(() => pl.evaluate(a => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), b = document.querySelector('#map').getBoundingClientRect();
+      const far = __gpxk.A.junctions.find(j => Math.abs(j.lat - a[0]) < 2e-4 && Math.abs(j.lon - a[1]) < 3e-4 && j.branches.length >= 2), f = (__gpxk.G.forks || []).find(x => x.j === far), ring = far && (__gpxk.ui.rings || []).find(o => o.key === far.key);
+      return { items: r.items.map(i => Math.round(i.a) + '..' + Math.round(i.b) + (i.rev ? 'r' : '')), undo: __gpxk.ui.undo.length,
+        nb: far ? far.branches.length : 0, loops: far ? far.branches.filter(br => br.loop).map(br => br.from).join('') : '',
+        chosen: f ? f.chosen : null, incoming: f ? f.incoming : null, chFrom: f && far.branches[f.chosen] ? (far.branches[f.chosen].loop ? 'loop@' : 'line@') + far.branches[f.chosen].from : '',
+        ring: ring ? { x: b.left + ring.x, y: b.top + ring.y, sel: ring.selected } : null, toast: document.querySelector('#toast').textContent }; }, atL(850, 0)));
+    const l0 = await lst();
+    check(l0.items.length === 4 && l0.nb === 3 && l0.loops === 'ab', tag + 'далечното разклонение има 3 клона, примката в двете посоки (' + l0.nb + ', ' + l0.loops + ') · маршрут ' + l0.items.join(' '));
+    check(l0.chosen >= 0 && l0.incoming >= 0 && l0.chFrom === 'loop@a' && l0.ring && l0.ring.sel, tag + 'там маршрутът е разпознат: идва по общата отсечка, продължава по излизащата отсечка (chosen ' + l0.chosen + ', incoming ' + l0.incoming + ', ' + l0.chFrom + '), пръстенът е плътен');
+    await pl.mouse.click(l0.ring.x, l0.ring.y);
+    await pl.waitForFunction(() => { const m = document.querySelector('#objMenu'); return m && !m.hidden && m.dataset.kind === 'junc'; });
+    const jm = await pl.evaluate(() => [...document.querySelectorAll('#objMenu [data-omk="go"]')].map(b => b.textContent.trim()));
+    check(jm.length === 1 && /^Продължи по blizalka(\.gpx)? · 1[,.]\d+\sкм · срещу посоката на записа$/.test(jm[0]), tag + 'менюто на далечния пръстен предлага само обиколката в обратна посока: ' + JSON.stringify(jm));
+    await pl.click('#objMenu [data-omk="go"]');
+    const l1 = await lst();
+    check(l1.items.length === 4 && l1.items[0] === l0.items[0] && l1.items[1] === l0.items[1] && l1.items[2] === l0.items[2] + 'r' && l1.items[3] === l0.items[3],
+      tag + 'изборът обръща примката и пази частта след нея: ' + l1.items.join(' '));
+    check(l1.chFrom === 'loop@b' && l1.incoming === l0.incoming && l1.undo === l0.undo + 1, tag + 'маршрутът вече е на връщащата се отсечка (' + l1.chFrom + '), едно действие за „Отмени“');
+    await pl.click('#undoBtn');
+    const l2 = await lst();
+    check(JSON.stringify(l2.items) === JSON.stringify(l0.items) && l2.chFrom === 'loop@a', tag + '„Отмени“ връща примката в посоката на записа: ' + l2.items.join(' '));
+    check(!el.length, tag + 'конзолата е чиста' + (el.length ? ': ' + el.join(' | ') : ''));
+    await cl.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));

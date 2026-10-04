@@ -756,4 +756,58 @@ console.log('общ участък OK');
   ends(r1, 'след махането');
   assert.strictEqual(Core.redundantJunctions(r1.junctions, { L: L }, 20).length, 0, 'нито един от двата пръстена не се предлага за махане');
   console.log('1.4.1 пръстен в двата края на общата отсечка при връщане по същия път: OK');
+
+  // 1.4.2: на завоя (далечния край) примката е два клона - излизащата и връщащата се отсечка.
+  var far = r1.junctions.filter(function (j) { return U.hav(j.lat, j.lon, e2[0], e2[1]) < 40; })[0];
+  var nearJ = r1.junctions.filter(function (j) { return U.hav(j.lat, j.lon, e1[0], e1[1]) < 40; })[0];
+  var loops = far.branches.filter(function (br) { return br.loop; });
+  assert.strictEqual(far.branches.length, 3, 'далечното разклонение има 3 клона: ' + far.branches.map(function (br) { return Math.round(br.a) + '..' + Math.round(br.b) + '@' + br.from; }));
+  assert.ok(loops.length === 2 && loops[0].key === loops[1].key && loops[0].from !== loops[1].from, 'примката е предложена в двете посоки');
+  assert.strictEqual(nearJ.branches.length, 3, 'близкото разклонение остава с 3 клона');
+  var tbL = { L: L }, parts = r1.byTrack.L.filter(function (s) { return s.kind === 'part'; });
+  function lolRoute() { return { forks: [], items: parts.map(function (s) { return { type: 'part', trackId: 'L', a: s.a, b: s.b }; }) }; }
+  var route = lolRoute(), geo = Core.routeGeometry(route, tbL, r1), fks = Core.routeForks(geo, r1.junctions, 20, tbL);
+  var ff = fks.filter(function (f) { return f.j === far; })[0], fn = fks.filter(function (f) { return f.j === nearJ; })[0];
+  assert.ok(ff && ff.chosen >= 0 && ff.incoming >= 0, 'далечният край: маршрутът е разпознат (chosen ' + (ff && ff.chosen) + ', incoming ' + (ff && ff.incoming) + ')');
+  assert.ok(far.branches[ff.chosen].loop && far.branches[ff.chosen].from === 'a' && !far.branches[ff.incoming].loop, 'идва по общата отсечка, продължава по излизащата отсечка на примката');
+  assert.ok(fn && fn.chosen >= 0 && fn.incoming >= 0, 'близкият край продължава да се разпознава');
+  // Истинската алтернатива е само примката в обратна посока; изборът ѝ не изхвърля частта след примката.
+  var alts = far.branches.filter(function (br, bi) { return bi !== ff.chosen && bi !== ff.incoming; });
+  assert.ok(alts.length === 1 && alts[0].loop && alts[0].from === 'b', 'алтернатива: обиколката в обратна посока');
+  Core.switchFork(route, ff, alts[0], tbL, 20);
+  assert.deepStrictEqual(route.items.map(function (it) { return Math.round(it.a) + '..' + Math.round(it.b) + (it.rev ? 'r' : ''); }),
+    parts.map(function (s, i) { return Math.round(s.a) + '..' + Math.round(s.b) + (i === 2 ? 'r' : ''); }), 'примката е обърната, частта след нея остава');
+  var f2 = Core.routeForks(Core.routeGeometry(route, tbL, r1), [far], 20, tbL)[0];
+  assert.ok(f2.chosen >= 0 && far.branches[f2.chosen].from === 'b' && f2.incoming === ff.incoming, 'след избора маршрутът е на връщащата се отсечка');
+  console.log('1.4.2 примката на далечния край - два клона, разпознат маршрут, избор в правилната посока: OK');
+})();
+
+// 1.4.2: клон, по-къс от сондата (80 м): маршрутът и клонът се сондират на едно и също разстояние.
+(function () {
+  var lat0 = 42.7, lon0 = 24.6, ky = 111320, kx = 111320 * Math.cos(lat0 * Math.PI / 180);
+  function at(e, n) { return [lat0 + n / ky, lon0 + e / kx]; }
+  function leg(e0, n0, e1, n1) {
+    var len = Math.hypot(e1 - e0, n1 - n0), k = Math.max(1, Math.round(len / 10)), p = [];
+    for (var i = 1; i <= k; i++) { var q = at(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k); p.push([q[0], q[1], 600]); }
+    return p;
+  }
+  // Същата близалка, но общата отсечка е 60 м.
+  var start = at(0, 0), pts = [[start[0], start[1], 600]].concat(leg(0, 0, 700, 0), leg(700, 0, 760, 0), leg(760, 0, 1060, 300),
+    leg(1060, 300, 1060, -300), leg(1060, -300, 760, 4), leg(760, 4, 700, 4), leg(700, 4, 700, -600));
+  var L = { id: 'L', pts: pts }, tb = { L: L };
+  var r0 = Core.analyze([L], 20);
+  L.skips = Core.mergeIv(r0.pend.map(function (s) { return { a: s.a, b: s.b }; }));
+  var r1 = Core.analyze([L], 20);
+  var parts = r1.byTrack.L.filter(function (s) { return s.kind === 'part'; }), shared = parts[1];
+  assert.ok(parts.length === 4 && shared.len < Core.PROBE, 'общата отсечка е по-къса от сондата: ' + Math.round(shared.len) + ' м');
+  var route = { items: parts.map(function (s) { return { type: 'part', trackId: 'L', a: s.a, b: s.b }; }) };
+  var fks = Core.routeForks(Core.routeGeometry(route, tb, r1), r1.junctions, 20, tb);
+  assert.strictEqual(fks.length, 2, 'маршрутът минава през двата края');
+  fks.forEach(function (f) {
+    assert.ok(f.k <= shared.len / 2 + 0.01 && f.k >= 15, 'сондата е до половината на най-късия клон: ' + Math.round(f.k) + ' м');
+    assert.ok(f.chosen >= 0 && f.incoming >= 0, 'клонът е разпознат (chosen ' + f.chosen + ', incoming ' + f.incoming + ')');
+    var onShared = [f.chosen, f.incoming].filter(function (i) { return f.j.branches[i].key === shared.key; });
+    assert.strictEqual(onShared.length, 1, 'късата обща отсечка е единият от двата клона на маршрута');
+  });
+  console.log('1.4.2 клон, по-къс от сондата: OK');
 })();
