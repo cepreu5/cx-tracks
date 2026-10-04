@@ -971,3 +971,89 @@ console.log('общ участък OK');
   assert.strictEqual(lo([P, X]).length, 0, 'пресичането не е останал дубликат');
   console.log('1.5 застъпване без маркер (под прага, над отклонението, къс завой) и проверката за дубликати: OK');
 })();
+
+// 1.6: чиста колекция - цялата споделена отсечка с маркера, застъпванията без маркер и малките дупки в колекцията,
+// трите условия за готова колекция. Синтетичната колекция tests/fixtures/chista-kolekcia.json (виж tests/browser.cjs, 1.6).
+(function () {
+  var fs = require('fs'), path = require('path');
+  function load() { return JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'chista-kolekcia.json'), 'utf8')).tracks; }
+  function byId(ts, id) { return ts.filter(function (t) { return t.id === id; })[0]; }
+  function iv(x) { return Math.round(x.a) + '-' + Math.round(x.b); }
+  // Разклоненията - метри по „Синтетичен А“.
+  function jA(ts, r) { var A = byId(ts, 'syn-a'); return r.junctions.map(function (j) { return Math.round(Core.nearestOnTrack(A, j.lat, j.lon).d); }).sort(function (p, q) { return p - q; }); }
+  var ts = load(), r0 = Core.analyze(ts, 20);
+  assert.strictEqual(r0.pend.length, 1, 'фикстурата: един маркиран дубликат');
+  var sec = r0.pend[0];
+  assert.ok(sec.trackId === 'syn-b' && sec.a > 340 && sec.b < 1030, 'маркерът покрива само частта на 8 м: ' + iv(sec));
+  assert.strictEqual(Core.trackHoles(ts, 20, 100).length, 1, 'фикстурата: една малка дупка (изтритият участък на А между двете пресичания)');
+
+  // 1.5: маркерът маха само своята част - краищата на 22 м остават и „връщат“ трака в участъка.
+  var t15 = load();
+  byId(t15, 'syn-b').skips = [{ a: sec.a, b: sec.b }];
+  var lo15 = Core.leftoverOverlaps(t15, 20).filter(function (x) { return x.a < 1200; });
+  assert.strictEqual(lo15.length, 2, 'само с маркера остават двата края на споделената отсечка: ' + lo15.map(iv));
+  assert.ok(jA(t15, Core.analyze(t15, 20)).some(function (d) { return d > 840 && d < 1560; }), 'и разклоненията стоят вътре в отсечката');
+
+  // 1.6: Core.dupStretch - цялата отсечка, докато Б върви на до jt (30 м) от А, успоредно.
+  var t16 = load(), B = byId(t16, 'syn-b'), cl = Core.dupCluster(r0.pend, sec, ['syn-a', 'syn-b']);
+  var st = Core.dupStretch(B, sec, t16, 20, cl.keep);
+  assert.ok(cl.keep === 'syn-a' && st.a < 300 && st.a > 270 && st.b > 1070 && st.b < 1100, 'споделената отсечка е по-широка от маркера: ' + iv(st) + ' срещу ' + iv(sec));
+  B.skips = [st];
+  var r16 = Core.analyze(t16, 20);
+  assert.ok(!Core.leftoverOverlaps(t16, 20).some(function (x) { return x.a < 1200; }), 'след нея в участъка не остава застъпване');
+  // Махнатото извън намерения дубликат също не е част: участъците на Б не влизат в отсечката.
+  assert.ok(r16.byTrack['syn-b'].every(function (s) { return s.kind !== 'part' || s.b <= st.a + 1 || s.a >= st.b - 1; }), 'участъците на Б не влизат в махнатото');
+  var dB = r16.byTrack['syn-b'].filter(function (s) { return s.kind === 'dup'; });
+  assert.ok(dB.length === 1 && Math.abs(dB[0].a - st.a) < 1 && Math.abs(dB[0].b - st.b) < 1, 'един махнат участък - дубликатът и краищата му: ' + dB.map(iv));
+  var j16 = jA(t16, r16);
+  assert.ok(!j16.some(function (d) { return d > 840 && d < 1560; }), 'вътре в отсечката няма разклонение: ' + j16);
+  assert.ok(j16.filter(function (d) { return Math.abs(d - 805) < 40; }).length === 1 && j16.filter(function (d) { return Math.abs(d - 1595) < 40; }).length === 1, 'по една точка на разклоняване в двата края: ' + j16);
+  // Махнатият дубликат не е дупка - отдолу стои А.
+  assert.deepStrictEqual(Core.trackHoles(t16, 20, 1000).map(function (h) { return h.trackId; }), ['syn-a'], 'отворът в Б е покрит от А - дупка е само изтритото на А');
+  console.log('1.6 цялата споделена отсечка с маркера, една точка на разклоняване в края: OK');
+
+  // Малките дупки в колекцията: пресичанията не покриват дупката, прагът важи, затворената е t.joins.
+  var th = load(), h = Core.trackHoles(th, 20, 100);
+  assert.ok(h.length === 1 && h[0].trackId === 'syn-a' && Math.abs(h[0].d - 60) < 3, 'дупката е 60 м: ' + JSON.stringify(h.map(function (x) { return [x.trackId, iv(x), Math.round(x.d)]; })));
+  assert.ok(Core.underTracks(byId(th, 'syn-a'), h[0].a, h[0].b, th, 20).length, 'без условието за успоредност двете пресичания (на 60 м) „покриват“ дупката');
+  assert.strictEqual(Core.trackHoles(th, 20, 50).length, 0, 'над прага (50 м) не е малка дупка');
+  assert.strictEqual(Core.closeHoles(th, 20, 0).length, 0, 'праг 0: нищо не се затваря');
+  var ch = Core.closeHoles(th, 20, 100);
+  assert.ok(ch.length === 1 && byId(th, 'syn-a').joins.length === 1, 'затворена дупка: t.joins');
+  assert.strictEqual(Core.trackHoles(th, 20, 100).length, 0, 'затворената не е отворена');
+  assert.strictEqual(Core.liveJoins(byId(th, 'syn-a')).length, 1, 'чертае се');
+  var aDels = byId(th, 'syn-a').dels; byId(th, 'syn-a').dels = [];
+  assert.strictEqual(Core.liveJoins(byId(th, 'syn-a')).length, 0, 'без отвора (след „Отмени“) затворената не се чертае');
+  byId(th, 'syn-a').dels = aDels;
+  console.log('1.6 малките дупки в колекцията: OK');
+
+  // Трите условия: пробата не пипа траковете; чистенето в реда на CX ги изпълнява.
+  var tc = load(), ck = Core.collectionCheck(tc, 20);
+  assert.ok(ck.marked === 1 && ck.after && ck.overlaps.length === 1 && ck.holes.length === 1 && !ck.ok, 'преди: 1 маркиран, след него 1 застъпване без маркер, 1 дупка: ' + JSON.stringify([ck.marked, ck.overlaps.length, ck.holes.length]));
+  assert.ok(ck.overlaps[0].trackId === 'syn-b' && ck.overlaps[0].withId === 'syn-a' && ck.overlaps[0].len < 100, 'застъпването без маркер е късото (под 100 м): ' + iv(ck.overlaps[0]));
+  assert.ok(tc.every(function (t) { return !(t.skips || []).length && !(t.joins || []).length; }), 'пробата не пипа траковете');
+  var skipped = [], res = Core.cleanCollection(tc, 20, { onSkip: function (id, a, b) { skipped.push(id + ':' + Math.round(a) + '-' + Math.round(b)); } });
+  assert.ok(res.dups === 1 && res.overlaps === 1 && res.joined === 1 && skipped.length === 2, 'изчистени: дубликат, застъпване, дупка: ' + JSON.stringify(res));
+  assert.strictEqual(Core.analyze(tc, 20).pend.length, 0, 'условие 1: няма дублирани тракове');
+  assert.deepStrictEqual(Core.leftoverOverlaps(tc, 20), [], 'условие 2: няма покрити един върху друг тракове, които не се отчитат');
+  assert.deepStrictEqual(Core.trackHoles(tc, 20, 100), [], 'условие 3: няма незатворени дупки');
+  assert.ok(Core.collectionCheck(tc, 20).ok, 'колекцията е консистентна');
+  console.log('1.6 трите условия за готова колекция върху фикстурата: OK');
+
+  // Същият трак, минал втори път (обратно): маркерът е на второто минаване, краищата на 22 м отиват с него.
+  var lat0 = 42.64, lon0 = 24.83, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
+  function poly(v) {
+    var o = [[lat0 + v[0][1] / ky, lon0 + v[0][0] / kx, 500]];
+    for (var i = 1; i < v.length; i++) { var a = v[i - 1], b = v[i], k = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10));
+      for (var j = 1; j <= k; j++) o.push([lat0 + (a[1] + (b[1] - a[1]) * j / k) / ky, lon0 + (a[0] + (b[0] - a[0]) * j / k) / kx, 500]); }
+    return o;
+  }
+  var H = { id: 'H', pts: poly([[0, 0], [1500, 0], [1500, 70], [1250, 70], [1240, 22], [1180, 22], [1170, 8], [400, 8], [390, 22], [330, 22], [320, 70], [0, 70]]) };
+  var rh = Core.analyze([H], 20);
+  assert.ok(rh.pend.length === 1 && rh.pend[0].withId === 'H', 'маркер на второто минаване на същия трак');
+  var sh = Core.dupStretch(H, rh.pend[0], [H], 20, 'H');
+  assert.ok(sh.b - sh.a > rh.pend[0].len + 80, 'отсечката взема и краищата: ' + iv(sh) + ' срещу ' + iv(rh.pend[0]));
+  Core.cleanCollection([H], 20, {});
+  assert.ok(Core.collectionCheck([H], 20).ok && Core.analyze([H], 20).byTrack.H.some(function (s) { return s.kind === 'part' && s.a < 100; }), 'след чистенето първото минаване остава, колекцията е консистентна');
+  console.log('1.6 същият трак, минал втори път: OK');
+})();

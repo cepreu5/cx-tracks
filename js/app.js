@@ -77,8 +77,8 @@
   // ---- Съхранение ----
   function plainTrack(t) {
     return {
-      id: t.id, name: t.name, title: t.title, color: t.color, pts: t.pts, breaks: t.breaks || [],
-      wpts: t.wpts || [], dels: t.dels || [], skips: t.skips || [], openGaps: t.openGaps || [], visible: t.visible !== false, created: t.created, walk: !!t.walk
+      id: t.id, name: t.name, title: t.title, orig: t.orig, color: t.color, pts: t.pts, breaks: t.breaks || [],
+      wpts: t.wpts || [], dels: t.dels || [], skips: t.skips || [], openGaps: t.openGaps || [], joins: t.joins || [], visible: t.visible !== false, created: t.created, walk: !!t.walk
     };
   }
   function snapshotState() {
@@ -139,7 +139,7 @@
     }
     ui.undo.push(JSON.stringify({
       rid: S.curId, items: cur().items,
-      skips: S.tracks.map(function (t) { return [t.id, t.skips || [], t.openGaps || []]; }),
+      skips: S.tracks.map(function (t) { return [t.id, t.skips || [], t.openGaps || [], t.joins || []]; }),
       dels: S.tracks.map(function (t) { return [t.id, t.dels || []]; }), dropJ: S.dropJ, keptJ: S.keptJ,
       forks: cur().forks || [], openGaps: cur().openGaps || [], smooth: cur().smooth || null
     }));
@@ -162,7 +162,7 @@
       r.items = s.items; r.forks = s.forks || []; r.openGaps = s.openGaps || []; S.curId = r.id;
       if (s.smooth) r.smooth = s.smooth; else delete r.smooth;
     }
-    (s.skips || []).forEach(function (c) { var t = track(c[0]); if (t) { t.skips = c[1]; t.openGaps = c[2]; } });
+    (s.skips || []).forEach(function (c) { var t = track(c[0]); if (t) { t.skips = c[1]; t.openGaps = c[2]; t.joins = c[3] || []; } });
     (s.dels || []).forEach(function (c) { var t = track(c[0]); if (t) t.dels = c[1]; });
     if (s.dropJ) S.dropJ = s.dropJ;
     if (s.keptJ) S.keptJ = s.keptJ;
@@ -615,7 +615,7 @@
     var following = !!ui.follower;
 
     // 1. Тракове-източници - тънко, в собствен цвят.
-    ui.drawn = {};
+    ui.drawn = {}; ui.joins = [];
     visibleTracks().forEach(function (t) {
       var col = trackColor(t);
       var secs = A.byTrack[t.id] || [];
@@ -635,6 +635,12 @@
       });
       walkGapLines(t, ui.drawn[t.id] || []).forEach(function (pts) {
         path(ctx, pr, pts); stroke(ctx, C.casing, LW.trackCase); stroke(ctx, C['walk-gap'], LW.track, [6, 5]);
+      });
+      // 1.6: затворената сама дупка в колекцията - тънка прекъсната линия в цвета на трака.
+      Core.liveJoins(t).forEach(function (j) {
+        var a = Core.pointAt(t, j.a), b = Core.pointAt(t, j.b);
+        path(ctx, pr, [a, b]); stroke(ctx, C.casing, LW.autoCase); stroke(ctx, col, LW.autoLine, [5, 4]);
+        ui.joins.push({ trackId: t.id, a: j.a, b: j.b, d: U.hav(a[0], a[1], b[0], b[1]) });
       });
     });
 
@@ -1114,7 +1120,49 @@
     toast(T('msg.forkSwitched', { name: trackLabel(track(fk.br.trackId)) }));
     routeChanged();
   }
-  // Клик върху маркера: от участъка падат всички тракове един върху друг освен един (Core.dupCluster).
+  /* 1.6: клик върху маркера пита - меню като при участък. „Затвори направо“ маха копието с цялата споделена
+     отсечка, под него остава един трак; „Затвори с чертане“ маха и трака отдолу, а мястото се чертае наново. */
+  function showDupMenu(sec) {
+    var t = track(sec.trackId); if (!t) return;
+    var cl = Core.dupCluster(A.pend, sec, trackOrder()), keep = track(cl.keep), p = Core.pointAt(t, (sec.a + sec.b) / 2);
+    var note = keep ? T(cl.keep === sec.trackId ? 'om.underSelf' : 'om.under', { name: trackLabel(keep), len: U.dist(sec.len) }) : '';
+    var btns = [
+      { key: 'dupClose', cls: 'pri', label: T('om.dupClose'), title: T('om.dupClose.title'), run: function () { skipDup(sec); } },
+      { key: 'dupDraw', cls: 'danger', label: T('om.dupDraw'), title: T('om.dupDraw.title'), run: function () { dupDraw(sec); } }
+    ];
+    showObjMenu({ sec: sec, dup: true }, 'dup', T('om.dup', { len: U.dist(sec.len) }),
+      trackLabel(t) + ' · ' + T('om.span', { a: U.num(Math.round(Math.min(sec.a, sec.b))), b: U.num(Math.round(Math.max(sec.a, sec.b))) }), btns, p, note);
+  }
+  // „Затвори с чертане“: падат копието (с цялата споделена отсечка) и тракът отдолу; мястото остава за чертане.
+  function dupDraw(sec) {
+    var t = track(sec.trackId); if (!t) return;
+    var cl = Core.dupCluster(A.pend, sec, trackOrder()), vt = visibleTracks();
+    var iv = Core.dupStretch(t, sec, vt, S.tol, cl.keep);
+    var under = Core.underTracks(t, iv.a, iv.b, vt.filter(function (x) { return x.id === cl.keep; }), S.tol)[0];
+    pushUndo();
+    applyDups([cl]);
+    var r = cur();
+    if (under) {
+      var ut = track(under.trackId);
+      ut.dels = Core.mergeIv((ut.dels || []).concat([{ a: under.a, b: under.b }]));
+      r.items = Core.trimItems(r.items, under.trackId, under.a, under.b);
+      analyzeNow();
+    }
+    // В маршрута връзката за чертане отива в дупката до мястото; без маршрут се чертае в режим „Добави“.
+    var mid = Core.pointAt(t, (iv.a + iv.b) / 2), gp = null, gd = Infinity;
+    (G ? G.gaps : []).forEach(function (g) {
+      var d = Math.min(U.hav(mid[0], mid[1], g.from[0], g.from[1]), U.hav(mid[0], mid[1], g.to[0], g.to[1]));
+      if (d < gd) { gd = d; gp = g; }
+    });
+    if (gp && gd < iv.b - iv.a + 200) {
+      r.items.splice(gp.beforeIdx, 0, { type: 'draw', pts: [], link: true });
+      ui.drawTarget = gp.beforeIdx;
+      routeChanged();
+    }
+    setMode('add');
+    toast(T('msg.dupDraw', { len: U.km(iv.b - iv.a), name: under ? trackLabel(track(under.trackId)) : '-' }), false, 6000);
+  }
+  // „Затвори направо“: от участъка падат всички тракове един върху друг освен един (Core.dupCluster).
   function skipDup(sec) {
     if (!track(sec.trackId)) return;
     var cl = Core.dupCluster(A.pend, sec, trackOrder());
@@ -1123,10 +1171,23 @@
     var ac = autoClose();
     toast(T.n('msg.dupRemoved', cl.trackIds.length, { len: U.km(sec.len) }) + ac, false, ac ? 6000 : undefined);
   }
-  // Прилага групите (от Core.dupCluster) без отпечатък за "Отмени" - него го прави този, който вика.
+  /* Прилага групите (от Core.dupCluster) без отпечатък за "Отмени" - него го прави този, който вика.
+     1.6: с всеки участък пада цялата споделена отсечка с копието, което остава (Core.dupStretch) - иначе
+     краищата ѝ остават и тракът пак се появява в участъка. */
   function applyDups(cls) {
-    var r = cur(), secs = [];
-    cls.forEach(function (cl) { secs = secs.concat(cl.secs); });
+    var vt = visibleTracks(), ivs = [];
+    cls.forEach(function (cl) {
+      cl.secs.forEach(function (d) {
+        var t = track(d.trackId); if (!t) return;
+        var iv = Core.dupStretch(t, d, vt, S.tol, cl.keep);
+        ivs.push({ trackId: d.trackId, a: iv.a, b: iv.b });
+      });
+    });
+    applySkips(ivs);
+  }
+  // Маха отрязъците {trackId, a, b} (t.skips) от картата и от маршрута.
+  function applySkips(secs) {
+    var r = cur();
     secs.forEach(function (d) {
       var t = track(d.trackId); if (!t) return;
       t.skips = Core.mergeIv((t.skips || []).concat([{ a: d.a, b: d.b }]));
@@ -1154,7 +1215,8 @@
      (остава по едно копие от всяка група), после всяка отворена дупка до Core.GAP_BRIDGE_MAX_M
      се свързва направо; по-дългите остават за чертане. Един отпечатък за "Отмени" за всичко. */
   function cleanRoute() {
-    if (!A.pend.length && !(G && G.gaps.some(Core.canBridge))) { toast(T(G && G.gaps.length ? 'msg.cleanLongOnly' : 'msg.cleanNone', { max: U.dist(Core.GAP_BRIDGE_MAX_M) })); return; }
+    var lc = liveCheck();
+    if (!A.pend.length && !(G && G.gaps.some(Core.canBridge)) && !lc.overlaps.length && !lc.holes.length) { toast(T(G && G.gaps.length ? 'msg.cleanLongOnly' : 'msg.cleanNone', { max: U.dist(Core.GAP_BRIDGE_MAX_M) })); return; }
     pushUndo();
     var n = 0;
     // Махането може да покаже нов чакащ участък - още един кръг, но не безкрайно.
@@ -1163,20 +1225,38 @@
       gs.forEach(function (cl) { n += cl.secs.length; });
       applyDups(gs);
     }
+    // 1.6: застъпванията без маркер (под прага, над отклонението, къс завой) - пада по-късното копие, с цялата отсечка.
+    var no = 0;
+    for (pass = 0; pass < 5; pass++) {
+      var vt = visibleTracks(), lo = Core.leftoverOverlaps(vt, S.tol);
+      if (!lo.length) break;
+      no += lo.length;
+      applySkips(lo.map(function (x) { var iv = Core.dupStretch(track(x.trackId), x, vt, S.tol, x.withId); return { trackId: x.trackId, a: iv.a, b: iv.b }; }));
+    }
     var nb = G ? Core.bridgeGaps(cur().items, G.gaps) : 0;
     if (nb) { ui.drawTarget = null; routeChanged(); }
+    // 1.6: и малките дупки в колекцията (до Core.GAP_BRIDGE_MAX_M, както в маршрута) - те няма кой друг да ги затвори.
+    var nh = Core.closeHoles(visibleTracks(), S.tol, Core.GAP_BRIDGE_MAX_M).length;
+    if (nh) routeChanged(true);
     var nl = G ? G.gaps.length : 0;
-    toast(T('msg.cleaned', { n: n, g: nb }) + (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: U.dist(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl ? 6000 : undefined);
+    toast(T('msg.cleaned', { n: n, g: nb }) + (no ? ' ' + T.n('msg.cleanedOvl', no) : '') + (nh ? ' ' + T.n('msg.cleanedHoles', nh) : '') +
+      (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: U.dist(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl || no || nh ? 6000 : undefined);
   }
   /* 1.5: малките дупки (до прага от „Настройки“, по подразбиране 100 м) се затварят сами след махнат
      дубликат, махнато излишно разклонение и изтрит участък - празна връзка с autoClose: влиза в маршрута
      и в .gpx, но не е част. По-дългите остават с пръстена. Връща добавката към съобщението ('' - нищо). */
   function autoClose() {
-    if (!G || !G.gaps.length) return '';
-    var max = Core.autoGapMax(SET.gap), n = Core.closeSmallGaps(cur(), G.gaps, max);
-    if (!n) return '';
-    routeChanged();
-    return ' ' + T.n('msg.autoClosed', n, { max: U.dist(max) });
+    var max = Core.autoGapMax(SET.gap);
+    if (!max) return '';
+    var rg = G ? G.gaps.filter(function (g) { return g.d <= max; }) : [], n = rg.length ? Core.closeSmallGaps(cur(), G.gaps, max) : 0;
+    // 1.6: и в етапа „колекция“ - дупката вътре в трака (Core.closeHoles). Мястото, затворено и в маршрута, се брои веднъж.
+    var hs = Core.closeHoles(visibleTracks(), S.tol, max), jt = Core.joinTol(S.tol);
+    var extra = hs.filter(function (h) {
+      return !rg.some(function (g) { return U.hav(g.from[0], g.from[1], h.from[0], h.from[1]) <= jt || U.hav(g.to[0], g.to[1], h.to[0], h.to[1]) <= jt || U.hav(g.from[0], g.from[1], h.to[0], h.to[1]) <= jt; });
+    }).length;
+    if (!n && !hs.length) return '';
+    routeChanged(!n);
+    return ' ' + T.n('msg.autoClosed', n + extra, { max: U.dist(max) });
   }
   // Махната затворена сама дупка остава отворена: следващото действие не я затваря пак.
   function keepOpen(it) {
@@ -1352,7 +1432,7 @@
     var h = hitTest(p);
     if (!h) { toggleBar(); return; }
     if (h.kind === 'none') return;
-    if (h.kind === 'marker') { skipDup(h.sec); return; }
+    if (h.kind === 'marker') { showDupMenu(h.sec); return; }
     if (h.kind === 'fork') { showJuncMenu(h.j); return; }
     if (h.kind === 'part') { showSegMenu(h.sec, null, p); return; }
     if (h.kind === 'item' && h.g.item.type === 'part') { showSegMenu(secAt(h.g.item, p), h.idx, p); return; }
@@ -1361,6 +1441,17 @@
     else if (h.kind === 'vertex') showPointMenu(h);
   }
   function toggleBar() { setBar(!document.body.classList.contains('bar-hidden')); }
+  /* 1.6: една плаваща стрелка долу вдясно. Най-горе (картата е на екрана) сочи надолу и води до числата под картата -
+     ролята на махнатата горнолява „↓“; другаде сочи нагоре и връща най-горе. */
+  var TOP_ZONE = 40;
+  function topArrow(force) {
+    var b = $('#toTopBtn'), dir = window.scrollY < TOP_ZONE ? 'down' : 'up';
+    if (!force && b.dataset.dir === dir) return;
+    var k = dir === 'down' ? 'topanel' : 'totop';
+    b.dataset.dir = dir;
+    b.setAttribute('data-i18n-title', k); b.setAttribute('data-i18n-aria', k);
+    b.title = T(k); b.setAttribute('aria-label', T(k));
+  }
   // Скрива/връща горната лента. Кръглата "Лента" горе вляво стои винаги: стрелкичката сочи нагоре при отворена
   // лента (натискаш - скрива я) и надолу при скрита (натискаш - връща я).
   function setBar(hide) {
@@ -1579,6 +1670,15 @@
     var msg = both && under ? T('msg.segDelUnder', { len: U.km(sec.len), name: un, len2: U.km(under.len) })
       : under ? T('msg.segDelLeft', { len: U.km(sec.len), name: un }) : T('msg.segDel', { len: U.km(sec.len) });
     toast(msg + ac, false, under || ac ? 6000 : undefined);
+  }
+  /* 1.6 „Изтрий имената“: всички тракове получават служебни имена Трак 1, 2, … по реда в панела. Първоначалното име
+     остава в t.orig - с него излиза .gpx на трака (и в подсказката на реда); „Отмени“ връща имената. */
+  function clearNames() {
+    if (!S.tracks.length) return;
+    pushUndo(true);
+    S.tracks.forEach(function (t, i) { if (!t.orig) t.orig = t.name; t.name = T('tr.auto', { n: i + 1 }); });
+    analyzeNow(); saveNow();
+    toast(T.n('msg.namesCleared', S.tracks.length));
   }
   function deleteTrack(t) {
     var usedIn = S.routes.filter(function (r) { return r.items.some(function (it) { return it.trackId === t.id; }); }).length;
@@ -1799,6 +1899,7 @@
   function renderTracks() {
     $('#tracksCount').textContent = '(' + S.tracks.length + ')';
     $('#clearTracksBtn').disabled = !S.tracks.length && !cur().items.length;
+    $('#clearNamesBtn').disabled = !S.tracks.length;
     $('#tracksList').innerHTML = S.tracks.map(function (t) {
       Core.prep(t);
       // Изтритите участъци не се броят в дължината; участъците - колко са след разрязването.
@@ -1806,7 +1907,7 @@
       var secs = t.visible !== false && A.byTrack[t.id], np = secs ? secs.filter(function (x) { return x.kind === 'part'; }).length : 0;
       return '<li data-track="' + t.id + '" class="' + (t.visible === false ? 'off' : '') + '">' +
         '<span class="sw" style="background:' + trackColor(t) + '"></span>' +
-        '<span class="t" title="' + U.esc(t.title || t.name) + '">' + U.esc(t.name) + (t.walk ? ' <small>' + TE('tr.walk') + '</small>' : '') +
+        '<span class="t" title="' + U.esc(t.title || t.orig || t.name) + '">' + U.esc(t.name) + (t.walk ? ' <small>' + TE('tr.walk') + '</small>' : '') +
         (secs ? ' <small class="tr-parts">· ' + U.esc(T.n('tr.parts', np)) + '</small>' : '') +
         (delL ? ' <small>· ' + TE('tr.dels', { len: U.km(delL) }) + '</small>' : '') + '</span>' +
         '<span class="v">' + U.km(t.len - delL) +
@@ -1831,43 +1932,68 @@
     var cnt = [];
     if (np) cnt.push(T('dups.toDecide', { n: np }));
     if (n) cnt.push(T.n('dups.skippedN', n));
+    // 1.6: и застъпванията без маркер - видими и при свит панел.
+    var lc0 = liveCheck();
+    if (!np && lc0.overlaps.length) cnt.push(T.n('dc.nOvl', lc0.overlaps.length));
     $('#dupsCount').textContent = cnt.length ? cnt.join(' · ') : '(0)';
     var gaps = G ? G.gaps : [], gd = 0;
     gaps.forEach(function (g) { gd += g.d; });
     $('#dupsGaps').textContent = T.n('dups.gaps', gaps.length, { d: U.dist(gd) });
     $('#dupsGaps').hidden = !gaps.length;
-    $('#cleanBtn').disabled = !np && !gaps.some(Core.canBridge);
+    var lc = liveCheck();
+    $('#cleanBtn').disabled = !np && !gaps.some(Core.canBridge) && !lc.overlaps.length && !lc.holes.length;
     renderDupCheck();
   }
 
-  /* 1.5 „Проверка за дубликати“: появява се, когато не остане маркиран дубликат. Пуска нова проверка по
-     цялата колекция (Core.leftoverOverlaps) за застъпвания без маркер - под прага, при разминаване над
-     отклонението, при къс завой на косата. Резултатът важи, докато тракът, изтритото и махнатото не се сменят. */
+  /* 1.5 „Проверка за дубликати“, 1.6 - винаги видима, с брояч. Трите условия за готова колекция (Core.collectionCheck):
+     маркирани дубликати, застъпвания без маркер (под прага, при разминаване над отклонението, при къс завой на косата)
+     и отворени малки дупки. Докато има маркирани, копчето казва колко са, а проверката показва какво остава след тях.
+     Броячът се смята на живо (кешира се до следващата промяна); списъкът излиза с копчето и пада при промяна. */
   function checkKey() {
-    return JSON.stringify([S.tol, visibleTracks().map(function (t) { return [t.id, t.pts.length, t.dels || [], t.skips || []]; })]);
+    return JSON.stringify([S.tol, SET.gap, S.dropJ || [], visibleTracks().map(function (t) { return [t.id, t.pts.length, t.dels || [], t.skips || [], t.joins || []]; })]);
+  }
+  function liveCheck() {
+    var k = checkKey();
+    if (ui.live && ui.live.key === k) return ui.live.res;
+    var res;
+    try { res = Core.collectionCheck(visibleTracks(), S.tol, { order: trackOrder(), drop: S.dropJ, max: SET.gap }); } catch (e) { console.error(e); res = { marked: A.pend.length, overlaps: [], holes: [], ok: false }; }
+    ui.live = { key: k, res: res };
+    return res;
   }
   function dupCheckNow() { return ui.dupCheck && ui.dupCheck.key === checkKey() ? ui.dupCheck : null; }
   function dupCheck() {
-    var found = [];
-    try { found = Core.leftoverOverlaps(visibleTracks(), S.tol); } catch (e) { console.error(e); toast(T('msg.dupErr', { e: e.message }), true); return; }
-    ui.dupCheck = { key: checkKey(), found: found };
+    var res;
+    try { ui.live = null; res = liveCheck(); } catch (e) { console.error(e); toast(T('msg.dupErr', { e: e.message }), true); return; }
+    ui.dupCheck = { key: checkKey(), found: res.overlaps, res: res };
     ui.dcHl = null;
     renderDupCheck();
-    toast(found.length ? T.n('dc.found', found.length) : T('dc.none'), false, found.length ? 6000 : undefined);
+    var msg = res.marked ? T.n('dc.toastMarked', res.marked, { o: res.overlaps.length }) : res.overlaps.length ? T.n('dc.found', res.overlaps.length) : res.holes.length ? T.n('dc.holes', res.holes.length) : T('dc.none');
+    toast(msg, false, res.ok ? undefined : 6000);
   }
   function dcLabel(x) {
     var t = track(x.trackId), w = track(x.withId);
     return T(x.withId === x.trackId ? 'dc.rowSelf' : 'dc.row', { name: trackLabel(t), km: kmRange(x.a, x.b), len: U.dist(x.len), with: trackLabel(w) });
   }
   function renderDupCheck() {
-    var box = $('#dupCheckRes'), dc = dupCheckNow();
-    $('#dupCheckBtn').hidden = !!A.pend.length || !visibleTracks().length;
+    var box = $('#dupCheckRes'), dc = dupCheckNow(), lc = liveCheck(), btn = $('#dupCheckBtn');
+    btn.hidden = !visibleTracks().length;
+    var cnt = lc.marked ? T.n('dc.nMarked', lc.marked) : T.n('dc.nOvl', lc.overlaps.length) + (lc.holes.length ? ' · ' + T.n('dc.nHoles', lc.holes.length) : '');
+    $('#dcCount').textContent = cnt;
+    btn.classList.toggle('dc-clean', !!lc.ok);
+    btn.dataset.marked = lc.marked; btn.dataset.ovl = lc.overlaps.length; btn.dataset.holes = lc.holes.length;
     if (!dc) { if (ui.dcHl) { ui.dcHl = null; if (map) map.redraw(); } box.hidden = true; box.innerHTML = ''; return; }
+    var r = dc.res, n = r.overlaps.length;
     box.hidden = false;
-    box.innerHTML = !dc.found.length ? '<p class="dc-ok small">' + TE('dc.none') + '</p>'
-      : '<p class="dc-warn small">' + U.esc(T.n('dc.found', dc.found.length)) + '</p><ol class="dc-list small">' + dc.found.map(function (x, i) {
-        return '<li><button type="button" class="linkbtn" data-dc="' + i + '">' + U.esc(dcLabel(x)) + '</button></li>';
-      }).join('') + '</ol>';
+    var head = r.marked ? (n ? '<p class="dc-warn small">' + U.esc(T.n('dc.foundAfter', n)) + '</p>' : '')
+      : !n ? (r.holes.length ? '' : '<p class="dc-ok small">' + TE('dc.none') + '</p>') : '<p class="dc-warn small">' + U.esc(T.n('dc.found', n)) + '</p>';
+    var list = n ? '<ol class="dc-list small">' + r.overlaps.map(function (x, i) {
+      return '<li><button type="button" class="linkbtn" data-dc="' + i + '">' + U.esc(dcLabel(x)) + '</button></li>';
+    }).join('') + '</ol>' : '';
+    var row = function (k, v) { return '<div><dt>' + TE(k) + '</dt> <dd class="num">' + U.esc(v) + '</dd></div> '; };
+    var sum = '<dl class="dc-sum small">' + (r.marked ? row('dc.marked', String(r.marked)) : '') +
+      row(r.marked ? 'dc.after' : 'dc.overlaps', T.n('dc.nOvl', n)) + row('dc.openHoles', String(r.holes.length)) + '</dl>' +
+      ' <p class="dc-verdict small ' + (r.ok ? 'ok' : 'warn') + '">' + TE(r.ok ? 'dc.ok' : 'dc.notOk') + '</p> ';
+    box.innerHTML = sum + head + list;
   }
   // Място от списъка: картата отива там и го осветява.
   function showDupSpot(i) {
@@ -1883,7 +2009,7 @@
     if (A.pend.length) return T.n('msg.collPend', A.pend.length);
     var dc = dupCheckNow();
     if (!dc) return T('msg.collNoCheck');
-    return dc.found.length ? T.n('msg.collLeft', dc.found.length) : '';
+    return dc.found.length ? T.n('msg.collLeft', dc.found.length) : dc.res.holes.length ? T.n('msg.collHoles', dc.res.holes.length) : '';
   }
 
   function renderRoutes() {
@@ -2157,8 +2283,10 @@
     return true;
   }
   function exportTrack(t) {
-    var xml = GPX.build({ name: t.title || t.name, pts: t.pts, wpts: (t.wpts || []).filter(function (w) { return w.name; }) });
-    U.download(new Blob([xml], { type: 'application/gpx+xml' }), U.slug(t.name.replace(/\.gpx.*$/i, '')) + '.gpx');
+    // 1.6: след „Изтрий имената“ .gpx излиза с първоначалното име (t.orig), не със служебното.
+    var nm = t.orig || t.name;
+    var xml = GPX.build({ name: t.title || nm, pts: t.pts, wpts: (t.wpts || []).filter(function (w) { return w.name; }) });
+    U.download(new Blob([xml], { type: 'application/gpx+xml' }), U.slug(nm.replace(/\.gpx.*$/i, '')) + '.gpx');
   }
   function exportCollection() {
     var data = snapshotState();
@@ -3037,6 +3165,7 @@
   }
   function relang() {
     langCode();
+    topArrow(true);
     barHandle();
     followBtns();
     showCompass();
@@ -3089,9 +3218,10 @@
       case 'live-gpx': liveDone('gpx'); break;
       case 'live-drop': liveDone('drop'); break;
       case 'to-panel': $('#panel').scrollIntoView({ behavior: 'smooth' }); break;
-      case 'to-top': window.scrollTo({ top: 0, behavior: 'smooth' }); break;
+      case 'to-top': if ($('#toTopBtn').dataset.dir === 'down') $('#panel').scrollIntoView({ behavior: 'smooth' }); else window.scrollTo({ top: 0, behavior: 'smooth' }); break;
       case 'undo': undo(); break;
       case 'clear-tracks': clearTracks(); break;
+      case 'clear-names': clearNames(); break;
       case 'clear-parts': clearParts(); break;
       case 'clean-route': cleanRoute(); break;
       case 'dup-check': dupCheck(); break;
@@ -3356,6 +3486,8 @@
       if (e.key === 'Escape') { hidePointMenu(); hideObjMenu(); if (ui.cut) cutBack(); }
     });
     window.addEventListener('resize', U.debounce(function () { drawProfile(); if (!$('#picView').hidden) picFit(); }, 150));
+    window.addEventListener('scroll', function () { topArrow(); }, { passive: true });
+    topArrow(true);
   }
 
   /* Групата горе вляво ("↓", "Лента", текстовото "Следене / Стоп") е в редица, когато се събира вляво от

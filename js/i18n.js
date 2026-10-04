@@ -693,4 +693,47 @@ I18N.add({
   'msg.collLeft.n': ['Внимание: проверката за дубликати намери {n} застъпвания без маркер.', 'Warning: the duplicate check found {n} overlaps without a marker.']
 });
 
+/* ---- 1.6: чиста колекция - маркерът пита, цялата споделена отсечка, застъпванията без маркер и малките дупки при чистенето,
+   видимата проверка с брояч, една стрелка, „Изтрий имената“ ---- */
+I18N.add({
+  'om.dup': ['Дубликат · {len}', 'Duplicate · {len}'],
+  'om.span': ['{a}–{b} м', '{a}–{b} m'],
+  'om.dupClose': ['Затвори направо · под него остава трак', 'Close directly · a track stays below'],
+  'om.dupClose.title': ['Маха копието заедно с цялата споделена отсечка; под него остава един трак. "Отмени" го връща.', 'Removes the copy together with the whole shared stretch; one track stays below. “Undo” brings it back.'],
+  'om.dupDraw': ['Затвори с чертане · маха и трака отдолу', 'Close by drawing · removes the track below too'],
+  'om.dupDraw.title': ['Маха копието и трака под него; мястото се чертае наново. "Отмени" връща и двете.', 'Removes the copy and the track below it; the place is drawn anew. “Undo” brings both back.'],
+  'msg.dupDraw': ['Махнати са дубликатът и тракът под него („{name}“) · {len}. Начертай мястото наново; "Отмени" връща и двете.', 'The duplicate and the track below it (“{name}”) are removed · {len}. Draw the place anew; “Undo” brings both back.'],
+  'msg.cleanedOvl.1': ['Махнато застъпване без маркер: {n}.', 'Overlap without a marker removed: {n}.'],
+  'msg.cleanedOvl.n': ['Махнати застъпвания без маркер: {n}.', 'Overlaps without a marker removed: {n}.'],
+  'msg.cleanedHoles.1': ['Затворена малка дупка в колекцията: {n}.', 'Small gap closed in the collection: {n}.'],
+  'msg.cleanedHoles.n': ['Затворени малки дупки в колекцията: {n}.', 'Small gaps closed in the collection: {n}.'],
+  'dups.clean.title': ['Маха всички застъпени участъци (от всяка група остава по едно копие, както при клик върху маркер), после застъпванията без маркер, и свързва направо отворените дупки до 500 м - в маршрута и в колекцията (по-дългите остават за чертане). "Отмени" връща всичко наведнъж.', 'Removes every stacked stretch (one copy of each group stays, as with a marker click), then the overlaps without a marker, and joins open gaps up to 500 m directly - in the route and in the collection (longer ones stay for drawing). “Undo” brings it all back at once.'],
+  'dc.btn.title': ['Трите условия за готова колекция: маркирани дубликати, застъпвания без маркер (под прага от 100 м, разминаване над отклонението, къс завой на косата) и отворени малки дупки. Броячът е на живо; копчето показва списъка.', 'The three conditions for a finished collection: marked duplicates, overlaps without a marker (under the 100 m threshold, drifting apart beyond the tolerance, a short hairpin turn) and open small gaps. The counter is live; the button shows the list.'],
+  'dc.nMarked.1': ['остава {n} маркиран', '{n} marked left'],
+  'dc.nMarked.n': ['остават {n} маркирани', '{n} marked left'],
+  'dc.nOvl.1': ['{n} застъпване', '{n} overlap'],
+  'dc.nOvl.n': ['{n} застъпвания', '{n} overlaps'],
+  'dc.nHoles.1': ['{n} дупка', '{n} gap'],
+  'dc.nHoles.n': ['{n} дупки', '{n} gaps'],
+  'dc.marked': ['остават маркирани', 'marked left'],
+  'dc.after': ['след изчистването им', 'after clearing them'],
+  'dc.overlaps': ['застъпвания без маркер', 'overlaps without a marker'],
+  'dc.openHoles': ['отворени малки дупки', 'open small gaps'],
+  'dc.ok': ['колекцията е консистентна', 'the collection is consistent'],
+  'dc.notOk': ['не е консистентна', 'not consistent'],
+  'dc.foundAfter.1': ['След махането на маркираните остава {n} застъпване без маркер - клик на реда го показва на картата:', 'After the marked ones are removed, {n} overlap without a marker is left - click the row to see it on the map:'],
+  'dc.foundAfter.n': ['След махането на маркираните остават {n} застъпвания без маркер - клик на ред го показва на картата:', 'After the marked ones are removed, {n} overlaps without a marker are left - click a row to see it on the map:'],
+  'dc.toastMarked.1': ['Остава {n} маркиран дубликат; след него застъпвания без маркер: {o}.', '{n} marked duplicate is left; after it, overlaps without a marker: {o}.'],
+  'dc.toastMarked.n': ['Остават {n} маркирани дубликата; след тях застъпвания без маркер: {o}.', '{n} marked duplicates are left; after them, overlaps without a marker: {o}.'],
+  'dc.holes.1': ['Остана {n} отворена малка дупка.', '{n} open small gap is left.'],
+  'dc.holes.n': ['Останаха {n} отворени малки дупки.', '{n} open small gaps are left.'],
+  'msg.collHoles.1': ['Внимание: остава {n} отворена малка дупка.', 'Warning: {n} open small gap is left.'],
+  'msg.collHoles.n': ['Внимание: остават {n} отворени малки дупки.', 'Warning: {n} open small gaps are left.'],
+  'tracks.clearNames': ['Изтрий имената', 'Clear names'],
+  'tracks.clearNames.title': ['Дава на всички тракове служебни имена Трак 1, 2, … по реда в панела. Първоначалните имена остават в .gpx файловете. "Отмени" ги връща.', 'Gives every track a working name Track 1, 2, … in panel order. The original names stay in the .gpx files. “Undo” brings them back.'],
+  'tr.auto': ['Трак {n}', 'Track {n}'],
+  'msg.namesCleared.1': ['Тракът е преименуван на „Трак 1“; първоначалното име остава в .gpx. "Отмени" го връща.', 'The track is renamed “Track 1”; the original name stays in the .gpx. “Undo” brings it back.'],
+  'msg.namesCleared.n': ['{n} трака са с имена Трак 1, 2, … по реда в панела; първоначалните остават в .gpx. "Отмени" ги връща.', '{n} tracks are named Track 1, 2, … in panel order; the original names stay in the .gpx. “Undo” brings them back.']
+});
+
 I18N.start();
