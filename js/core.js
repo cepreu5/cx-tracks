@@ -475,6 +475,13 @@
         partsOf(t.id).forEach(function (s) {
           var pa = pointAt(t, s.a), pb = pointAt(t, s.b);
           var da = U.hav(j.lat, j.lon, pa[0], pa[1]), db = U.hav(j.lat, j.lon, pb[0], pb[1]);
+          // Участък с двата края в точката (примка) е два клона: излизащата и връщащата се
+          // отсечка - иначе изборът на едната би бил избор и на другата.
+          if (da <= jt && db <= jt) {
+            j.branches.push({ trackId: t.id, a: s.a, b: s.b, len: s.len, key: s.key, from: 'a', at: pa, loop: true });
+            j.branches.push({ trackId: t.id, a: s.a, b: s.b, len: s.len, key: s.key, from: 'b', at: pb, loop: true });
+            return;
+          }
           var from = da <= db ? 'a' : 'b';
           if (Math.min(da, db) <= jt) j.branches.push({ trackId: t.id, a: s.a, b: s.b, len: s.len, key: s.key, from: from, at: from === 'a' ? pa : pb });
         });
@@ -956,7 +963,7 @@
     });
   }
 
-  var PROBE = 80; // на толкова метра след точката се сравнява накъде тръгва маршрутът
+  var PROBE = 80, PROBE_MIN = 15; // на толкова метра след точката се сравнява накъде тръгва маршрутът
 
   // Точка по сглобения маршрут на разстояние d.
   function routeAt(geo, d) {
@@ -969,18 +976,25 @@
     var f = (d - c[lo]) / ((c[hi] - c[lo]) || 1), p = pts[lo], q = pts[hi];
     return [p[0] + f * (q[0] - p[0]), p[1] + f * (q[1] - p[1])];
   }
-  // Точка по клона, малко след точката на прекъсване.
-  function branchProbe(br, tracksById) {
+  // Разстоянието на сондата в точката: маршрутът и клоновете се сондират на едно и също
+  // разстояние, не повече от половината на най-късия клон - иначе късият клон не се разпознава.
+  function probeK(j) {
+    var m = Infinity;
+    (j && j.branches || []).forEach(function (br) { m = Math.min(m, br.b - br.a); });
+    return Math.max(PROBE_MIN, Math.min(PROBE, m / 2));
+  }
+  // Точка по клона на k метра след точката на прекъсване (по подразбиране probeK(j)).
+  function branchProbe(br, tracksById, k) {
     var t = tracksById[br.trackId];
     if (!t) return null;
-    var k = Math.min(PROBE, (br.b - br.a) / 2);
+    k = Math.min(k == null ? Math.min(PROBE, (br.b - br.a) / 2) : k, br.b - br.a);
     return pointAt(t, br.from === 'a' ? br.a + k : br.b - k);
   }
-  function nearestBranch(j, probe, tracksById, jt) {
+  function nearestBranch(j, probe, tracksById, jt, k) {
     if (!probe) return -1;
     var bi = -1, bd = jt;
     j.branches.forEach(function (br, i) {
-      var q = branchProbe(br, tracksById);
+      var q = branchProbe(br, tracksById, k);
       var d = q ? U.hav(q[0], q[1], probe[0], probe[1]) : Infinity;
       if (d <= bd) { bd = d; bi = i; }
     });
@@ -1009,11 +1023,21 @@
       }
       if (!hit) return;
       hit.j = j;
+      hit.k = probeK(j);
       hit.at = routeAt(geo, hit.d);
-      hit.probeAfter = hit.atEnd ? null : routeAt(geo, hit.d + PROBE);
-      hit.chosen = nearestBranch(j, hit.probeAfter, tracksById, jt);
-      hit.incoming = hit.atStart ? -1 : nearestBranch(j, routeAt(geo, hit.d - PROBE), tracksById, jt);
+      hit.probeAfter = hit.atEnd ? null : routeAt(geo, hit.d + hit.k);
+      hit.chosen = nearestBranch(j, hit.probeAfter, tracksById, jt, hit.k);
+      hit.incoming = hit.atStart ? -1 : nearestBranch(j, routeAt(geo, hit.d - hit.k), tracksById, jt, hit.k);
       if (hit.chosen === hit.incoming) hit.chosen = -1;
+      // Продължението е примка: след кой елемент маршрутът пак е в точката (back).
+      var cb = j.branches[hit.chosen];
+      if (cb && cb.loop) {
+        for (var m = 0; m < real.length; m++) {
+          if (real[m].idx <= hit.head) continue;
+          var pe = geo.pts[real[m].end];
+          if (U.hav(j.lat, j.lon, pe[0], pe[1]) <= jt) { hit.back = real[m].idx; break; }
+        }
+      }
       out.push(hit);
     });
     return out;
@@ -1032,10 +1056,16 @@
       entry.alts = entry.alts.filter(function (a) { return !near(a.probe, fork.probeAfter); });
       entry.alts.push({ probe: [fork.probeAfter[0], fork.probeAfter[1]], items: JSON.parse(JSON.stringify(tail)) });
     }
-    var bp = branchProbe(br, tracksById);
-    var alt = entry.alts.filter(function (a) { return near(a.probe, bp); })[0];
-    var next = alt ? JSON.parse(JSON.stringify(alt.items))
-      : [{ type: 'part', trackId: br.trackId, a: br.a, b: br.b, rev: br.from === 'b' }];
+    var bp = branchProbe(br, tracksById, fork.k);
+    var part = { type: 'part', trackId: br.trackId, a: br.a, b: br.b, rev: br.from === 'b' }, next;
+    if (br.loop) {
+      // Примката се връща в точката: вмъква се, а маршрутът след нея остава. Досегашната
+      // примка (fork.back) се заменя с новата посока.
+      next = [part].concat(route.items.slice((fork.back != null ? fork.back : fork.head) + 1));
+    } else {
+      var alt = entry.alts.filter(function (a) { return near(a.probe, bp); })[0];
+      next = alt ? JSON.parse(JSON.stringify(alt.items)) : [part];
+    }
     route.items = route.items.slice(0, fork.head + 1).concat(next);
     entry.chosen = bp ? [bp[0], bp[1]] : null;
     return route;
@@ -1150,7 +1180,7 @@
     prep: prep, analyze: analyze, slice: slice, pointAt: pointAt, nearestOn: nearestOn, alongOn: alongOn,
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
     trackBounds: trackBounds, overlap: overlap, ROUTE_GAP: ROUTE_GAP, LINK_MIN: LINK_MIN, DUP_BRIDGE: DUP_BRIDGE,
-    routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe,
+    routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe, probeK: probeK, PROBE: PROBE,
     redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
