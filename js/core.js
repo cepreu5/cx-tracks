@@ -12,6 +12,8 @@
   var LINK_MIN = 1; // между части от различни тракове скок над толкова метра се свързва (до отклонението)
   var GAP_BRIDGE_MAX_M = 500; // пръстенът на дупката и "Изчисти преди сглобяване" свързват направо дупка до толкова метра; по-дългата се чертае
 
+  function joinTol(tol) { return Math.max(ROUTE_GAP, 1.5 * (tol || 20)); }
+
   // Натрупани разстояния и дължина - пазят се върху обекта, без да се записват.
   function prep(t) {
     if (!t._cum || t._cum.length !== t.pts.length) {
@@ -308,6 +310,7 @@
       sections.forEach(function (s) { if (s.kind === 'dup') result.dups.push(s); });
     });
     result.junctions = findJunctions(live, result, tol, kx, ky, opts.drop || []);
+    result.links = collectionLinks(live);
     live.forEach(function (t) {
       result.byTrack[t.id].forEach(function (s) {
         if (s.kind === 'part') (s.pend ? result.pend : result.parts).push(s);
@@ -844,9 +847,13 @@
      отклонението, а краищата (между tol и jt) остават - след махането те „връщат“ трака в участъка и дават
      второ разклонение. Затова махането (клик върху маркера, „Изчисти преди сглобяване“) взема цялата отсечка.
      Същият трак (минал втори път) се гледа само на поне SELF_SEP*jt по трака от мястото. Връща {a, b}. */
+  /* 1.7: докъде стига отсечката - до reach метра от keepId. По подразбиране прагът за дубликат (tol): крие се точно
+     покритото от оставащото копие и нищо извън него (CX, 4 окт 2026) - краищата лягат върху него. За застъпванията без
+     маркер (те са до jt) се подава jt, както в 1.6. */
   var STRETCH_STEP = 5;
-  function dupStretch(t, sec, tracks, tol, keepId) {
+  function dupStretch(t, sec, tracks, tol, keepId, reach) {
     var jt = Math.max(ROUTE_GAP, 1.5 * (tol == null ? 20 : tol)), cosMax = Math.cos(SELF_ANGLE * Math.PI / 180);
+    var rd = reach == null ? Math.max(1, tol == null ? 20 : tol) : reach;
     var lo = Math.min(sec.a, sec.b), hi = Math.max(sec.a, sec.b);
     if (keepId == null) keepId = sec.withId;
     var o = (tracks || []).filter(function (x) { return x && x.id === keepId && x.pts && x.pts.length > 1; })[0];
@@ -865,9 +872,9 @@
       var vx = (p1[1] - p0[1]) * kx, vy = (p1[0] - p0[0]) * ky, vl = Math.hypot(vx, vy) || 1;
       for (var j = 0; j < o.pts.length - 1; j++) {
         var a = o.pts[j], b = o.pts[j + 1], ax = a[1] * kx, ay = a[0] * ky, dx = b[1] * kx - ax, dy = b[0] * ky - ay;
-        if (Math.min(ax, ax + dx) - jt > px || Math.max(ax, ax + dx) + jt < px || Math.min(ay, ay + dy) - jt > py || Math.max(ay, ay + dy) + jt < py) continue;
+        if (Math.min(ax, ax + dx) - rd > px || Math.max(ax, ax + dx) + rd < px || Math.min(ay, ay + dy) - rd > py || Math.max(ay, ay + dy) + rd < py) continue;
         var l2 = dx * dx + dy * dy, f = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
-        if (Math.hypot(ax + f * dx - px, ay + f * dy - py) > jt) continue;
+        if (Math.hypot(ax + f * dx - px, ay + f * dy - py) > rd) continue;
         var along = oc[j] + f * (oc[j + 1] - oc[j]);
         if (self && Math.abs(along - d) < SELF_SEP * jt) continue;
         if (hidden(o, along)) continue;
@@ -880,7 +887,11 @@
       // Къс преход (до jt) без съвпадение - косият завой между отклонението и jt - не прекъсва отсечката.
       var end = from, miss = 0, maxMiss = Math.ceil(jt / STRETCH_STEP);
       for (var d = from + dir * STRETCH_STEP; d >= 0 && d <= t.len; d += dir * STRETCH_STEP) {
-        if (hidden(t, d)) break;
+        if (hidden(t, d)) {
+          // 1.7: отсечката опира в махнато или изтрито - стига до самия му край, без трохи между двете.
+          if (!miss) { var u = end, v = d; for (var k = 0; k < 12; k++) { var w = (u + v) / 2; if (hidden(t, w)) v = w; else u = w; } end = v; }
+          break;
+        }
         if (near(d)) { end = d; miss = 0; } else if (++miss > maxMiss) break;
       }
       // Остатък до края на трака, по-къс от стъпката, отива с отсечката.
@@ -962,7 +973,7 @@
       for (pass = 0; pass < 5; pass++) {
         var lo = leftoverOverlaps(tracks, tol);
         if (!lo.length) break;
-        lo.forEach(function (x) { var t = byId(x.trackId); if (t) { skip(x.trackId, dupStretch(t, x, tracks, tol, x.withId)); out.overlaps++; } });
+        lo.forEach(function (x) { var t = byId(x.trackId); if (t) { skip(x.trackId, dupStretch(t, x, tracks, tol, x.withId, joinTol(tol))); out.overlaps++; } });
       }
     }
     if (!opts.noJoin) out.joined = closeHoles(tracks, tol, opts.max == null ? AUTO_GAP_DEF : opts.max).length;
@@ -987,6 +998,174 @@
     }
     var overlaps = leftoverOverlaps(ts, tol), holes = trackHoles(ts, tol, max || AUTO_GAP_DEF);
     return { marked: marked, overlaps: overlaps, holes: holes, after: !!marked, ok: !marked && !overlaps.length && !holes.length };
+  }
+
+  /* 1.7: колекцията без празно място. Най-близкото видимо място от друга линия до точката d на трака t (или до
+     дадена точка pt): другите тракове и другото минаване на същия (поне SELF_SEP*jt по трака от d). Изтритото и
+     махнатото не се броят. Връща {trackId, d, pt, dist} или null, ако няма нищо до maxD метра. */
+  function hiddenAt(tr, d) {
+    if (isCut(tr, d)) return true;
+    var sk = tr.skips || [];
+    for (var k = 0; k < sk.length; k++) if (d > sk[k].a + 0.5 && d < sk[k].b - 0.5) return true;
+    return false;
+  }
+  function nearestLive(tracks, t, d, maxD, tol, pt) {
+    var jt = joinTol(tol), p = pt || pointAt(t, d), kx = Math.cos(p[0] * U.RAD) * MPD, ky = MPD, px = p[1] * kx, py = p[0] * ky, best = null;
+    (tracks || []).forEach(function (o) {
+      if (!o || !o.pts || o.pts.length < 2) return;
+      prep(o);
+      var self = t && (o === t || o.id === t.id), oc = o._cum;
+      for (var j = 0; j < o.pts.length - 1; j++) {
+        var a = o.pts[j], b = o.pts[j + 1], ax = a[1] * kx, ay = a[0] * ky, dx = b[1] * kx - ax, dy = b[0] * ky - ay;
+        if (Math.min(ax, ax + dx) - maxD > px || Math.max(ax, ax + dx) + maxD < px || Math.min(ay, ay + dy) - maxD > py || Math.max(ay, ay + dy) + maxD < py) continue;
+        var l2 = dx * dx + dy * dy, f = l2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+        var dd = Math.hypot(ax + f * dx - px, ay + f * dy - py);
+        if (dd > maxD || best && dd >= best.dist) continue;
+        var along = oc[j] + f * (oc[j + 1] - oc[j]);
+        if (self && Math.abs(along - d) < SELF_SEP * jt) continue;
+        if (hiddenAt(o, along)) continue;
+        best = { trackId: o.id, d: along, pt: [a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1])], dist: dd };
+      }
+    });
+    return best;
+  }
+
+  /* 1.7: краищата на махнат дубликат лягат върху оставащата линия. За всеки край на махнат отрязък (t.skips), който
+     не е край на трака, най-близкото видимо място от друга линия (до jt): кратка връзка от края дотам - автоматична,
+     не се чертае и не се свързва ръчно. Връща [{trackId, d, from, to, dist, withId}]. */
+  function skipEnds(tracks, tol) {
+    var jt = joinTol(tol), out = [];
+    (tracks || []).forEach(function (t) {
+      if (!t || !t.pts || t.pts.length < 2 || !(t.skips || []).length) return;
+      prep(t);
+      mergeIv(t.skips).forEach(function (s) {
+        [[s.a, -0.5], [s.b, 0.5]].forEach(function (e) {
+          var d = e[0];
+          if (d <= 1 || d >= t.len - 1 || hiddenAt(t, d + e[1])) return;
+          var n = nearestLive(tracks, t, d, jt, tol);
+          if (n) out.push({ trackId: t.id, d: d, from: pointAt(t, d), to: [n.pt[0], n.pt[1], null], dist: n.dist, withId: n.trackId });
+        });
+      });
+    });
+    return out;
+  }
+
+  /* 1.7: връзките в колекцията. t.joins ({a, b, pts?}) затварят дупка в трака, t.links ({a, to, b, pts}) свързват края на
+     трака t (a) с края на трака to (b). pts - върховете между двата края ([[lat, lon]]). Връщат се като линии:
+     [{kind, trackId, a, toId, b, line, len}] - чертаят се в цвета на трака и влизат в маршрута и в .gpx. */
+  var LINK_MAX = 500; // ръчната връзка с точки е до толкова метра (CX, 4 окт 2026); над тях връзка не се чертае
+  function linkPts(pts) { return (pts || []).map(function (p) { return [p[0], p[1], null]; }); }
+  function collectionLinks(tracks) {
+    var by = {}, out = [];
+    (tracks || []).forEach(function (t) { if (t && t.pts && t.pts.length > 1) by[t.id] = t; });
+    Object.keys(by).forEach(function (id) {
+      var t = by[id];
+      liveJoins(t).forEach(function (j) {
+        var line = [pointAt(t, j.a)].concat(linkPts(j.pts)).concat([pointAt(t, j.b)]);
+        out.push({ kind: 'join', trackId: t.id, a: j.a, toId: t.id, b: j.b, line: line, len: U.lengthOf(line), ref: j });
+      });
+      (t.links || []).forEach(function (l) {
+        var o = by[l.to]; if (!o) return;
+        var line = [pointAt(t, l.a)].concat(linkPts(l.pts)).concat([pointAt(o, l.b)]);
+        out.push({ kind: 'link', trackId: t.id, a: l.a, toId: o.id, b: l.b, line: line, len: U.lengthOf(line), ref: l });
+      });
+    });
+    return out;
+  }
+
+  /* 1.7: отворените краища на колекцията - краищата на видимите парчета от траковете (началото и краят на трака,
+     краищата на изтритото), които не са свързани (t.joins, t.links), не лягат върху друга линия като краищата на
+     махнат дубликат и не са до tol от друга видима линия. Връща [{trackId, d, pt}]. */
+  function openEnds(tracks, tol) {
+    var live = (tracks || []).filter(function (t) { return t && t.pts && t.pts.length > 1; }), out = [];
+    live.forEach(prep);
+    var links = collectionLinks(live), se = skipEnds(live, tol), tl = Math.max(1, tol == null ? 20 : tol);
+    live.forEach(function (t) {
+      var off = mergeIv(offIv(t).concat(t.skips || []).map(function (x) { return { a: Math.max(0, x.a), b: Math.min(t.len, x.b) }; })
+        .filter(function (x) { return x.b - x.a > 0; })), pos = 0, ends = [];
+      off.forEach(function (x) { if (x.a - pos > 1) ends.push(pos, x.a); pos = Math.max(pos, x.b); });
+      if (t.len - pos > 1) ends.push(pos, t.len);
+      ends.forEach(function (e) {
+        if (links.some(function (l) { return l.trackId === t.id && Math.abs(l.a - e) <= 1 || l.toId === t.id && Math.abs(l.b - e) <= 1; })) return;
+        if (se.some(function (x) { return x.trackId === t.id && Math.abs(x.d - e) <= 1; })) return;
+        if (nearestLive(live, t, e, tl, tol)) return;
+        out.push({ trackId: t.id, d: e, pt: pointAt(t, e) });
+      });
+    });
+    return out;
+  }
+
+  /* 1.7: връзка между два отворени края (от openEnds) през точките pts ([[lat, lon]]). Двата края на една дупка в трака
+     стават t.joins, иначе t.links на първия трак. Над LINK_MAX не се прави нищо. Връща {len, kind} или {len, over: true}. */
+  function addLink(tracks, e1, e2, pts) {
+    var by = {};
+    tracks.forEach(function (t) { by[t.id] = t; });
+    var t1 = by[e1.trackId], t2 = by[e2.trackId];
+    if (!t1 || !t2) return null;
+    var line = [pointAt(t1, e1.d)].concat(linkPts(pts)).concat([pointAt(t2, e2.d)]), len = U.lengthOf(line);
+    if (len > LINK_MAX) return { len: len, over: true };
+    var vs = (pts || []).map(function (p) { return [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]; });
+    if (t1 === t2) {
+      var lo = Math.min(e1.d, e2.d), hi = Math.max(e1.d, e2.d);
+      var h = holeIv(t1).filter(function (x) { return Math.abs(x.a - lo) <= 1 && Math.abs(x.b - hi) <= 1; })[0];
+      if (h) {
+        t1.joins = (t1.joins || []).concat([{ a: h.a, b: h.b, pts: e1.d <= e2.d ? vs : vs.reverse(), hand: true }]);
+        return { len: len, kind: 'join' };
+      }
+    }
+    t1.links = (t1.links || []).concat([{ a: e1.d, to: t2.id, b: e2.d, pts: vs }]);
+    return { len: len, kind: 'link' };
+  }
+
+  /* 1.7: „Местене“ и „Махане“ пипат върховете на трака. Новите точки сменят разстоянията по трака: remapper дава
+     функция старо d -> ново d (map[i] - новият номер на стария връх i или -1, ако е махнат). Махнатият връх: мястото
+     между съседите му се разпределя по новата отсечка. */
+  function remapper(oldPts, newPts, map) {
+    var oc = U.cumulative(oldPts), nc = U.cumulative(newPts), n = oldPts.length;
+    return function (d) {
+      if (!isFinite(d)) return d;
+      var lo = 0, hi = n - 1;
+      if (d <= 0) lo = hi = 0;
+      else if (d >= oc[n - 1]) lo = hi = n - 1;
+      else { while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (oc[mid] <= d) lo = mid; else hi = mid; } }
+      var L = lo, H = hi;
+      while (L >= 0 && map[L] < 0) L--;
+      while (H < n && map[H] < 0) H++;
+      if (L < 0 && H >= n) return 0;
+      if (L < 0) return nc[map[H]];
+      if (H >= n) return nc[map[L]];
+      if (L === H) return nc[map[L]];
+      var f = (d - oc[L]) / ((oc[H] - oc[L]) || 1);
+      return nc[map[L]] + Math.max(0, Math.min(1, f)) * (nc[map[H]] - nc[map[L]]);
+    };
+  }
+
+  /* 1.7: тракът за .gpx - една непрекъсната линия: без изтритото, а връзките (t.joins, t.links в началото и в края) са
+     върхове в трака. tracks - видимите (за другия край на t.links). */
+  function trackLine(t, tracks) {
+    prep(t);
+    var links = collectionLinks(tracks && tracks.length ? tracks : [t]), js = links.filter(function (l) { return l.kind === 'join' && l.trackId === t.id; });
+    var off = mergeIv(offIv(t).concat(js.map(function (j) { return { a: j.a, b: j.b }; })).map(function (x) { return { a: Math.max(0, x.a), b: Math.min(t.len, x.b) }; })
+      .filter(function (x) { return x.b - x.a > 0; }));
+    var out = [], pos = 0;
+    function add(pts) { pts.forEach(function (p) { var l = out[out.length - 1]; if (!l || Math.abs(l[0] - p[0]) > 1e-7 || Math.abs(l[1] - p[1]) > 1e-7) out.push(p); }); }
+    off.forEach(function (x) {
+      if (x.a > pos) add(slice(t, pos, x.a));
+      var j = js.filter(function (l) { return Math.abs(l.a - x.a) <= 1 && Math.abs(l.b - x.b) <= 1; })[0];
+      if (j) add(j.line);
+      pos = Math.max(pos, x.b);
+    });
+    if (pos < t.len) add(slice(t, pos, t.len));
+    links.forEach(function (l) {
+      if (l.kind !== 'link') return;
+      var line = null;
+      if (l.trackId === t.id && l.toId !== t.id) line = { d: l.a, pts: l.line };
+      else if (l.toId === t.id && l.trackId !== t.id) line = { d: l.b, pts: l.line.slice().reverse() };
+      if (!line) return;
+      if (line.d <= 1) { var rest = out; out = []; add(line.pts.slice().reverse()); add(rest); }
+      else if (line.d >= t.len - 1) add(line.pts);
+    });
+    return out;
   }
 
   /* "Изтрий разклонението" - маршрутът в точката j (fork от routeForks или null):
@@ -1230,7 +1409,11 @@
         var e = prev.pts[prev.pts.length - 1], s = g.pts[0];
         var d = U.hav(e[0], e[1], s[0], s[1]);
         var diff = prev.item.type === 'part' && prev.item.trackId !== g.item.trackId;
-        if (d > ROUTE_GAP || diff && d > LINK_MIN) {
+        var cl = d > LINK_MIN && analysis && collLink(analysis.links, e, s);
+        if (cl) {
+          // 1.7: връзка от колекцията между края на едната част и началото на другата - маршрутът минава по нея.
+          out.push({ idx: null, shared: true, coll: true, item: { type: 'clink', kind: cl.kind, trackId: cl.trackId }, pts: cl.pts });
+        } else if (d > ROUTE_GAP || diff && d > LINK_MIN) {
           var link = d > ROUTE_GAP && analysis && sharedLink(prev, g, analysis, tracksById, tol);
           var gp = { beforeIdx: g.idx, afterIdx: prev.idx, d: d, from: e, to: s };
           if (link) {
@@ -1278,6 +1461,19 @@
     });
     autoGaps.sort(function (p, q) { return p.d0 - q.d0; });
     return { items: items, pts: all, cum: cum, len: all.length ? cum[cum.length - 1] : 0, gaps: gaps, autoGaps: autoGaps };
+  }
+
+  // 1.7: връзката от колекцията (Core.collectionLinks), чиито краища са при e и s (в двете посоки).
+  function collLink(links, e, s) {
+    var best = null;
+    (links || []).forEach(function (l) {
+      var f = l.line[0], z = l.line[l.line.length - 1];
+      [[f, z, false], [z, f, true]].forEach(function (c) {
+        var sc = U.hav(e[0], e[1], c[0][0], c[0][1]) + U.hav(s[0], s[1], c[1][0], c[1][1]);
+        if (sc <= 3 && (!best || sc < best.sc)) best = { sc: sc, kind: l.kind, trackId: l.trackId, pts: c[2] ? l.line.slice().reverse() : l.line.slice() };
+      });
+    });
+    return best;
   }
 
   // Дупка между части, отворена пак с "Отвори пак" (route.openGaps: [[lat,lon,lat,lon]]).
@@ -1544,6 +1740,7 @@
     dupStretch: dupStretch, trackHoles: trackHoles, closeHoles: closeHoles, liveJoins: liveJoins, cleanCollection: cleanCollection, collectionCheck: collectionCheck, HOLE_COVER: HOLE_COVER, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
-    joinTol: function (tol) { return Math.max(ROUTE_GAP, 1.5 * (tol || 20)); }
+    joinTol: joinTol, nearestLive: nearestLive, skipEnds: skipEnds, collectionLinks: collectionLinks, openEnds: openEnds, addLink: addLink,
+    remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX
   };
 })();

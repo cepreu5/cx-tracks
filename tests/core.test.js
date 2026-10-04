@@ -994,9 +994,9 @@ console.log('общ участък OK');
   assert.strictEqual(lo15.length, 2, 'само с маркера остават двата края на споделената отсечка: ' + lo15.map(iv));
   assert.ok(jA(t15, Core.analyze(t15, 20)).some(function (d) { return d > 840 && d < 1560; }), 'и разклоненията стоят вътре в отсечката');
 
-  // 1.6: Core.dupStretch - цялата отсечка, докато Б върви на до jt (30 м) от А, успоредно.
+  // 1.6: Core.dupStretch до jt (30 м) от А, успоредно - от 1.7 само за застъпванията без маркер (reach = jt).
   var t16 = load(), B = byId(t16, 'syn-b'), cl = Core.dupCluster(r0.pend, sec, ['syn-a', 'syn-b']);
-  var st = Core.dupStretch(B, sec, t16, 20, cl.keep);
+  var st = Core.dupStretch(B, sec, t16, 20, cl.keep, Core.joinTol(20));
   assert.ok(cl.keep === 'syn-a' && st.a < 300 && st.a > 270 && st.b > 1070 && st.b < 1100, 'споделената отсечка е по-широка от маркера: ' + iv(st) + ' срещу ' + iv(sec));
   B.skips = [st];
   var r16 = Core.analyze(t16, 20);
@@ -1029,11 +1029,12 @@ console.log('общ участък OK');
 
   // Трите условия: пробата не пипа траковете; чистенето в реда на CX ги изпълнява.
   var tc = load(), ck = Core.collectionCheck(tc, 20);
-  assert.ok(ck.marked === 1 && ck.after && ck.overlaps.length === 1 && ck.holes.length === 1 && !ck.ok, 'преди: 1 маркиран, след него 1 застъпване без маркер, 1 дупка: ' + JSON.stringify([ck.marked, ck.overlaps.length, ck.holes.length]));
-  assert.ok(ck.overlaps[0].trackId === 'syn-b' && ck.overlaps[0].withId === 'syn-a' && ck.overlaps[0].len < 100, 'застъпването без маркер е късото (под 100 м): ' + iv(ck.overlaps[0]));
+  // 1.7: маркерът крие само покритото до прага (8 м) - двата края на 22 м остават като застъпвания без маркер.
+  assert.ok(ck.marked === 1 && ck.after && ck.overlaps.length === 3 && ck.holes.length === 1 && !ck.ok, 'преди: 1 маркиран, след него 3 застъпвания без маркер (късото и двата края на 22 м), 1 дупка: ' + JSON.stringify([ck.marked, ck.overlaps.length, ck.holes.length]));
+  assert.ok(ck.overlaps.every(function (o) { return o.trackId === 'syn-b' && o.withId === 'syn-a' && o.len < 100; }), 'застъпванията без маркер са къси (под 100 м): ' + ck.overlaps.map(iv));
   assert.ok(tc.every(function (t) { return !(t.skips || []).length && !(t.joins || []).length; }), 'пробата не пипа траковете');
   var skipped = [], res = Core.cleanCollection(tc, 20, { onSkip: function (id, a, b) { skipped.push(id + ':' + Math.round(a) + '-' + Math.round(b)); } });
-  assert.ok(res.dups === 1 && res.overlaps === 1 && res.joined === 1 && skipped.length === 2, 'изчистени: дубликат, застъпване, дупка: ' + JSON.stringify(res));
+  assert.ok(res.dups === 1 && res.overlaps === 3 && res.joined === 1 && skipped.length === 4, 'изчистени: дубликат, застъпвания, дупка: ' + JSON.stringify(res));
   assert.strictEqual(Core.analyze(tc, 20).pend.length, 0, 'условие 1: няма дублирани тракове');
   assert.deepStrictEqual(Core.leftoverOverlaps(tc, 20), [], 'условие 2: няма покрити един върху друг тракове, които не се отчитат');
   assert.deepStrictEqual(Core.trackHoles(tc, 20, 100), [], 'условие 3: няма незатворени дупки');
@@ -1051,7 +1052,7 @@ console.log('общ участък OK');
   var H = { id: 'H', pts: poly([[0, 0], [1500, 0], [1500, 70], [1250, 70], [1240, 22], [1180, 22], [1170, 8], [400, 8], [390, 22], [330, 22], [320, 70], [0, 70]]) };
   var rh = Core.analyze([H], 20);
   assert.ok(rh.pend.length === 1 && rh.pend[0].withId === 'H', 'маркер на второто минаване на същия трак');
-  var sh = Core.dupStretch(H, rh.pend[0], [H], 20, 'H');
+  var sh = Core.dupStretch(H, rh.pend[0], [H], 20, 'H', Core.joinTol(20));
   assert.ok(sh.b - sh.a > rh.pend[0].len + 80, 'отсечката взема и краищата: ' + iv(sh) + ' срещу ' + iv(rh.pend[0]));
   Core.cleanCollection([H], 20, {});
   assert.ok(Core.collectionCheck([H], 20).ok && Core.analyze([H], 20).byTrack.H.some(function (s) { return s.kind === 'part' && s.a < 100; }), 'след чистенето първото минаване остава, колекцията е консистентна');
