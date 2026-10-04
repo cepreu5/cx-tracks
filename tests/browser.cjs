@@ -1107,9 +1107,9 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.3.2' && await p5.isVisible('#appVersion') && /^Версия 1\.3\.2 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.4.0' && await p5.isVisible('#appVersion') && /^Версия 1\.4\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.3.2' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.4.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -2563,6 +2563,132 @@ function barFits() {
       check(!ek.length, tag + 'конзолата е чиста' + (ek.length ? ': ' + ek.join(' | ') : ''));
       await ck.close();
     }
+  }
+
+  // ---- 1.4: маркерите броят, посочване/задържане осветява удвоеното, пръстен на дупките (до 500 м), „Изчисти преди сглобяване“ ----
+  {
+    const tag = '1.4: ';
+    const ce = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const pe = await ce.newPage();
+    const ee = [];
+    pe.on('pageerror', e => ee.push('pageerror: ' + e.message));
+    pe.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) ee.push('console: ' + m.text()); });
+    await pe.goto(url);
+    await pe.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    const seqE = (...ps) => ps.reduce((o, p, i) => o.concat(i ? p.slice(1) : p), []);
+    const dLat = m => m / 111195, dLon = m => m / (111195 * Math.cos(42.6 * Math.PI / 180));
+    // L по 42,6; M на 5 м над L и N на 5 м под L (км 0,4 - 1,2) - три трака един върху друг; O на 8 м над L (км 3 - 3,8) - два.
+    const lon0 = 24.70, at = km => lon0 + dLon(km * 1000);
+    const eFiles = [
+      writeGpx('EL', line(42.6, at(0), 42.6, at(5), 250)),
+      writeGpx('EM', seqE(line(42.6 + dLat(400), at(0.4), 42.6 + dLat(5), at(0.4), 20), line(42.6 + dLat(5), at(0.4), 42.6 + dLat(5), at(1.2), 40), line(42.6 + dLat(5), at(1.2), 42.6 + dLat(400), at(1.2), 20))),
+      writeGpx('EN', seqE(line(42.6 - dLat(400), at(0.4), 42.6 - dLat(5), at(0.4), 20), line(42.6 - dLat(5), at(0.4), 42.6 - dLat(5), at(1.2), 40), line(42.6 - dLat(5), at(1.2), 42.6 - dLat(400), at(1.2), 20))),
+      writeGpx('EO', seqE(line(42.6 + dLat(400), at(3), 42.6 + dLat(8), at(3), 20), line(42.6 + dLat(8), at(3), 42.6 + dLat(8), at(3.8), 40), line(42.6 + dLat(8), at(3.8), 42.6 + dLat(400), at(3.8), 20))),
+      // Три части по 42,62: 60 м дупка между първите две, 800 м между втората и третата.
+      writeGpx('EP1', line(42.62, at(0), 42.62, at(1), 50)),
+      writeGpx('EP2', line(42.62, at(1.06), 42.62, at(2), 50)),
+      writeGpx('EP3', line(42.62, at(2.8), 42.62, at(3.8), 50))
+    ];
+    await pe.setInputFiles('#fileInput', eFiles);
+    await pe.waitForFunction(() => __gpxk.S.tracks.length === 7);
+    await pe.evaluate(() => { const d = document.querySelector('#dlgImport'); if (d.open) d.close(); window.scrollTo(0, 0); });
+    const frame = () => pe.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const view = (lat, lon, z) => pe.evaluate(a => __gpxk.map.setView(a[0], a[1], a[2]), [lat, lon, z]).then(frame);
+    await view(42.6, at(2.1), 14);
+    await pe.waitForFunction(() => (__gpxk.ui.markers || []).length === 3);
+    const mks = await pe.evaluate(() => { const S = __gpxk.S, b = document.querySelector('.map-canvas').getBoundingClientRect();
+      return __gpxk.ui.markers.map(o => ({ x: b.left + o.x, y: b.top + o.y, n: o.n, t: S.tracks.find(t => t.id === o.sec.trackId).name, key: o.sec.key,
+        cl: Core.dupCluster(__gpxk.A.pend, o.sec, S.tracks.map(t => t.id)).secs.length })); });
+    const byN = mks.map(m => m.t + '=' + m.n).sort().join(' ');
+    check(mks.every(m => m.n === m.cl + 1) && JSON.stringify(mks.map(m => m.n).sort()) === '[2,3,3]' && mks.filter(m => m.n === 3).every(m => /E[MN]/.test(m.t)) && mks.filter(m => m.n === 2).every(m => m.t === 'EO.gpx'),
+      tag + 'числото в маркера = колко маха кликът + копието, което остава; три трака -> 3, два -> 2: ' + byN);
+    // Числото е нарисувано: пиксел в центъра е в цвета на текста (casing), не в червеното на кръга.
+    const inkMid = await pe.evaluate(m => { const cv = document.querySelector('.map-canvas'), k = cv.width / cv.getBoundingClientRect().width, b = cv.getBoundingClientRect();
+      let light = 0; for (let dx = -4; dx <= 4; dx++) for (let dy = -5; dy <= 5; dy++) { const d = cv.getContext('2d').getImageData(Math.round((m.x - b.left + dx) * k), Math.round((m.y - b.top + dy) * k), 1, 1).data; if (d[0] > 200 && d[1] > 200 && d[2] > 200) light++; }
+      return light; }, mks.find(m => m.n === 3));
+    check(inkMid > 6, tag + 'в кръга има число (светли пиксели в средата: ' + inkMid + ')');
+    // Посочване с истинската мишка: удвоеният участък (M и N) светва, надписът „махни дубликата“ остава, маркерът не пада.
+    const m3 = mks.find(m => m.n === 3);
+    await pe.mouse.move(m3.x, m3.y);
+    await pe.waitForFunction(() => __gpxk.ui.hover && __gpxk.ui.hover.kind === 'marker' && (__gpxk.ui.dupHl || []).length > 0);
+    const hv = await pe.evaluate(() => ({ hl: __gpxk.ui.dupHl.map(d => __gpxk.S.tracks.find(t => t.id === d.trackId).name).sort().join(), marks: __gpxk.ui.markers.length, tip: document.querySelector('#tip').hidden }));
+    check(hv.hl === 'EM.gpx,EN.gpx' && hv.marks === 3 && hv.tip, tag + 'посочване: осветени са застъпените участъци ' + hv.hl + ', маркерите стоят (' + hv.marks + ')');
+    await pe.mouse.move(5, 790);
+    await pe.waitForFunction(() => !__gpxk.ui.hover && !(__gpxk.ui.dupHl || []).length);
+    // Задържане с пръст (pointerType touch) върху маркера с 2: светва участъкът на O и остава след вдигането; нищо не пада.
+    const m2 = mks.find(m => m.n === 2);
+    const touch = (type, m) => pe.evaluate(a => document.querySelector('.map-canvas').dispatchEvent(new PointerEvent(a[0], { pointerId: 7, pointerType: 'touch', isPrimary: true, clientX: a[1], clientY: a[2], bubbles: true, button: 0 })), [type, m.x, m.y]);
+    await touch('pointerdown', m2);
+    await pe.waitForFunction(() => __gpxk.ui.hover && __gpxk.ui.hover.press, null, { timeout: 3000 });
+    await touch('pointerup', m2);
+    await frame();
+    const lp = await pe.evaluate(() => ({ hl: (__gpxk.ui.dupHl || []).map(d => __gpxk.S.tracks.find(t => t.id === d.trackId).name).join(), marks: __gpxk.ui.markers.length, pend: __gpxk.A.pend.length }));
+    check(lp.hl === 'EO.gpx' && lp.marks === 3 && lp.pend === 3, tag + 'задържане: светва участъкът на ' + lp.hl + ' и остава след вдигането; маркерите стоят ' + JSON.stringify(lp));
+    await pe.evaluate(() => { const m = __gpxk.map; m.opts.onClick(Object.assign({ x: 40, y: 700 }, m.unproject(40, 700))); });
+    await frame();
+    check(await pe.evaluate(() => !__gpxk.ui.hover && !(__gpxk.ui.dupHl || []).length && __gpxk.A.pend.length === 3), tag + 'следващото докосване встрани гаси осветяването, без да маха нищо');
+
+    // Маршрут от трите части: две отворени дупки (60 м и 800 м), всяка с пръстен.
+    await pe.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), T = S.tracks.filter(t => /^EP/.test(t.name));
+      r.items = T.map(t => ({ type: 'part', trackId: t.id, a: 0, b: Core.prep(t).len, rev: false })); __gpxk.refresh(); });
+    await view(42.62, at(1.9), 14);
+    const est = () => frame().then(() => pe.evaluate(() => { const S = __gpxk.S, G = __gpxk.G, r = S.routes.find(x => x.id === S.curId), b = document.querySelector('.map-canvas').getBoundingClientRect();
+      return { gaps: G.gaps.map(g => Math.round(g.d)), rings: (__gpxk.ui.gapRings || []).map(o => ({ x: b.left + o.x, y: b.top + o.y, d: Math.round(G.gaps.find(g => g.beforeIdx === o.beforeIdx).d) })),
+        items: JSON.stringify(r.items), bridges: r.items.filter(i => i.bridge).length, pend: __gpxk.A.pend.length, marks: (__gpxk.ui.markers || []).length, undo: __gpxk.ui.undo.length,
+        skips: JSON.stringify(S.tracks.map(t => t.skips || [])), toast: document.querySelector('#toast').textContent,
+        gapsRow: document.querySelector('#dupsGaps').hidden ? '' : document.querySelector('#dupsGaps').textContent, cleanOff: document.querySelector('#cleanBtn').disabled }; }));
+    let e1 = await est();
+    check(e1.gaps.length === 2 && e1.rings.length === 2 && e1.gaps[0] > 50 && e1.gaps[0] < 70 && e1.gaps[1] > 750 && /^Отворени дупки: 2 · /.test(e1.gapsRow) && !e1.cleanOff, tag + 'две отворени дупки, всяка с пръстен: ' + JSON.stringify(e1.gaps) + ' · ' + e1.gapsRow);
+    const ringPx = await pe.evaluate(o => { const cv = document.querySelector('.map-canvas'), k = cv.width / cv.getBoundingClientRect().width, b = cv.getBoundingClientRect();
+      const d = cv.getContext('2d').getImageData(Math.round((o.x - b.left) * k), Math.round((o.y - b.top - 9) * k), 1, 1).data, h = U.cssVar('--app-walk-gap').trim().replace('#', '');
+      const c = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); return Math.abs(d[0] - c[0]) + Math.abs(d[1] - c[1]) + Math.abs(d[2] - c[2]); }, e1.rings[0]);
+    check(ringPx < 60, tag + 'пръстенът е кехлибарен (--app-walk-gap), разлика ' + ringPx);
+    const longR = e1.rings.find(o => o.d > 500), shortR = e1.rings.find(o => o.d < 500);
+    // Над 500 м: кликът не свързва, дупката остава, съобщението казва защо.
+    await pe.mouse.click(longR.x, longR.y);
+    let e2 = await est();
+    check(e2.gaps.length === 2 && e2.items === e1.items && e2.undo === e1.undo && /^Дупката е \d+ м - над 500 м не се свързва направо\. Затвори я с чертаене/.test(e2.toast), tag + 'клик върху пръстена на дупка над 500 м: остава отворена · ' + e2.toast);
+    // До 500 м: кликът свързва направо (като „Свържи направо“), „Отмени“ я връща.
+    await pe.mouse.click(shortR.x, shortR.y);
+    e2 = await est();
+    check(e2.gaps.length === 1 && e2.gaps[0] > 500 && e2.bridges === 1 && e2.undo === e1.undo + 1, tag + 'клик върху пръстена на 60 м дупка: свързана направо, остава само дългата ' + JSON.stringify(e2.gaps));
+    await pe.click('#undoBtn');
+    e2 = await est();
+    check(e2.gaps.length === 2 && e2.items === e1.items, tag + '„Отмени“ връща дупката');
+
+    // „Изчисти преди сглобяване“: всички маркери падат по правилото на клика, късата дупка се свързва, дългата остава - една стъпка.
+    await pe.evaluate(() => { const b = document.querySelector('#dupsCard .fold-t'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); });
+    await pe.locator('#cleanBtn').scrollIntoViewIfNeeded();
+    const btn = await pe.evaluate(() => ({ text: document.querySelector('#cleanBtn').textContent.trim(), title: document.querySelector('#cleanBtn').title }));
+    check(btn.text === 'Изчисти преди сглобяване' && /до 500 м/.test(btn.title), tag + 'копчето в „Дубликати“: ' + btn.text);
+    const pendBefore = e2.pend;
+    await pe.click('#cleanBtn');
+    const e3 = await est();
+    const kept = await pe.evaluate(() => { const S = __gpxk.S, L = S.tracks.find(t => t.name === 'EL.gpx'), A = __gpxk.A;
+      // При км 0,8 и 3,4 по L остава точно един трак.
+      return [0.8, 3.4].map(km => S.tracks.filter(t => { const m = Core.nearestOnTrack(t, 42.6, 24.70 + km * 1000 / (111195 * Math.cos(42.6 * Math.PI / 180)));
+        return m.dist < 12 && A.byTrack[t.id].some(s => s.kind === 'part' && m.d > s.a && m.d < s.b); }).map(t => t.name).join()); });
+    check(e3.pend === 0 && e3.marks === 0 && JSON.stringify(kept) === '["EL.gpx","EL.gpx"]', tag + 'изчистване: маркери не остават, от всяка група остава едно копие (' + kept + ')');
+    check(e3.gaps.length === 1 && e3.gaps[0] > 500 && e3.bridges === 1, tag + 'изчистване: дупката от 60 м е свързана, тази над 500 м остава отворена ' + JSON.stringify(e3.gaps));
+    check(new RegExp('^Махнати застъпени тракове: ' + pendBefore + ' · свързани дупки: 1\\. "Отмени" връща всичко\\. 1 дупка над 500 м остава отворена - затвори я с чертаене\\.$').test(e3.toast), tag + 'съобщението: ' + e3.toast);
+    check(e3.undo === e2.undo + 1, tag + 'цялото изчистване е един отпечатък за „Отмени“ (' + e2.undo + ' -> ' + e3.undo + ')');
+    if (true) { await pe.setViewportSize({ width: 1280, height: 800 }); await pe.screenshot({ path: path.join(OUT, 'clean-14-1280.png'), fullPage: false }); }
+    await pe.click('#undoBtn');
+    const e4 = await est();
+    check(e4.pend === pendBefore && e4.marks === 3 && e4.items === e2.items && e4.skips === e2.skips && e4.gaps.length === 2, tag + 'едно „Отмени“ връща маркерите и дупките точно както са били ' + JSON.stringify([e4.pend, e4.marks, e4.gaps]));
+    // 390 px: копчето и редовете се побират, без хоризонтално превъртане.
+    await pe.setViewportSize({ width: 390, height: 844 });
+    await pe.locator('#cleanBtn').scrollIntoViewIfNeeded();
+    const narrow = await pe.evaluate(() => { const r = document.querySelector('#cleanBtn').getBoundingClientRect(), g = document.querySelector('#dupsGaps').getBoundingClientRect();
+      return { fits: r.left >= 0 && r.right <= innerWidth && g.right <= innerWidth + 0.5, scroll: document.documentElement.scrollWidth <= innerWidth, w: Math.round(r.width) }; });
+    check(narrow.fits && narrow.scroll, tag + '390 px: копчето (' + narrow.w + ' px) и „Отворени дупки“ се побират, без хоризонтално превъртане');
+    await pe.screenshot({ path: path.join(OUT, 'clean-14-390.png') });
+    // Тъмна тема: копчето и редът се виждат (текстът не е в цвета на фона).
+    const dark = await pe.evaluate(() => { document.documentElement.setAttribute('data-app-mode', 'dark'); const b = getComputedStyle(document.querySelector('#cleanBtn')); return { c: b.color, bg: b.backgroundColor }; });
+    check(dark.c !== dark.bg, tag + 'тъмна тема: копчето се чете ' + JSON.stringify(dark));
+    await pe.screenshot({ path: path.join(OUT, 'clean-14-390-dark.png') });
+    check(!ee.length, tag + 'конзолата е чиста' + (ee.length ? ': ' + ee.join(' | ') : ''));
+    await ce.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));

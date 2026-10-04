@@ -703,5 +703,17 @@ console.log('общ участък OK');
   assert.strictEqual(g1.gaps.length, 0, 'няма дупки след това');
   assert.ok(Math.abs(g1.len - g0.len) < 1, 'дължината не се мени - скокът и досега се броеше направо: ' + Math.round(g0.len) + ' / ' + Math.round(g1.len));
   assert.strictEqual(Core.bridgeGaps(route.items, g1.gaps), 0, 'второ натискане не прави нищо');
-  console.log('1.4 число в маркера, изчистване наведнъж, свързване на дупките: OK');
+  // Праг GAP_BRIDGE_MAX_M (500 м): дупка до него се свързва, по-дългата остава отворена за чертане.
+  assert.strictEqual(Core.GAP_BRIDGE_MAX_M, 500, 'прагът е 500 м');
+  assert.ok(Core.canBridge({ d: 500 }) && Core.canBridge({ d: 340 }) && !Core.canBridge({ d: 500.5 }) && !Core.canBridge(null), 'canBridge: до 500 м включително');
+  var W = { id: 'W', pts: line(latAt(1400), lonAt(3000), latAt(1400), lonAt(4000), 50) };
+  var ts2 = [X, Y, Z, W], tbw = byIdOf(ts2), rw = Core.analyze(ts2, 20);
+  var route2 = { items: [{ type: 'part', trackId: 'X', a: 0, b: 1000 }, { type: 'part', trackId: 'Y', a: 0, b: 1000 }, { type: 'part', trackId: 'Z', a: 0, b: 1000 }, { type: 'part', trackId: 'W', a: 0, b: 1000 }] };
+  var gw = Core.routeGeometry(route2, tbw, rw);
+  assert.deepStrictEqual(gw.gaps.map(function (g) { return g.d > 500; }), [false, false, true], 'две къси дупки и една над 500 м: ' + gw.gaps.map(function (g) { return Math.round(g.d); }));
+  assert.strictEqual(Core.bridgeGaps(route2.items, gw.gaps), 2, 'свързани са само двете къси');
+  var gw1 = Core.routeGeometry(route2, tbw, rw);
+  assert.ok(gw1.gaps.length === 1 && gw1.gaps[0].d > 500, 'дупката над 500 м остава отворена: ' + gw1.gaps.map(function (g) { return Math.round(g.d); }));
+  assert.deepStrictEqual(route2.items.map(function (it) { return it.type === 'part' ? it.trackId : 'bridge'; }), ['X', 'bridge', 'Y', 'bridge', 'Z', 'W'], 'между Z и W връзка няма');
+  console.log('1.4 число в маркера, изчистване наведнъж, свързване на дупките до 500 м: OK');
 })();

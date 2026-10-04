@@ -886,7 +886,7 @@
       if (h.g.link) return U.esc(T('tip.link')) + ' · <b>' + U.dist(h.g.len) + '</b><br>' + U.esc(T('tip.clickRemove'));
       return U.esc(T('tip.part', { n: h.g.no })) + ' · <b>' + U.km(h.g.len) + '</b><br>' + U.esc(h.g.bad ? T('tip.invalid', { why: h.g.badWhy }) : T('tip.itemMenu'));
     }
-    if (h.kind === 'gap') return U.esc(T('tip.gap')) + ' <b>' + U.dist(h.gap.d) + '</b><br>' + U.esc(T('tip.gapClick'));
+    if (h.kind === 'gap') return U.esc(T('tip.gap')) + ' <b>' + U.dist(h.gap.d) + '</b><br>' + U.esc(Core.canBridge(h.gap) ? T('tip.gapClick') : T('tip.gapLong', { max: U.dist(Core.GAP_BRIDGE_MAX_M) }));
     if (h.kind === 'fork') {
       var f = forkOf(h.j);
       return U.esc(T('tip.junction')) + ' · ' + U.esc(T.n('n.branches', h.j.branches.length)) + '<br>' +
@@ -1020,10 +1020,10 @@
     if (moved) routeChanged();
   }
   /* "Изчисти преди сглобяване": всеки чакащ дубликат пада по правилото на клика върху маркера
-     (остава по едно копие от всяка група), после всяка отворена дупка се свързва направо.
-     Един отпечатък за "Отмени" за всичко. */
+     (остава по едно копие от всяка група), после всяка отворена дупка до Core.GAP_BRIDGE_MAX_M
+     се свързва направо; по-дългите остават за чертане. Един отпечатък за "Отмени" за всичко. */
   function cleanRoute() {
-    if (!A.pend.length && !(G && G.gaps.length)) { toast(T('msg.cleanNone')); return; }
+    if (!A.pend.length && !(G && G.gaps.some(Core.canBridge))) { toast(T(G && G.gaps.length ? 'msg.cleanLongOnly' : 'msg.cleanNone', { max: U.dist(Core.GAP_BRIDGE_MAX_M) })); return; }
     pushUndo();
     var n = 0;
     // Махането може да покаже нов чакащ участък - още един кръг, но не безкрайно.
@@ -1034,7 +1034,8 @@
     }
     var nb = G ? Core.bridgeGaps(cur().items, G.gaps) : 0;
     if (nb) { ui.drawTarget = null; routeChanged(); }
-    toast(T('msg.cleaned', { n: n, g: nb }));
+    var nl = G ? G.gaps.length : 0;
+    toast(T('msg.cleaned', { n: n, g: nb }) + (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: U.dist(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl ? 6000 : undefined);
   }
   // "Отвори пак": затворената сама дупка става обикновена дупка с двата бутона.
   function reopenGap(gp) {
@@ -1064,6 +1065,11 @@
     routeChanged();
     bridgeLabel(it);
     map.redraw();
+  }
+  // Клик върху пръстена (или пунктира) на дупка: до Core.GAP_BRIDGE_MAX_M се свързва направо, по-дългата остава за чертане.
+  function ringGap(gp) {
+    if (Core.canBridge(gp)) bridgeGap(gp);
+    else toast(T('msg.gapLong', { d: U.dist(gp.d), max: U.dist(Core.GAP_BRIDGE_MAX_M) }));
   }
   /* Къде отива връзка, начертана без избрана дупка: между двете съседни части, до чийто
      скок е най-близо кликът (предимство имат местата със скок). Никога в края на маршрута -
@@ -1204,7 +1210,7 @@
     if (h.kind === 'part') { showSegMenu(h.sec, null, p); return; }
     if (h.kind === 'item' && h.g.item.type === 'part') { showSegMenu(secAt(h.g.item, p), h.idx, p); return; }
     if (h.kind === 'item') removeItem(h.idx);
-    else if (h.kind === 'gap') bridgeGap(h.gap);
+    else if (h.kind === 'gap') ringGap(h.gap);
     else if (h.kind === 'vertex') showPointMenu(h);
   }
   function toggleBar() { setBar(!document.body.classList.contains('bar-hidden')); }
@@ -1666,7 +1672,7 @@
     gaps.forEach(function (g) { gd += g.d; });
     $('#dupsGaps').textContent = T.n('dups.gaps', gaps.length, { d: U.dist(gd) });
     $('#dupsGaps').hidden = !gaps.length;
-    $('#cleanBtn').disabled = !np && !gaps.length;
+    $('#cleanBtn').disabled = !np && !gaps.some(Core.canBridge);
   }
 
   function renderRoutes() {
