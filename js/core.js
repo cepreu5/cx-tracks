@@ -288,6 +288,7 @@
   }
 
   var JOIN_MIN = 40; // по-къси парчета при разделяне в точка на прекъсване не се правят
+  var SELF_ANGLE = 30; // трак, който пресича себе си под по-малък ъгъл (градуси), е шум, не кръстовище
 
   // Най-близкото място до точка, само в участъка [a,b] на трака.
   function nearestInRange(t, a, b, lat, lon, kx, ky) {
@@ -401,13 +402,15 @@
         });
       });
     });
-    // 3. Пресичания на приети участъци от различни тракове (решетка от отсечки).
+    // 3. Пресичания на приети участъци (решетка от отсечки): на различни тракове - всяко;
+    // на един и същ трак - само истинско кръстовище между два различни приети участъка.
     var cell = 250, grid = new Map();
     live.forEach(function (t, ti) {
       var c = t._cum, pts = t.pts, ps = partsOf(t.id);
       for (var j = 0; j < pts.length - 1; j++) {
-        var inPart = ps.some(function (p) { return c[j] >= p.a - 0.5 && c[j + 1] <= p.b + 0.5; });
-        if (!inPart) continue;
+        var pi = -1;
+        for (var u = 0; u < ps.length && pi < 0; u++) if (c[j] >= ps[u].a - 0.5 && c[j + 1] <= ps[u].b + 0.5) pi = u;
+        if (pi < 0) continue;
         var x0 = pts[j][1] * kx, y0 = pts[j][0] * ky, x1 = pts[j + 1][1] * kx, y1 = pts[j + 1][0] * ky;
         var ax = Math.floor(Math.min(x0, x1) / cell), bx = Math.floor(Math.max(x0, x1) / cell);
         var ay = Math.floor(Math.min(y0, y1) / cell), by = Math.floor(Math.max(y0, y1) / cell);
@@ -415,7 +418,7 @@
         for (var ix = ax; ix <= bx; ix++) for (var iy = ay; iy <= by; iy++) {
           var k = ix + ':' + iy, l = grid.get(k);
           if (!l) grid.set(k, l = []);
-          l.push([ti, j, x0, y0, x1, y1, (c[j] + c[j + 1]) / 2]);
+          l.push([ti, j, x0, y0, x1, y1, (c[j] + c[j + 1]) / 2, pi]);
         }
       }
     });
@@ -424,24 +427,34 @@
       var tp = live[p[0]].id, tq = live[q[0]].id;
       return ext.some(function (x) { return x.t === tp && x.o === tq && p[6] >= x.a - 1 && p[6] <= x.b + 1; });
     }
+    // Трак, който минава през себе си: шумът вътре в един участък и плиткото застъпване
+    // (две успоредни минавания на 20-30 м) не са кръстовища.
+    var cosMax = Math.cos(SELF_ANGLE * U.RAD);
+    function selfCross(p, q) {
+      if (p[7] === q[7] || Math.abs(p[1] - q[1]) <= 1) return false;
+      var rx = p[4] - p[2], ry = p[5] - p[3], sx = q[4] - q[2], sy = q[5] - q[3];
+      var rs = Math.hypot(rx, ry) * Math.hypot(sx, sy);
+      return rs > 0 && Math.abs(rx * sx + ry * sy) / rs <= cosMax;
+    }
     grid.forEach(function (l) {
       for (var m = 0; m < l.length; m++) for (var n = m + 1; n < l.length; n++) {
-        var p = l[m], q = l[n];
-        if (p[0] === q[0] || inExt(p, q) || inExt(q, p)) continue;
+        var p = l[m], q = l[n], self = p[0] === q[0];
+        if (self ? !selfCross(p, q) : inExt(p, q) || inExt(q, p)) continue;
         var f = segCross(p[2], p[3], p[4], p[5], q[2], q[3], q[4], q[5]);
         if (f == null) continue;
         var cq = [(p[3] + f * (p[5] - p[3])) / ky, (p[2] + f * (p[4] - p[2])) / kx, null];
-        cq.src = 'cross';
+        cq.src = self ? 'self' : 'cross';
         cand.push(cq);
       }
     });
     // Близките точки се сливат; остава първата (краищата на дубликатите са с предимство).
     // j.cross: в точката само се пресичат приети участъци, нито един не свършва там (няма избор).
+    // j.self: тракът пресича себе си - разклонение с двете посоки на другата отсечка.
     var js = [];
     cand.forEach(function (q) {
       var m = js.filter(function (j) { return U.hav(j.lat, j.lon, q[0], q[1]) <= jt; })[0];
-      if (m) { if (q.src !== 'cross') m.cross = false; return; }
-      js.push({ lat: q[0], lon: q[1], keep: q.keep || null, cross: q.src === 'cross' });
+      if (m) { if (q.src !== 'cross') m.cross = false; if (q.src === 'self') m.self = true; return; }
+      js.push({ lat: q[0], lon: q[1], keep: q.keep || null, cross: q.src === 'cross', self: q.src === 'self' });
     });
     // Изтритите разклонения ("Изтрий разклонението") не се връщат: там тракът не се реже.
     js = js.filter(function (j) { return !dropped(drop, j); });
@@ -1180,7 +1193,7 @@
     prep: prep, analyze: analyze, slice: slice, pointAt: pointAt, nearestOn: nearestOn, alongOn: alongOn,
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
     trackBounds: trackBounds, overlap: overlap, ROUTE_GAP: ROUTE_GAP, LINK_MIN: LINK_MIN, DUP_BRIDGE: DUP_BRIDGE,
-    routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe, probeK: probeK, PROBE: PROBE,
+    routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe, probeK: probeK, PROBE: PROBE, SELF_ANGLE: SELF_ANGLE,
     redundantJunctions: redundantJunctions, nearJunctions: nearJunctions, dupCluster: dupCluster, dupCounts: dupCounts, dupGroups: dupGroups, bridgeGaps: bridgeGaps, canBridge: canBridge, GAP_BRIDGE_MAX_M: GAP_BRIDGE_MAX_M, dropJunction: dropJunction, junctionPlace: junctionPlace, junctionAt: junctionAt,
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,

@@ -1375,8 +1375,9 @@
       if (bi === f.chosen || bi === f.incoming) return;
       var sec = { trackId: br.trackId, kind: 'part', a: br.a, b: br.b, len: br.len, key: br.key };
       if (f.atEnd && findItemFor(sec) >= 0) return;
-      // Примката се предлага в двете посоки - коя е коя, казва посоката на записа.
-      btns.push({ key: 'go', label: T(br.loop ? (br.from === 'a' ? 'om.goFwd' : 'om.goRev') : 'om.go', { name: trackLabel(tb[br.trackId]), len: U.km(br.len) }),
+      // Примката и другата отсечка на трак, който пресича себе си, се предлагат в двете
+      // посоки - коя е коя, казва посоката на записа (името на трака е едно и също).
+      btns.push({ key: 'go', label: T(br.loop || j.self ? (br.from === 'a' ? 'om.goFwd' : 'om.goRev') : 'om.go', { name: trackLabel(tb[br.trackId]), len: U.km(br.len) }),
         run: f.atEnd ? function () { addPart(sec); } : function () { switchFork({ fork: f, br: br }); } });
     });
     // Близък трак (краищата на два трака на по-малко от отклонението) - само предложение.
