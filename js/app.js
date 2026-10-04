@@ -1209,6 +1209,28 @@
         });
       });
     });
+    // 1.6: изрязаната част вече започва (свършва) там, където траковете се разделят, а не до старата свръзка - съседната
+    // част от другия трак я следва по своя трак до мястото срещу новия край (до jt от него, през видимо трасе).
+    var jt = Core.joinTol(S.tol);
+    function cut(id, e) { return secs.some(function (d) { return d.trackId === id && (Math.abs(e - d.a) < 1 || Math.abs(e - d.b) < 1); }); }
+    function span(it) { var lo = Math.min(it.a, it.b), hi = Math.max(it.a, it.b); return it.rev ? [hi, lo] : [lo, hi]; }
+    function setEnd(it, k, v) { var sp = span(it); sp[k] = v; it.a = Math.min(sp[0], sp[1]); it.b = Math.max(sp[0], sp[1]); }
+    r.items.forEach(function (it, i) {
+      var t = it.type === 'part' && track(it.trackId);
+      if (!t) return;
+      [[r.items[i + 1], 1, 0], [r.items[i - 1], 0, 1]].forEach(function (c) {
+        var nb = c[0], k = c[1], nt = nb && nb.type === 'part' && nb.trackId !== it.trackId && track(nb.trackId);
+        if (!nt || !cut(nb.trackId, span(nb)[c[2]])) return;
+        var q = Core.pointAt(nt, span(nb)[c[2]]), e = span(it)[k], n = Core.nearestOnTrack(t, q[0], q[1]);
+        if (!n || n.dist > jt || Math.abs(n.d - e) < 1 || Math.abs(n.d - e) > (nt.len || 0)) return;
+        // Само напред по посоката на частта (за края) или назад (за началото), без да влиза в махнато или изтрито.
+        var dir = (k === 1 ? 1 : -1) * (it.rev ? -1 : 1);
+        if ((n.d - e) * dir <= 0) return;
+        var lo = Math.min(n.d, e), hi = Math.max(n.d, e);
+        if ((t.skips || []).concat(t.dels || []).some(function (x) { return x.b > lo + 0.5 && x.a < hi - 0.5; })) return;
+        setEnd(it, k, n.d); moved = true;
+      });
+    });
     if (moved) routeChanged();
   }
   /* "Изчисти преди сглобяване": всеки чакащ дубликат пада по правилото на клика върху маркера
