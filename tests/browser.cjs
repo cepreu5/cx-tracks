@@ -3079,7 +3079,7 @@ function barFits() {
     // Проверката при маркиран дубликат: колко са маркирани, какво остава след тях, дупките, „не е консистентна“.
     await p16.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const s1 = await st();
-    check(/остават маркирани 1/.test(s1.res) && /след изчистването им 3 застъпвания/.test(s1.res) && /отворени малки дупки 1/.test(s1.res) && /не е консистентна/.test(s1.res) && s1.rows.length === 1 && /^Синтетичен Б · км 2,\d\s[-–]\s2,\d · \d+\sм · под него „Синтетичен А“$/.test(s1.rows[0]),
+    check(/остават маркирани 1/.test(s1.res) && /след изчистването им 3 застъпвания/.test(s1.res) && /отворени малки дупки 1/.test(s1.res) && /не е консистентна/.test(s1.res) && s1.rows.length === 3 && /^Синтетичен Б · км 2,\d\s[-–]\s2,\d · \d+\sм · под него „Синтетичен А“$/.test(s1.rows[2]) && s1.rows.slice(0, 2).every(x => /^Синтетичен Б · км [01],\d/.test(x)),
       tag + 'проверката при маркиран дубликат: ' + s1.res);
     await p16.evaluate(() => { if (document.querySelector('#dupsFoldBody').hidden) document.querySelector('#dupsCard .fold-t').click(); });
     await p16.locator('#dupsCard').screenshot({ path: path.join(OUT, 'check-160.png') });
