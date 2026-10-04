@@ -274,7 +274,7 @@ I18N.add({
   'prof.t': ['Профил', 'Profile'],
   'prof.pct': ['Наклон в проценти', 'Grade in percent'],
   'prof.aria': ['Профил на височината', 'Elevation profile'],
-  'hint': ['Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Режимът „Изрязване“ маха с две точки по линията произволна част от трака - завинаги, както „Изтрий участъка“; „Отмени“ я връща. Посочването на ред в списъка светва същия сегмент на картата.', 'Clicking a segment opens a menu: “Add to route” adds it as the next part, “Delete stretch” removes it from the map, the track and the route. A ring is a junction: clicking it opens its menu - “Continue along” changes the direction there, “Delete junction” joins the two pieces of the track. Duplicate stretches stay out of the route, and a stretch shared by two parts is ridden once. The “Cut” mode removes any piece of a track between two points on its line - for good, like “Delete stretch”; “Undo” brings it back. Pointing at a row in the list highlights the same segment on the map.'],
+  'hint': ['Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Четирите режима пипат колекцията, не маршрута: „Изрязване“ маха с две точки част от трака и свързва краищата направо (до 500 м), „Добавяне“ затваря дупка с връзка, „Местене“ и „Махане“ местят и махат върховете на траковете и връзките; „Отмени“ връща всичко. Посочването на ред в списъка светва същия сегмент на картата.', 'Clicking a segment opens a menu: “Add to route” adds it as the next part, “Delete stretch” removes it from the map, the track and the route. A ring is a junction: clicking it opens its menu - “Continue along” changes the direction there, “Delete junction” joins the two pieces of the track. Duplicate stretches stay out of the route, and a stretch shared by two parts is ridden once. The four modes work on the collection, not on the route: “Cut” removes a piece of a track with two points and joins the ends directly (up to 500 m), “Add” closes a gap with a link, “Move” and “Remove” move and remove the vertices of tracks and links; “Undo” brings everything back. Pointing at a row in the list highlights the same segment on the map.'],
   'parts.h': ['Части в маршрута', 'Parts in the route'],
   'parts.clear.title': ['Махни всички части; траковете остават. "Отмени" ги връща.', 'Remove all parts; the tracks stay. “Undo” brings them back.'],
   'parts.clear': ['Изтрий', 'Clear'],
@@ -734,6 +734,35 @@ I18N.add({
   'tr.auto': ['Трак {n}', 'Track {n}'],
   'msg.namesCleared.1': ['Тракът е преименуван на „Трак 1“; първоначалното име остава в .gpx. "Отмени" го връща.', 'The track is renamed “Track 1”; the original name stays in the .gpx. “Undo” brings it back.'],
   'msg.namesCleared.n': ['{n} трака са с имена Трак 1, 2, … по реда в панела; първоначалните остават в .gpx. "Отмени" ги връща.', '{n} tracks are named Track 1, 2, … in panel order; the original names stay in the .gpx. “Undo” brings them back.']
+});
+
+/* ---- 1.7: четирите режима пипат колекцията; изтрит дубликат не оставя празно място; връзките (до 500 м) пътуват с .gpx ---- */
+I18N.add({
+  'mode.cut.title': ['Две точки по трака махат частта между тях; тракът продължава с права връзка през махнатото (до 500 м). „Отмени“ я връща.', 'Two points along a track remove the piece between them; the track continues with a straight link across it (up to 500 m). “Undo” brings it back.'],
+  'mode.add.title': ['Връзка в колекцията: две точки в дупка прилепват към двата ѝ края и я затварят (до 500 м)', 'A link in the collection: two points in a gap snap to its two ends and close it (up to 500 m)'],
+  'mode.move.title': ['Влачи връх на трак (приближи картата) или на връзка', 'Drag a vertex of a track (zoom in) or of a link'],
+  'mode.remove.title': ['Клик върху връх на трак или на връзка го маха и свързва съседите; клик върху връзка я маха', 'Clicking a vertex of a track or a link removes it and joins its neighbours; clicking a link removes it'],
+  'msg.addColl': ['Добавяне в колекцията: цъкни две точки в дупка - връзката прилепва към двата ѝ края (кръгчетата) и я затваря. До {max}.', 'Add to the collection: click two points in a gap - the link snaps to its two ends (the circles) and closes it. Up to {max}.'],
+  'msg.addPt': ['Точка {n} - цъкни следващата при другия край на дупката', 'Point {n} - click the next one at the other end of the gap'],
+  'msg.addNoEnds': ['В колекцията няма отворени краища - няма какво да се свързва', 'The collection has no open ends - there is nothing to link'],
+  'msg.linkLong': ['Връзката би била {d} - над {max} връзка не се чертае. Мястото остава открито.', 'The link would be {d} - above {max} no link is drawn. The place stays open.'],
+  'msg.linked': ['Връзка {d} в колекцията: „{a}“ - „{b}“. Маршрутът не е пипнат; „Отмени“ я маха.', 'A {d} link in the collection: “{a}” - “{b}”. The route is untouched; “Undo” removes it.'],
+  'msg.moveColl': ['Местене: влачи връх на трак (приближи картата) или на връзка', 'Move: drag a vertex of a track (zoom in) or of a link'],
+  'msg.removeColl': ['Махане: клик върху връх на трак или на връзка го маха и свързва съседите', 'Remove: clicking a vertex of a track or a link removes it and joins its neighbours'],
+  'msg.clickRemove': ['Цъкни върху връх на трак (приближи картата), на връзка или върху самата връзка', 'Click a vertex of a track (zoom in), of a link, or the link itself'],
+  'msg.grabPoint': ['Хвани връх на трак (приближи картата) или на връзка и го влачи', 'Grab a vertex of a track (zoom in) or of a link and drag it'],
+  'msg.vtxMoved': ['Преместен връх на „{name}“. „Отмени“ го връща.', 'Moved a vertex of “{name}”. “Undo” brings it back.'],
+  'msg.vtxRemoved': ['Махнат връх на „{name}“ - съседите му са свързани. „Отмени“ го връща.', 'Removed a vertex of “{name}” - its neighbours are joined. “Undo” brings it back.'],
+  'msg.vtxLast': ['Тракът има само две точки - връх не се маха', 'The track has only two points - no vertex is removed'],
+  'msg.linkVtxRemoved': ['Махнат връх на връзката. „Отмени“ го връща.', 'Removed a vertex of the link. “Undo” brings it back.'],
+  'msg.linkRemoved': ['Махната връзка {d} - дупката е пак отворена. „Отмени“ я връща.', 'Removed a {d} link - the gap is open again. “Undo” brings it back.'],
+  'msg.cutJoined': ['Изрязани {len} от {name}; тракът продължава с права връзка {d} през махнатото. „Отмени“ връща всичко.', 'Cut {len} from {name}; the track continues with a straight {d} link across it. “Undo” brings it all back.'],
+  'msg.cutLong': ['Изрязани {len} от {name}. Краищата са на {d} - над {max} връзка не се чертае, мястото остава открито. „Отмени“ ги връща.', 'Cut {len} from {name}. The ends are {d} apart - above {max} no link is drawn, the place stays open. “Undo” brings them back.'],
+  'cut.sub': ['{len} се махат от трака; двата края се свързват направо (до 500 м). „Отмени“ ги връща.', '{len} are removed from the track; the two ends are joined directly (up to 500 m). “Undo” brings them back.'],
+  'parts.coll': ['връзка от колекцията', 'link from the collection'],
+  'dc.routeReady': ['маршрутът вече може да се сглобява', 'the route can be assembled now'],
+  'dc.routeWait': ['маршрутът още не се сглобява', 'the route is not assembled yet'],
+  'om.dupClose.title': ['Маха копието точно там, където оставащият трак го покрива, и нищо извън това; краищата му лягат върху оставащата линия. "Отмени" го връща.', 'Removes the copy exactly where the remaining track covers it and nothing beyond; its ends land on the remaining line. “Undo” brings it back.']
 });
 
 I18N.start();

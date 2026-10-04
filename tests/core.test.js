@@ -1057,4 +1057,65 @@ console.log('общ участък OK');
   Core.cleanCollection([H], 20, {});
   assert.ok(Core.collectionCheck([H], 20).ok && Core.analyze([H], 20).byTrack.H.some(function (s) { return s.kind === 'part' && s.a < 100; }), 'след чистенето първото минаване остава, колекцията е консистентна');
   console.log('1.6 същият трак, минал втори път: OK');
+
+  // ---- 1.7: изтрит дубликат крие само покритото, краищата лягат върху оставащата линия ----
+  var t17 = load(), B17 = byId(t17, 'syn-b'), A17 = byId(t17, 'syn-a'), r17 = Core.analyze(t17, 20), s17 = r17.pend[0];
+  var cl17 = Core.dupCluster(r17.pend, s17, ['syn-a', 'syn-b']), st17 = Core.dupStretch(B17, s17, t17, 20, cl17.keep), wide = Core.dupStretch(B17, s17, t17, 20, cl17.keep, Core.joinTol(20));
+  assert.ok(st17.a >= s17.a - 20 && st17.b <= s17.b + 20 && st17.a - wide.a > 50 && wide.b - st17.b > 50, '1.7: отрязъкът е покритото до прага ' + iv(st17) + ' (маркерът ' + iv(s17) + ', до jt ' + iv(wide) + ')');
+  for (var d17 = st17.a; d17 <= st17.b; d17 += 5) {
+    var p17 = Core.pointAt(B17, d17), n17 = Core.nearestOnTrack(A17, p17[0], p17[1]);
+    assert.ok(n17.dist <= 20, '1.7: под всеки скрит метър лежи А (при ' + Math.round(d17) + ' м: ' + n17.dist.toFixed(1) + ' м)');
+  }
+  B17.skips = [st17];
+  var se17 = Core.skipEnds(t17, 20);
+  assert.strictEqual(se17.length, 2, '1.7: два края на махнатото: ' + JSON.stringify(se17.map(function (e) { return Math.round(e.d); })));
+  se17.forEach(function (e) {
+    assert.ok(e.trackId === 'syn-b' && e.withId === 'syn-a' && e.dist <= 20 && Core.nearestOnTrack(A17, e.to[0], e.to[1]).dist < 0.5, '1.7: краят при ' + Math.round(e.d) + ' м ляга върху А (' + e.dist.toFixed(1) + ' м)');
+  });
+  assert.ok(!Core.openEnds(t17, 20).some(function (e) { return e.trackId === 'syn-b' && (Math.abs(e.d - st17.a) < 1 || Math.abs(e.d - st17.b) < 1); }), '1.7: краищата на махнатия дубликат не са отворени краища');
+  assert.ok(!(B17.joins || []).length && !(B17.links || []).length, '1.7: при изтрит дубликат нищо не се свързва');
+  // Самозастъпване: краят пада върху първото минаване на същия трак.
+  var H17 = { id: 'H', pts: H.pts }, rh17 = Core.analyze([H17], 20), sh17 = Core.dupStretch(H17, rh17.pend[0], [H17], 20, 'H');
+  H17.skips = [sh17];
+  var seH = Core.skipEnds([H17], 20);
+  assert.ok(sh17.b - sh17.a < rh17.pend[0].len + 50 && seH.length === 2 && seH.every(function (e) { return e.withId === 'H' && e.dist <= 20; }), '1.7: самозастъпване - ' + iv(sh17) + ', двата края лягат на първото минаване: ' + seH.map(function (e) { return e.dist.toFixed(1); }));
+  console.log('1.7 изтрит дубликат без празно място: OK');
+
+  // ---- 1.7: колекцията - отворени краища, връзки (до 500 м), изрязване със свързване, върхове, износ ----
+  function str(id, x0, x1) { return { id: id, pts: poly([[x0, 0], [x1, 0]]) }; }
+  var P = str('P', 0, 2000), Q = str('Q', 2060, 3500), R = str('R', 3580, 5000), T7 = str('T', 5550, 6000), cs = [P, Q, R, T7];
+  function ends() { return Core.openEnds(cs, 20).map(function (e) { return e.trackId + Math.round(e.d); }).join(','); }
+  assert.strictEqual(ends(), 'P0,P2000,Q0,Q1440,R0,R1420,T0,T450', '1.7: отворените краища на колекцията');
+  function endOf(id, d) { return Core.openEnds(cs, 20).filter(function (e) { return e.trackId === id && Math.abs(e.d - d) < 1; })[0]; }
+  var l1 = Core.addLink(cs, endOf('P', 2000), endOf('Q', 0), []);
+  assert.ok(l1.kind === 'link' && Math.abs(l1.len - 60) < 1 && P.links.length === 1 && P.links[0].to === 'Q', '1.7: връзка P - Q в колекцията (60 м)');
+  var l2 = Core.addLink(cs, endOf('Q', 1440), endOf('R', 0), [[P.pts[0][0] + 0.0002, Q.pts[Q.pts.length - 1][1] + 0.0004]]);
+  assert.ok(l2.kind === 'link' && Q.links[0].pts.length === 1 && P.links.length === 1, '1.7: втората дупка - отделна връзка с връх по средата, първата не е пипната');
+  assert.strictEqual(ends(), 'P0,R1420,T0,T450', '1.7: затворените краища не са отворени');
+  var l3 = Core.addLink(cs, endOf('R', 1420), endOf('T', 0), []);
+  assert.ok(l3.over && Math.abs(l3.len - 550) < 2 && !(R.links || []).length, '1.7: над 500 м (550 м) връзка не се прави: ' + JSON.stringify(l3));
+  assert.strictEqual(Core.LINK_MAX, 500, '1.7: таванът е 500 м');
+  // Маршрут P + Q минава по връзката от колекцията; празният маршрут не се пипа.
+  var rc = Core.analyze(cs, 20), byC = {}; cs.forEach(function (t) { byC[t.id] = t; });
+  assert.strictEqual(rc.links.length, 2, '1.7: analyze връща връзките на колекцията');
+  var gE = Core.routeGeometry({ items: [] }, byC, rc);
+  assert.ok(gE.pts.length === 0 && gE.len === 0, '1.7: празният маршрут остава празен');
+  var gPQ = Core.routeGeometry({ items: [{ type: 'part', trackId: 'P', a: 0, b: P.len }, { type: 'part', trackId: 'Q', a: 0, b: Q.len }] }, byC, rc);
+  assert.ok(!gPQ.gaps.length && gPQ.items.filter(function (g) { return g.coll; }).length === 1 && Math.abs(gPQ.len - (P.len + 60 + Q.len)) < 2, '1.7: маршрутът P + Q минава по връзката: ' + Math.round(gPQ.len) + ' м');
+  // Изрязване на P 500-700 м и връзка между двата края: дупка в един трак - t.joins, не е отворена.
+  P.dels = [{ a: 500, b: 700 }];
+  assert.ok(/P500,P700/.test(ends()), '1.7: изрязаното има два отворени края');
+  var lj = Core.addLink(cs, endOf('P', 500), endOf('P', 700), []);
+  assert.ok(lj.kind === 'join' && P.joins.length === 1 && !/P500|P700/.test(ends()) && !Core.trackHoles(cs, 20, 1000).length, '1.7: дупка в един трак се затваря с t.joins');
+  // Износ: една линия, връзките са върхове в трака.
+  var tl = Core.trackLine(P, cs), kx7 = Math.cos(lat0 * Math.PI / 180) * ky;
+  var xs = tl.map(function (p) { return Math.round((p[1] - lon0) * kx7); }), i500 = xs.indexOf(500);
+  assert.ok(xs[0] === 0 && xs[xs.length - 1] === 2060 && i500 > 0 && xs[i500 + 1] === 700 && xs.indexOf(600) < 0, '1.7: .gpx на P - изрязаното е права 500 -> 700 м, връзката към Q е последният връх');
+  // Върхове: махнат връх на трака - разстоянията (изтрито, връзка, части) следват новите точки.
+  var np = P.pts.filter(function (p, i) { return i !== 10; }), mp = P.pts.map(function (p, i) { return i < 10 ? i : i > 10 ? i - 1 : -1; });
+  var f7 = Core.remapper(P.pts, np, mp);
+  assert.ok(Math.abs(f7(500) - 500) < 0.01 && Math.abs(f7(95) - 95) < 0.01 && Math.abs(f7(2000) - 2000) < 0.01, '1.7: на права махнатият връх не мени разстоянията');
+  var bent = P.pts.map(function (p, i) { return i === 10 ? [p[0] + 30 / ky, p[1], p[2]] : p; }), fb = Core.remapper(P.pts, bent, P.pts.map(function (p, i) { return i; }));
+  assert.ok(fb(500) > 500 + 10 && Math.abs(fb(50) - 50) < 0.01 && fb(2000) > 2000 + 10, '1.7: преместен връх удължава трака след него: 500 -> ' + fb(500).toFixed(1));
+  console.log('1.7 колекцията: отворени краища, връзки до 500 м, изрязване със свързване, маршрут по връзката, .gpx, върхове: OK');
 })();
