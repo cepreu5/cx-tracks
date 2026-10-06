@@ -10,7 +10,11 @@
   var JOIN_WIN = 25; // прозорец (м) за изгладения профил на разстоянието между два трака
   var JOIN_TIE = 0.002; // при равни разстояния - по-близо до края на общата отсечка (м на м)
   var LINK_MIN = 1; // между части от различни тракове скок над толкова метра се свързва (до отклонението)
-  var GAP_BRIDGE_MAX_M = 500; // пръстенът на дупката и "Изчисти преди сглобяване" свързват направо дупка до толкова метра; по-дългата се чертае
+  /* 1.9: един таван вместо три по 500 м (CX, 6 окт 2026: 1000 м). До него стигат самозатварянето (AUTO_GAP_MAX - горната граница
+     на настройката), пръстенът и "Изчисти преди сглобяване" (GAP_BRIDGE_MAX_M), връзката с „Добавяне“, „Изрязване“ и
+     „Свържи с най-близката линия“ (LINK_MAX). По-дългото се чертае с ръка. */
+  var GAP_CEIL_M = 1000;
+  var GAP_BRIDGE_MAX_M = GAP_CEIL_M; // пръстенът на дупката и "Изчисти преди сглобяване" свързват направо дупка до толкова метра; по-дългата се чертае
 
   function joinTol(tol) { return Math.max(ROUTE_GAP, 1.5 * (tol || 20)); }
 
@@ -693,10 +697,10 @@
     return gs.length;
   }
 
-  /* 1.5: самозатваряне на малките дупки след махнат дубликат (клик върху маркера), махнато излишно
+  /* 1.5: самозатваряне на дупките след махнат дубликат (клик върху маркера), махнато излишно
      разклонение и изтрит участък. Праг по подразбиране AUTO_GAP_DEF, сменя се в „Настройки“ (0 = никога),
      таван AUTO_GAP_MAX. Отделно е от самозатварянето до отклонението в routeGeometry - то важи винаги. */
-  var AUTO_GAP_DEF = 100, AUTO_GAP_MAX = 500;
+  var AUTO_GAP_DEF = 500, AUTO_GAP_MAX = GAP_CEIL_M; // 1.9: по подразбиране 500 (днешният таван), таван 1000
   function autoGapMax(v) {
     v = Math.round(+v);
     return isFinite(v) ? Math.max(0, Math.min(AUTO_GAP_MAX, v)) : AUTO_GAP_DEF;
@@ -1071,7 +1075,8 @@
   /* 1.7: връзките в колекцията. t.joins ({a, b, pts?}) затварят дупка в трака, t.links ({a, to, b, pts}) свързват края на
      трака t (a) с края на трака to (b). pts - върховете между двата края ([[lat, lon]]). Връщат се като линии:
      [{kind, trackId, a, toId, b, line, len}] - чертаят се в цвета на трака и влизат в маршрута и в .gpx. */
-  var LINK_MAX = 500; // ръчната връзка с точки е до толкова метра (CX, 4 окт 2026); над тях връзка не се чертае
+  var LINK_MAX = GAP_CEIL_M; // връзката с точки е до толкова метра (1.9: таванът); над тях връзка не се чертае
+  var LINK_SNAP_M = 250; // „Добавяне“ прилепва за край най-много от толкова метра (до 1.9 - LINK_MAX / 2); не следва тавана
   function linkPts(pts) { return (pts || []).map(function (p) { return [p[0], p[1], null]; }); }
   function collectionLinks(tracks) {
     var by = {}, out = [];
@@ -1873,7 +1878,7 @@
     DROP_R: DROP_R, NEAR_J: NEAR_J,
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: joinTol, nearestLive: nearestLive, skipEnds: skipEnds, collectionLinks: collectionLinks, openEnds: openEnds, addLink: addLink,
-    remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX,
+    remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX, LINK_SNAP_M: LINK_SNAP_M, GAP_CEIL_M: GAP_CEIL_M,
     liveParts: liveParts, partAt: partAt, JOIN_MIN: JOIN_MIN, extendEnd: extendEnd, trimEnd: trimEnd, insertVertex: insertVertex, nearestInRange: nearestIn
   };
 })();

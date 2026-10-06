@@ -274,7 +274,7 @@ I18N.add({
   'prof.t': ['Профил', 'Profile'],
   'prof.pct': ['Наклон в проценти', 'Grade in percent'],
   'prof.aria': ['Профил на височината', 'Elevation profile'],
-  'hint': ['Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Четирите режима пипат колекцията, не маршрута: „Изрязване“ маха с две точки част от трака и свързва краищата направо (до 500 м), „Добавяне“ затваря дупка с връзка, „Местене“ и „Махане“ местят и махат върховете на траковете и връзките; „Удължи/Скъси“ от менюто на трака влачи свободния му край - удължава, скъсява, прави разклонение или свързва с друг трак; „Отмени“ връща всичко. Посочването на ред в списъка светва същия сегмент на картата.', 'Clicking a segment opens a menu: “Add to route” adds it as the next part, “Delete stretch” removes it from the map, the track and the route. A ring is a junction: clicking it opens its menu - “Continue along” changes the direction there, “Delete junction” joins the two pieces of the track. Duplicate stretches stay out of the route, and a stretch shared by two parts is ridden once. The four modes work on the collection, not on the route: “Cut” removes a piece of a track with two points and joins the ends directly (up to 500 m), “Add” closes a gap with a link, “Move” and “Remove” move and remove the vertices of tracks and links; “Extend/Shorten” from a track’s menu drags its free end - longer, shorter, a junction or a join with another track; “Undo” brings everything back. Pointing at a row in the list highlights the same segment on the map.'],
+  'hint': ['Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Четирите режима пипат колекцията, не маршрута: „Изрязване“ маха с две точки част от трака и свързва краищата направо (до 1000 м), „Добавяне“ затваря дупка с връзка, „Местене“ и „Махане“ местят и махат върховете на траковете и връзките; „Удължи/Скъси“ от менюто на трака влачи свободния му край - удължава, скъсява, прави разклонение или свързва с друг трак; „Отмени“ връща всичко. Посочването на ред в списъка светва същия сегмент на картата.', 'Clicking a segment opens a menu: “Add to route” adds it as the next part, “Delete stretch” removes it from the map, the track and the route. A ring is a junction: clicking it opens its menu - “Continue along” changes the direction there, “Delete junction” joins the two pieces of the track. Duplicate stretches stay out of the route, and a stretch shared by two parts is ridden once. The four modes work on the collection, not on the route: “Cut” removes a piece of a track with two points and joins the ends directly (up to 1000 m), “Add” closes a gap with a link, “Move” and “Remove” move and remove the vertices of tracks and links; “Extend/Shorten” from a track’s menu drags its free end - longer, shorter, a junction or a join with another track; “Undo” brings everything back. Pointing at a row in the list highlights the same segment on the map.'],
   'parts.h': ['Части в маршрута', 'Parts in the route'],
   'parts.clear.title': ['Махни всички части; траковете остават. "Отмени" ги връща.', 'Remove all parts; the tracks stay. “Undo” brings them back.'],
   'parts.clear': ['Изтрий', 'Clear'],
@@ -291,9 +291,9 @@ I18N.add({
   'dups.gaps.1': ['Отворени дупки: {n} · {d}', 'Open gaps: {n} · {d}'],
   'dups.gaps.n': ['Отворени дупки: {n} · {d}', 'Open gaps: {n} · {d}'],
   'dups.clean': ['Изчисти преди сглобяване', 'Clean up before assembling'],
-  'dups.clean.title': ['Маха всички застъпени участъци, като от всяка група остава по едно копие (както клик върху маркер), и свързва направо отворените дупки до 500 м (по-дългите остават за чертане). "Отмени" връща всичко наведнъж.', 'Removes every stacked stretch, keeping one copy of each group (like a marker click), and joins open gaps up to 500 m directly (longer ones stay for drawing). “Undo” brings it all back at once.'],
+  'dups.clean.title': ['Маха всички застъпени участъци, като от всяка група остава по едно копие (както клик върху маркер), и свързва направо отворените дупки до 1000 м (по-дългите остават за чертане). "Отмени" връща всичко наведнъж.', 'Removes every stacked stretch, keeping one copy of each group (like a marker click), and joins open gaps up to 1000 m directly (longer ones stay for drawing). “Undo” brings it all back at once.'],
   'dups.note1': ['Участък, който минава по-близо от ', 'A stretch that runs closer than '],
-  'dups.note2': [' до вече приетото трасе, получава маркер по средата си. Числото в маркера казва колко застъпени участъка събира кликът; посочването (на телефон - задържането) осветява удвоения участък. Клик върху маркера маха застъпените участъци от маршрута и от картата, като остава едно копие; "Отмени" ги връща. Дупка, по-къса от отклонението, се затваря сама; по-дългата получава кехлибарен пръстен, който я свързва направо, ако е до 500 м. Отклонението се сменя с полето "Отклонение" в лентата.', ' to the already accepted line gets a marker in its middle. The number in the marker says how many stacked stretches a click gathers; pointing at it (on a phone, holding it) highlights the doubled stretch. Clicking the marker removes the stacked stretches from the route and the map, keeping one copy; “Undo” brings them back. A gap shorter than the tolerance closes by itself; a longer one gets an amber ring that joins it directly if it is up to 500 m. The tolerance is changed with the “Tolerance” field in the bar.'],
+  'dups.note2': [' до вече приетото трасе, получава маркер по средата си. Числото в маркера казва колко застъпени участъка събира кликът; посочването (на телефон - задържането) осветява удвоения участък. Клик върху маркера маха застъпените участъци от маршрута и от картата, като остава едно копие; "Отмени" ги връща. Дупка, по-къса от отклонението, се затваря сама; по-дългата получава кехлибарен пръстен, който я свързва направо, ако е до 1000 м. Отклонението се сменя с полето "Отклонение" в лентата.', ' to the already accepted line gets a marker in its middle. The number in the marker says how many stacked stretches a click gathers; pointing at it (on a phone, holding it) highlights the doubled stretch. Clicking the marker removes the stacked stretches from the route and the map, keeping one copy; “Undo” brings them back. A gap shorter than the tolerance closes by itself; a longer one gets an amber ring that joins it directly if it is up to 1000 m. The tolerance is changed with the “Tolerance” field in the bar.'],
   'piccard.h': ['Запазена картина', 'Saved picture'],
   'piccard.make': ['Направи картина', 'Make a picture'],
   'piccard.open': ['Покажи върху картината', 'Show on the picture'],
@@ -671,8 +671,8 @@ I18N.add({
   'om.delUnder.title': ['Изтрий участъка и трака под него', 'Delete the stretch and the track below it'],
   'msg.segDelLeft': ['Участъкът е изтрит ({len}); под него остава „{name}“. "Отмени" го връща.', 'The stretch is deleted ({len}); “{name}” stays below it. “Undo” brings it back.'],
   'msg.segDelUnder': ['Изтрити са участъкът ({len}) и тракът под него („{name}“, {len2}). "Отмени" връща и двата.', 'The stretch ({len}) and the track below it (“{name}”, {len2}) are deleted. “Undo” brings both back.'],
-  'msg.autoClosed.1': ['Малка дупка (до {max}) е затворена сама.', 'A small gap (up to {max}) closed by itself.'],
-  'msg.autoClosed.n': ['{n} малки дупки (до {max}) са затворени сами.', '{n} small gaps (up to {max}) closed by themselves.'],
+  'msg.autoClosed.1': ['Дупка (до {max}) е затворена сама.', 'A gap (up to {max}) closed by itself.'],
+  'msg.autoClosed.n': ['{n} дупки (до {max}) са затворени сами.', '{n} gaps (up to {max}) closed by themselves.'],
   'set.h': ['Настройки', 'Settings'],
   'set.tab.menus': ['Менюта', 'Menus'],
   'set.tab.gaps': ['Дупки', 'Gaps'],
@@ -680,7 +680,7 @@ I18N.add({
   'set.alpha': ['Прозрачност на менютата', 'Menu transparency'],
   'set.alpha.note': ['Важи за трите менюта над картата: на разклонението, на участъка и на точката. При 50% тракът под менюто се вижда, а буквите се четат. 0% - плътно меню.', 'Applies to the three menus over the map: junction, stretch and point. At 50% the track under the menu shows through and the letters stay readable. 0% - a solid menu.'],
   'set.gap': ['Затваряй сами дупките до', 'Close gaps by themselves up to'],
-  'set.gap.note': ['0 значи никога: всички дупки остават с пръстен и с двата бутона. Таван 500 м. Важи след махнат дубликат, махнато излишно разклонение и изтрит участък; затворената сама дупка е тънка прекъсната линия - в маршрута и в .gpx е, но не е част.', '0 means never: every gap keeps its ring and both buttons. Maximum 500 m. Applies after a removed duplicate, a removed extra junction and a deleted stretch; a gap closed by itself is a thin dashed line - it is in the route and the .gpx, but it is not a part.'],
+  'set.gap.note': ['0 значи никога: всички дупки остават с пръстен и с двата бутона. Таван 1000 м, по подразбиране 500 м. Важи след махнат дубликат, махнато излишно разклонение и изтрит участък; затворената сама дупка е тънка прекъсната линия - в маршрута и в .gpx е, но не е част.', '0 means never: every gap keeps its ring and both buttons. Maximum 1000 m, default 500 m. Applies after a removed duplicate, a removed extra junction and a deleted stretch; a gap closed by itself is a thin dashed line - it is in the route and the .gpx, but it is not a part.'],
   'set.col.track': ['трак {n}', 'track {n}'],
   'set.col.a': ['част А', 'part A'],
   'set.col.b': ['част Б', 'part B'],
@@ -716,7 +716,7 @@ I18N.add({
   'msg.cleanedOvl.n': ['Махнати застъпвания без маркер: {n}.', 'Overlaps without a marker removed: {n}.'],
   'msg.cleanedHoles.1': ['Затворена малка дупка в колекцията: {n}.', 'Small gap closed in the collection: {n}.'],
   'msg.cleanedHoles.n': ['Затворени малки дупки в колекцията: {n}.', 'Small gaps closed in the collection: {n}.'],
-  'dups.clean.title': ['Маха всички застъпени участъци (от всяка група остава по едно копие, както при клик върху маркер), после застъпванията без маркер, и свързва направо отворените дупки до 500 м - в маршрута и в колекцията (по-дългите остават за чертане). "Отмени" връща всичко наведнъж.', 'Removes every stacked stretch (one copy of each group stays, as with a marker click), then the overlaps without a marker, and joins open gaps up to 500 m directly - in the route and in the collection (longer ones stay for drawing). “Undo” brings it all back at once.'],
+  'dups.clean.title': ['Маха всички застъпени участъци (от всяка група остава по едно копие, както при клик върху маркер), после застъпванията без маркер, и свързва направо отворените дупки до 1000 м - в маршрута и в колекцията (по-дългите остават за чертане). "Отмени" връща всичко наведнъж.', 'Removes every stacked stretch (one copy of each group stays, as with a marker click), then the overlaps without a marker, and joins open gaps up to 1000 m directly - in the route and in the collection (longer ones stay for drawing). “Undo” brings it all back at once.'],
   'dc.btn.title': ['Трите условия за готова колекция: маркирани дубликати, застъпвания без маркер (под прага от 100 м, разминаване над отклонението, къс завой на косата) и отворени малки дупки. Броячът е на живо; копчето показва списъка.', 'The three conditions for a finished collection: marked duplicates, overlaps without a marker (under the 100 m threshold, drifting apart beyond the tolerance, a short hairpin turn) and open small gaps. The counter is live; the button shows the list.'],
   'dc.nMarked.1': ['остава {n} маркиран', '{n} marked left'],
   'dc.nMarked.n': ['остават {n} маркирани', '{n} marked left'],
@@ -745,10 +745,10 @@ I18N.add({
   'msg.namesCleared.n': ['{n} трака са с имена Трак 1, 2, … по реда в панела; първоначалните остават в .gpx. "Отмени" ги връща.', '{n} tracks are named Track 1, 2, … in panel order; the original names stay in the .gpx. “Undo” brings them back.']
 });
 
-/* ---- 1.7: четирите режима пипат колекцията; изтрит дубликат не оставя празно място; връзките (до 500 м) пътуват с .gpx ---- */
+/* ---- 1.7: четирите режима пипат колекцията; изтрит дубликат не оставя празно място; връзките (до 500 м, от 1.9 до 1000 м) пътуват с .gpx ---- */
 I18N.add({
-  'mode.cut.title': ['Две точки по трака махат частта между тях; тракът продължава с права връзка през махнатото (до 500 м). „Отмени“ я връща.', 'Two points along a track remove the piece between them; the track continues with a straight link across it (up to 500 m). “Undo” brings it back.'],
-  'mode.add.title': ['Връзка в колекцията: две точки в дупка прилепват към двата ѝ края и я затварят (до 500 м)', 'A link in the collection: two points in a gap snap to its two ends and close it (up to 500 m)'],
+  'mode.cut.title': ['Две точки по трака махат частта между тях; тракът продължава с права връзка през махнатото (до 1000 м). „Отмени“ я връща.', 'Two points along a track remove the piece between them; the track continues with a straight link across it (up to 1000 m). “Undo” brings it back.'],
+  'mode.add.title': ['Връзка в колекцията: две точки в дупка прилепват към двата ѝ края и я затварят (до 1000 м)', 'A link in the collection: two points in a gap snap to its two ends and close it (up to 1000 m)'],
   'mode.move.title': ['Влачи връх на трак (приближи картата) или на връзка', 'Drag a vertex of a track (zoom in) or of a link'],
   'mode.remove.title': ['Клик върху връх на трак или на връзка го маха и свързва съседите; клик върху връзка я маха', 'Clicking a vertex of a track or a link removes it and joins its neighbours; clicking a link removes it'],
   'msg.addColl': ['Добавяне в колекцията: цъкни две точки в дупка - връзката прилепва към двата ѝ края (кръгчетата) и я затваря. До {max}.', 'Add to the collection: click two points in a gap - the link snaps to its two ends (the circles) and closes it. Up to {max}.'],
@@ -773,11 +773,17 @@ I18N.add({
   'msg.linkRemoved': ['Махната връзка {d} - дупката е пак отворена. „Отмени“ я връща.', 'Removed a {d} link - the gap is open again. “Undo” brings it back.'],
   'msg.cutJoined': ['Изрязани {len} от {name}; тракът продължава с права връзка {d} през махнатото. „Отмени“ връща всичко.', 'Cut {len} from {name}; the track continues with a straight {d} link across it. “Undo” brings it all back.'],
   'msg.cutLong': ['Изрязани {len} от {name}. Краищата са на {d} - над {max} връзка не се чертае, мястото остава открито. „Отмени“ ги връща.', 'Cut {len} from {name}. The ends are {d} apart - above {max} no link is drawn, the place stays open. “Undo” brings them back.'],
-  'cut.sub': ['{len} се махат от трака; двата края се свързват направо (до 500 м). „Отмени“ ги връща.', '{len} are removed from the track; the two ends are joined directly (up to 500 m). “Undo” brings them back.'],
+  'cut.sub': ['{len} се махат от трака; двата края се свързват направо (до 1000 м). „Отмени“ ги връща.', '{len} are removed from the track; the two ends are joined directly (up to 1000 m). “Undo” brings them back.'],
   'parts.coll': ['връзка от колекцията', 'link from the collection'],
   'dc.routeReady': ['маршрутът вече може да се сглобява', 'the route can be assembled now'],
   'dc.routeWait': ['маршрутът още не се сглобява', 'the route is not assembled yet'],
   'om.dupClose.title': ['Маха копието точно там, където оставащият трак го покрива, и нищо извън това; краищата му лягат върху оставащата линия. "Отмени" го връща.', 'Removes the copy exactly where the remaining track covers it and nothing beyond; its ends land on the remaining line. “Undo” brings it back.']
+});
+
+/* ---- 1.9: един таван от 1000 м вместо три по 500 м; свободният край се свързва с най-близката линия с един клик ---- */
+I18N.add({
+  'om.near': ['Свържи с най-близката линия', 'Join the nearest line'],
+  'om.near.sub': ['свободен край · {name} · {d}', 'free end · {name} · {d}']
 });
 
 I18N.start();

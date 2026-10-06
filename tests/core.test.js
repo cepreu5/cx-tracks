@@ -703,18 +703,25 @@ console.log('общ участък OK');
   assert.strictEqual(g1.gaps.length, 0, 'няма дупки след това');
   assert.ok(Math.abs(g1.len - g0.len) < 1, 'дължината не се мени - скокът и досега се броеше направо: ' + Math.round(g0.len) + ' / ' + Math.round(g1.len));
   assert.strictEqual(Core.bridgeGaps(route.items, g1.gaps), 0, 'второ натискане не прави нищо');
-  // Праг GAP_BRIDGE_MAX_M (500 м): дупка до него се свързва, по-дългата остава отворена за чертане.
-  assert.strictEqual(Core.GAP_BRIDGE_MAX_M, 500, 'прагът е 500 м');
-  assert.ok(Core.canBridge({ d: 500 }) && Core.canBridge({ d: 340 }) && !Core.canBridge({ d: 500.5 }) && !Core.canBridge(null), 'canBridge: до 500 м включително');
-  var W = { id: 'W', pts: line(latAt(1400), lonAt(3000), latAt(1400), lonAt(4000), 50) };
+  // Праг GAP_BRIDGE_MAX_M (1.9: 1000 м, беше 500): дупка до него се свързва, по-дългата остава отворена за чертане.
+  assert.strictEqual(Core.GAP_BRIDGE_MAX_M, 1000, '1.9: прагът е 1000 м');
+  assert.ok(Core.canBridge({ d: 1000 }) && Core.canBridge({ d: 900 }) && Core.canBridge({ d: 340 }) && !Core.canBridge({ d: 1000.5 }) && !Core.canBridge({ d: 1200 }) && !Core.canBridge(null), 'canBridge: до 1000 м включително');
+  // Z свършва на 600 м на север, W започва на 1800 м: дупка 1200 м.
+  var W = { id: 'W', pts: line(latAt(1800), lonAt(3000), latAt(1800), lonAt(4000), 50) };
   var ts2 = [X, Y, Z, W], tbw = byIdOf(ts2), rw = Core.analyze(ts2, 20);
   var route2 = { items: [{ type: 'part', trackId: 'X', a: 0, b: 1000 }, { type: 'part', trackId: 'Y', a: 0, b: 1000 }, { type: 'part', trackId: 'Z', a: 0, b: 1000 }, { type: 'part', trackId: 'W', a: 0, b: 1000 }] };
   var gw = Core.routeGeometry(route2, tbw, rw);
-  assert.deepStrictEqual(gw.gaps.map(function (g) { return g.d > 500; }), [false, false, true], 'две къси дупки и една над 500 м: ' + gw.gaps.map(function (g) { return Math.round(g.d); }));
+  assert.deepStrictEqual(gw.gaps.map(function (g) { return g.d > Core.GAP_BRIDGE_MAX_M; }), [false, false, true], 'две къси дупки и една над 1000 м: ' + gw.gaps.map(function (g) { return Math.round(g.d); }));
   assert.strictEqual(Core.bridgeGaps(route2.items, gw.gaps), 2, 'свързани са само двете къси');
   var gw1 = Core.routeGeometry(route2, tbw, rw);
-  assert.ok(gw1.gaps.length === 1 && gw1.gaps[0].d > 500, 'дупката над 500 м остава отворена: ' + gw1.gaps.map(function (g) { return Math.round(g.d); }));
+  assert.ok(gw1.gaps.length === 1 && Math.abs(gw1.gaps[0].d - 1200) < 5, 'дупката от 1200 м остава отворена: ' + gw1.gaps.map(function (g) { return Math.round(g.d); }));
   assert.deepStrictEqual(route2.items.map(function (it) { return it.type === 'part' ? it.trackId : 'bridge'; }), ['X', 'bridge', 'Y', 'bridge', 'Z', 'W'], 'между Z и W връзка няма');
+  // 1.9: дупка 900 м (над стария таван от 500 м) вече се свързва направо.
+  var W9 = { id: 'W9', pts: line(latAt(1500), lonAt(3000), latAt(1500), lonAt(4000), 50) }, ts9 = [X, Y, Z, W9], r9 = Core.analyze(ts9, 20);
+  var route9 = { items: [{ type: 'part', trackId: 'Z', a: 0, b: 1000 }, { type: 'part', trackId: 'W9', a: 0, b: 1000 }] }, g9 = Core.routeGeometry(route9, byIdOf(ts9), r9);
+  assert.ok(g9.gaps.length === 1 && Math.abs(g9.gaps[0].d - 900) < 5, '1.9: Z - W9 е дупка 900 м: ' + g9.gaps.map(function (g) { return Math.round(g.d); }));
+  assert.strictEqual(Core.bridgeGaps(route9.items, g9.gaps), 1, '1.9: дупката от 900 м се свързва направо');
+  assert.strictEqual(Core.routeGeometry(route9, byIdOf(ts9), r9).gaps.length, 0, '1.9: след това няма дупка');
   console.log('1.4 число в маркера, изчистване наведнъж, свързване на дупките до 500 м: OK');
 })();
 
@@ -894,10 +901,13 @@ console.log('общ участък OK');
     for (var i = 1; i <= k; i++) o.push(at(e0 + (e1 - e0) * i / k, n0 + (n1 - n0) * i / k));
     return o;
   }
-  // Прагът: 100 м по подразбиране, 0 = никога, таван 500 м.
-  assert.strictEqual(Core.AUTO_GAP_DEF, 100, 'прагът по подразбиране е 100 м');
-  assert.strictEqual(Core.AUTO_GAP_MAX, 500, 'таванът е 500 м');
-  assert.deepStrictEqual([Core.autoGapMax(900), Core.autoGapMax(-5), Core.autoGapMax('x'), Core.autoGapMax('70')], [500, 0, 100, 70], 'прагът се стяга в 0..500');
+  // Прагът (1.9): 500 м по подразбиране, 0 = никога, таван 1000 м.
+  assert.strictEqual(Core.AUTO_GAP_DEF, 500, '1.9: прагът по подразбиране е 500 м');
+  assert.strictEqual(Core.AUTO_GAP_MAX, 1000, '1.9: таванът е 1000 м');
+  assert.ok(Core.GAP_CEIL_M === 1000 && Core.GAP_BRIDGE_MAX_M === Core.GAP_CEIL_M && Core.LINK_MAX === Core.GAP_CEIL_M && Core.AUTO_GAP_MAX === Core.GAP_CEIL_M, '1.9: един таван навсякъде');
+  assert.strictEqual(Core.LINK_SNAP_M, 250, '1.9: прилепването при „Добавяне“ остава 250 м');
+  assert.deepStrictEqual([Core.autoGapMax(900), Core.autoGapMax(1000), Core.autoGapMax(1500), Core.autoGapMax(-5), Core.autoGapMax('x'), Core.autoGapMax('70'), Core.autoGapMax(null)],
+    [900, 1000, 1000, 0, 500, 70, 0], 'прагът се стяга в 0..1000');
 
   // Трак 2 км на изток; маршрутът е целият. „Изтрий участъка“ маха 60 м и 300 м от него.
   var P = { id: 'P', pts: [at(0, 0)].concat(leg(0, 0, 2000, 0)) }, tb = { P: P };
@@ -921,6 +931,7 @@ console.log('общ участък OK');
   assert.ok(c100.route.items[li - 1].type === 'part' && c100.route.items[li + 1].type === 'part', 'връзката стои между двете части - .gpx минава направо от края на едната до началото на другата');
   assert.strictEqual(cutRoute(0).n, 0, 'праг 0: нищо не се затваря');
   assert.strictEqual(cutRoute(500).n, 2, 'праг 500: и двете');
+  assert.strictEqual(cutRoute(Core.AUTO_GAP_DEF).n, 2, '1.9: с прага по подразбиране (500 м) се затварят и двете');
   var g0 = c100.before.gaps[0];
   assert.strictEqual(cutRoute(100, [[g0.from[0], g0.from[1], g0.to[0], g0.to[1]]]).n, 0, 'отворената пак дупка не се затваря сама');
   // Сегашното самозатваряне до отклонението си остава: при отклонение 40 м дупка от 35 м е autoGap, без да пипа route.items.
@@ -929,7 +940,30 @@ console.log('общ участък OK');
   var g15 = Core.routeGeometry(rt, tb, Core.analyze([P], 40));
   assert.ok(g15.gaps.length === 0 && g15.autoGaps.length === 1, 'дупка под отклонението се затваря сама както досега');
   delete P.dels;
-  console.log('1.5 самозатваряне на малките дупки до прага: OK');
+  // 1.9: таванът е 1000 м - изтрити 900 м се затварят сами, ако прагът го стига; 1200 м - никога (прагът се стяга до 1000).
+  var L9 = { id: 'L9', pts: [at(0, 0)].concat(leg(0, 0, 4000, 0)) }, tb9 = { L9: L9 };
+  function cut9(dels, max) {
+    L9.dels = dels;
+    var route = { items: [{ type: 'part', trackId: 'L9', a: 0, b: Core.prep(L9).len }] };
+    dels.forEach(function (d) { route.items = Core.trimItems(route.items, 'L9', d.a, d.b); });
+    var r = Core.analyze([L9], 20), g = Core.routeGeometry(route, tb9, r), n = Core.closeSmallGaps(route, g.gaps, Core.autoGapMax(max));
+    return { gaps: g.gaps.map(function (x) { return Math.round(x.d); }), n: n, left: Core.routeGeometry(route, tb9, r).gaps.length };
+  }
+  var k9 = cut9([{ a: 1000, b: 1900 }], 1000);
+  assert.ok(k9.gaps.join() === '900' && k9.n === 1 && k9.left === 0, '1.9: дупка 900 м се затваря сама при праг 1000: ' + JSON.stringify(k9));
+  assert.strictEqual(cut9([{ a: 1000, b: 1900 }], Core.AUTO_GAP_DEF).n, 0, '1.9: при прага по подразбиране (500 м) дупката от 900 м остава с пръстена');
+  var k12 = cut9([{ a: 1000, b: 2200 }], 5000);
+  assert.ok(k12.gaps.join() === '1200' && k12.n === 0 && k12.left === 1, '1.9: дупка 1200 м не се затваря сама дори при въведени 5000 (таван 1000): ' + JSON.stringify(k12));
+  // И дупката вътре в трака (closeHoles, t.joins): 900 м да, 1200 м не.
+  function hole9(gapM) {
+    var H = { id: 'H9', pts: [at(0, 0)].concat(leg(0, 0, 4000, 0)), dels: [{ a: 1000, b: 1000 + gapM }] };
+    return { n: Core.closeHoles([H], 20, 5000).length, def: Core.trackHoles([H], 20).length };
+  }
+  var h9 = hole9(900), h12 = hole9(1200);
+  assert.ok(h9.n === 1 && h9.def === 0, '1.9: изтрити 900 м в трака се затварят сами при праг 1000, при 500 м по подразбиране - не: ' + JSON.stringify(h9));
+  assert.ok(h12.n === 0, '1.9: изтрити 1200 м в трака остават отворени: ' + JSON.stringify(h12));
+  delete L9.dels;
+  console.log('1.5 самозатваряне на малките дупки до прага (1.9: таван 1000 м, по подразбиране 500 м): OK');
 
   // Застъпване без маркер: analyze не слага маркер, а линия под участъка има.
   function marks(r, id) { return r.pend.filter(function (s) { return s.trackId === id; }).length; }
@@ -1083,7 +1117,7 @@ console.log('общ участък OK');
 
   // ---- 1.7: колекцията - отворени краища, връзки (до 500 м), изрязване със свързване, върхове, износ ----
   function str(id, x0, x1) { return { id: id, pts: poly([[x0, 0], [x1, 0]]) }; }
-  var P = str('P', 0, 2000), Q = str('Q', 2060, 3500), R = str('R', 3580, 5000), T7 = str('T', 5550, 6000), cs = [P, Q, R, T7];
+  var P = str('P', 0, 2000), Q = str('Q', 2060, 3500), R = str('R', 3580, 5000), T7 = str('T', 6200, 6650), cs = [P, Q, R, T7];
   function ends() { return Core.openEnds(cs, 20).map(function (e) { return e.trackId + Math.round(e.d); }).join(','); }
   assert.strictEqual(ends(), 'P0,P2000,Q0,Q1440,R0,R1420,T0,T450', '1.7: отворените краища на колекцията');
   function endOf(id, d) { return Core.openEnds(cs, 20).filter(function (e) { return e.trackId === id && Math.abs(e.d - d) < 1; })[0]; }
@@ -1093,8 +1127,8 @@ console.log('общ участък OK');
   assert.ok(l2.kind === 'link' && Q.links[0].pts.length === 1 && P.links.length === 1, '1.7: втората дупка - отделна връзка с връх по средата, първата не е пипната');
   assert.strictEqual(ends(), 'P0,R1420,T0,T450', '1.7: затворените краища не са отворени');
   var l3 = Core.addLink(cs, endOf('R', 1420), endOf('T', 0), []);
-  assert.ok(l3.over && Math.abs(l3.len - 550) < 2 && !(R.links || []).length, '1.7: над 500 м (550 м) връзка не се прави: ' + JSON.stringify(l3));
-  assert.strictEqual(Core.LINK_MAX, 500, '1.7: таванът е 500 м');
+  assert.ok(l3.over && Math.abs(l3.len - 1200) < 2 && !(R.links || []).length, '1.9: над 1000 м (1200 м) връзка не се прави: ' + JSON.stringify(l3));
+  assert.strictEqual(Core.LINK_MAX, 1000, '1.9: таванът е 1000 м (беше 500)');
   // Маршрут P + Q минава по връзката от колекцията; празният маршрут не се пипа.
   var rc = Core.analyze(cs, 20), byC = {}; cs.forEach(function (t) { byC[t.id] = t; });
   assert.strictEqual(rc.links.length, 2, '1.7: analyze връща връзките на колекцията');
@@ -1117,7 +1151,7 @@ console.log('общ участък OK');
   assert.ok(Math.abs(f7(500) - 500) < 0.01 && Math.abs(f7(95) - 95) < 0.01 && Math.abs(f7(2000) - 2000) < 0.01, '1.7: на права махнатият връх не мени разстоянията');
   var bent = P.pts.map(function (p, i) { return i === 10 ? [p[0] + 30 / ky, p[1], p[2]] : p; }), fb = Core.remapper(P.pts, bent, P.pts.map(function (p, i) { return i; }));
   assert.ok(fb(500) > 500 + 10 && Math.abs(fb(50) - 50) < 0.01 && fb(2000) > 2000 + 10, '1.7: преместен връх удължава трака след него: 500 -> ' + fb(500).toFixed(1));
-  console.log('1.7 колекцията: отворени краища, връзки до 500 м, изрязване със свързване, маршрут по връзката, .gpx, върхове: OK');
+  console.log('1.7 колекцията: отворени краища, връзки до 1000 м (1.9), изрязване със свързване, маршрут по връзката, .gpx, върхове: OK');
 })();
 
 // ---- 1.8: „Удължи/Скъси“ - свободният край расте с нови върхове, пуснат върху трак прави разклонение (истински връх в
