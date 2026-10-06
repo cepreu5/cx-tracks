@@ -1131,9 +1131,9 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.8.0' && await p5.isVisible('#appVersion') && /^Версия 1\.8\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  check(ver === '1.9.0' && await p5.isVisible('#appVersion') && /^Версия 1\.9\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.8.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-1.9.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -2348,7 +2348,7 @@ function barFits() {
     // Менюто на пръстен и на участък - на 360 / 560 / 760 px и 390x844.
     const crossRing = () => pr.evaluate(() => { const j = __gpxk.A.junctions.find(j => j.cross); if (!j) return null; const at = j.ring || [j.lat, j.lon], q = __gpxk.map.project(at[0], at[1]), b = document.querySelector('#map').getBoundingClientRect(); return { x: b.left + q.x, y: b.top + q.y }; });
     const menuState = () => pr.evaluate(() => { const m = document.querySelector('#objMenu'), r = m.getBoundingClientRect(), w = document.querySelector('#mapwrap').getBoundingClientRect();
-      return { open: !m.hidden, kind: m.dataset.kind, title: document.querySelector('#omTitle').textContent, sub: document.querySelector('#omSub').textContent, btns: [...m.querySelectorAll('button')].filter(b => b.dataset.omk !== 'ext').map(b => b.textContent),
+      return { open: !m.hidden, kind: m.dataset.kind, title: document.querySelector('#omTitle').textContent, sub: document.querySelector('#omSub').textContent, btns: [...m.querySelectorAll('button')].filter(b => !/^ext/.test(b.dataset.omk)).map(b => b.textContent),
         inMap: r.width > 150 && r.left >= w.left - 0.5 && r.right <= Math.min(w.right, innerWidth) + 0.5 && r.top >= w.top - 0.5 && r.bottom <= Math.min(w.bottom, innerHeight) + 0.5, bar: document.body.classList.contains('bar-hidden') }; });
     const routeSt = () => pr.evaluate(() => { const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); return { items: r.items.length, len: __gpxk.G.len, pts: JSON.stringify(__gpxk.G.pts), sLen: document.querySelector('#sLen').textContent }; });
     const showCross = () => pr.evaluate(() => { const j = __gpxk.A.junctions.find(j => j.cross) || { lat: 42.5, lon: 24.70 + 2500 / (Math.cos(42.5 * Math.PI / 180) * 6371008.8 * Math.PI / 180) }; __gpxk.map.setView(j.lat, j.lon, 16); });
@@ -2558,11 +2558,11 @@ function barFits() {
       await pk.waitForFunction(() => Math.abs(__gpxk.map.w - document.querySelector('#map').clientWidth) < 1);
       const title = await pk.getAttribute('[data-mode="cut"]', 'title');
       const kp = await pk.evaluate(() => { const t = __gpxk.S.tracks[0]; Core.prep(t); const c = Core.pointAt(t, t.len * 0.35); __gpxk.map.setView(c[0], c[1], 14);
-        return [0.25, 0.45].map(f => { const p = Core.pointAt(t, t.len * f); return __gpxk.map.project(p[0], p[1]); }); });
+        return [0.25, 0.5].map(f => { const p = Core.pointAt(t, t.len * f); return __gpxk.map.project(p[0], p[1]); }); });
       for (const q of kp) await pk.evaluate(q => { const m = __gpxk.map; m.opts.onClick(Object.assign({ x: q.x, y: q.y }, m.unproject(q.x, q.y))); }, q);
       const box = await pk.evaluate(() => ({ t: document.querySelector('#cutText').textContent, s: document.querySelector('#cutSub').textContent, ok: !document.querySelector('[data-act="cut-ok"]').disabled }));
-      // 1.7: изрязването маха и свързва двата края направо (до 500 м).
-      check(title === 'Две точки по трака махат частта между тях; тракът продължава с права връзка през махнатото (до 500 м). „Отмени“ я връща.' && /^Изрязване: км 1,\d - 2,\d/.test(box.t) && /^\d+,\d\sкм се махат от трака; двата края се свързват направо \(до 500\sм\)\. „Отмени“ ги връща\.$/.test(box.s) && box.ok, tag + 'кутията за изрязване казва какво се маха и че краищата се свързват: ' + JSON.stringify([title, box]));
+      // 1.7: изрязването маха и свързва двата края направо (1.9: до 1000 м).
+      check(title === 'Две точки по трака махат частта между тях; тракът продължава с права връзка през махнатото (до 1000 м). „Отмени“ я връща.' && /^Изрязване: км 1,\d - 2,\d/.test(box.t) && /^\d+,\d\sкм се махат от трака; двата края се свързват направо \(до 1000\sм\)\. „Отмени“ ги връща\.$/.test(box.s) && box.ok, tag + 'кутията за изрязване казва какво се маха и че краищата се свързват: ' + JSON.stringify([title, box]));
       const before = await pk.evaluate(() => { const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); return { items: JSON.stringify(r.items), len: __gpxk.G.len, partsLen: r.items.reduce((a, it) => a + (it.type === 'part' ? Math.abs(it.b - it.a) : 0), 0) }; });
       await pk.click('[data-act="cut-ok"]');
       const st = () => pk.evaluate(() => { const S = __gpxk.S, A = __gpxk.A, t = S.tracks[0], r = S.routes.find(x => x.id === S.curId);
@@ -2571,9 +2571,9 @@ function barFits() {
           bad: __gpxk.G.items.some(g => g.bad), len: __gpxk.G.len, partsLen: r.items.reduce((a, it) => a + (it.type === 'part' ? Math.abs(it.b - it.a) : 0), 0), toast: document.querySelector('#toast').textContent,
           row: document.querySelector('#tracksList li .t').textContent, card: !!document.querySelector('#cutsCard'), scroll: document.documentElement.scrollWidth <= innerWidth }; });
       const k1 = await st();
-      check(!k1.cuts && k1.d && k1.d.b - k1.d.a > 900 && !k1.cutSec && !k1.card, tag + 'изрязаното е изтрит участък (t.dels), не изрязване за връщане: ' + k1.dels);
-      check(!k1.through && !k1.bad && k1.items !== before.items && k1.partsLen < before.partsLen - 900, tag + 'частта от маршрута губи отсечката (няма невалидна част): ' + k1.items);
-      check(/^Изрязани \d+,\d\sкм от KX\.gpx\. Краищата са на \d+\sм - над 500\sм връзка не се чертае, мястото остава открито\. „Отмени“ ги връща\.$/.test(k1.toast), tag + 'съобщението (краищата са над 500 м - без връзка): ' + k1.toast);
+      check(!k1.cuts && k1.d && k1.d.b - k1.d.a > 1100 && !k1.cutSec && !k1.card, tag + 'изрязаното е изтрит участък (t.dels), не изрязване за връщане: ' + k1.dels);
+      check(!k1.through && !k1.bad && k1.items !== before.items && k1.partsLen < before.partsLen - 1100, tag + 'частта от маршрута губи отсечката (няма невалидна част): ' + k1.items);
+      check(/^Изрязани \d+,\d\sкм от KX\.gpx\. Краищата са на \d+(,\d+)?\sк?м - над 1000\sм връзка не се чертае, мястото остава открито\. „Отмени“ ги връща\.$/.test(k1.toast), tag + 'съобщението (краищата са над 1000 м - без връзка): ' + k1.toast);
       check(/изтрити \d+,\d\sкм/.test(k1.row) && !/изрязани/.test(k1.row) && k1.scroll, tag + 'редът в „Тракове-източници“ носи само „изтрити“: ' + k1.row);
       if (W === 390) await pk.screenshot({ path: path.join(OUT, 'cut-132-390.png') });
       await pk.click('#undoBtn');
@@ -2614,10 +2614,10 @@ function barFits() {
       writeGpx('EM', seqE(line(42.6 + dLat(400), at(0.4), 42.6 + dLat(5), at(0.4), 20), line(42.6 + dLat(5), at(0.4), 42.6 + dLat(5), at(1.2), 40), line(42.6 + dLat(5), at(1.2), 42.6 + dLat(400), at(1.2), 20))),
       writeGpx('EN', seqE(line(42.6 - dLat(400), at(0.4), 42.6 - dLat(5), at(0.4), 20), line(42.6 - dLat(5), at(0.4), 42.6 - dLat(5), at(1.2), 40), line(42.6 - dLat(5), at(1.2), 42.6 - dLat(400), at(1.2), 20))),
       writeGpx('EO', seqE(line(42.6 + dLat(400), at(3), 42.6 + dLat(8), at(3), 20), line(42.6 + dLat(8), at(3), 42.6 + dLat(8), at(3.8), 40), line(42.6 + dLat(8), at(3.8), 42.6 + dLat(400), at(3.8), 20))),
-      // Три части по 42,62: 60 м дупка между първите две, 800 м между втората и третата.
+      // Три части по 42,62: 60 м дупка между първите две, 1200 м между втората и третата (1.9: над тавана от 1000 м).
       writeGpx('EP1', line(42.62, at(0), 42.62, at(1), 50)),
       writeGpx('EP2', line(42.62, at(1.06), 42.62, at(2), 50)),
-      writeGpx('EP3', line(42.62, at(2.8), 42.62, at(3.8), 50))
+      writeGpx('EP3', line(42.62, at(3.2), 42.62, at(4.2), 50))
     ];
     await pe.setInputFiles('#fileInput', eFiles);
     await pe.waitForFunction(() => __gpxk.S.tracks.length === 7);
@@ -2658,7 +2658,7 @@ function barFits() {
     await frame();
     check(await pe.evaluate(() => !__gpxk.ui.hover && !(__gpxk.ui.dupHl || []).length && __gpxk.A.pend.length === 3), tag + 'следващото докосване встрани гаси осветяването, без да маха нищо');
 
-    // Маршрут от трите части: две отворени дупки (60 м и 800 м), всяка с пръстен.
+    // Маршрут от трите части: две отворени дупки (60 м и 1200 м), всяка с пръстен.
     await pe.evaluate(() => { const S = __gpxk.S, r = S.routes.find(x => x.id === S.curId), T = S.tracks.filter(t => /^EP/.test(t.name));
       r.items = T.map(t => ({ type: 'part', trackId: t.id, a: 0, b: Core.prep(t).len, rev: false })); __gpxk.refresh(); });
     await view(42.62, at(1.9), 14);
@@ -2668,20 +2668,20 @@ function barFits() {
         skips: JSON.stringify(S.tracks.map(t => t.skips || [])), toast: document.querySelector('#toast').textContent,
         gapsRow: document.querySelector('#dupsGaps').hidden ? '' : document.querySelector('#dupsGaps').textContent, cleanOff: document.querySelector('#cleanBtn').disabled }; }));
     let e1 = await est();
-    check(e1.gaps.length === 2 && e1.rings.length === 2 && e1.gaps[0] > 50 && e1.gaps[0] < 70 && e1.gaps[1] > 750 && /^Отворени дупки: 2 · /.test(e1.gapsRow) && !e1.cleanOff, tag + 'две отворени дупки, всяка с пръстен: ' + JSON.stringify(e1.gaps) + ' · ' + e1.gapsRow);
+    check(e1.gaps.length === 2 && e1.rings.length === 2 && e1.gaps[0] > 50 && e1.gaps[0] < 70 && e1.gaps[1] > 1150 && /^Отворени дупки: 2 · /.test(e1.gapsRow) && !e1.cleanOff, tag + 'две отворени дупки, всяка с пръстен: ' + JSON.stringify(e1.gaps) + ' · ' + e1.gapsRow);
     const ringPx = await pe.evaluate(o => { const cv = document.querySelector('.map-canvas'), k = cv.width / cv.getBoundingClientRect().width, b = cv.getBoundingClientRect();
       const d = cv.getContext('2d').getImageData(Math.round((o.x - b.left) * k), Math.round((o.y - b.top - 9) * k), 1, 1).data, h = U.cssVar('--app-walk-gap').trim().replace('#', '');
       const c = [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); return Math.abs(d[0] - c[0]) + Math.abs(d[1] - c[1]) + Math.abs(d[2] - c[2]); }, e1.rings[0]);
     check(ringPx < 60, tag + 'пръстенът е кехлибарен (--app-walk-gap), разлика ' + ringPx);
-    const longR = e1.rings.find(o => o.d > 500), shortR = e1.rings.find(o => o.d < 500);
-    // Над 500 м: кликът не свързва, дупката остава, съобщението казва защо.
+    const longR = e1.rings.find(o => o.d > 1000), shortR = e1.rings.find(o => o.d < 1000);
+    // Над 1000 м (1.9; беше 500): кликът не свързва, дупката остава, съобщението казва защо.
     await pe.mouse.click(longR.x, longR.y);
     let e2 = await est();
-    check(e2.gaps.length === 2 && e2.items === e1.items && e2.undo === e1.undo && /^Дупката е \d+\sм - над 500\sм не се свързва направо\. Затвори я с чертаене/.test(e2.toast), tag + 'клик върху пръстена на дупка над 500 м: остава отворена · ' + e2.toast);
-    // До 500 м: кликът свързва направо (като „Свържи направо“), „Отмени“ я връща.
+    check(e2.gaps.length === 2 && e2.items === e1.items && e2.undo === e1.undo && /^Дупката е \d+(,\d+)?\sк?м - над 1000\sм не се свързва направо\. Затвори я с чертаене/.test(e2.toast), tag + 'клик върху пръстена на дупка над 1000 м: остава отворена · ' + e2.toast);
+    // До 1000 м: кликът свързва направо (като „Свържи направо“), „Отмени“ я връща.
     await pe.mouse.click(shortR.x, shortR.y);
     e2 = await est();
-    check(e2.gaps.length === 1 && e2.gaps[0] > 500 && e2.bridges === 1 && e2.undo === e1.undo + 1, tag + 'клик върху пръстена на 60 м дупка: свързана направо, остава само дългата ' + JSON.stringify(e2.gaps));
+    check(e2.gaps.length === 1 && e2.gaps[0] > 1000 && e2.bridges === 1 && e2.undo === e1.undo + 1, tag + 'клик върху пръстена на 60 м дупка: свързана направо, остава само дългата ' + JSON.stringify(e2.gaps));
     await pe.click('#undoBtn');
     e2 = await est();
     check(e2.gaps.length === 2 && e2.items === e1.items, tag + '„Отмени“ връща дупката');
@@ -2690,7 +2690,7 @@ function barFits() {
     await pe.evaluate(() => { const b = document.querySelector('#dupsCard .fold-t'); if (b.getAttribute('aria-expanded') !== 'true') b.click(); });
     await pe.locator('#cleanBtn').scrollIntoViewIfNeeded();
     const btn = await pe.evaluate(() => ({ text: document.querySelector('#cleanBtn').textContent.trim(), title: document.querySelector('#cleanBtn').title }));
-    check(btn.text === 'Изчисти преди сглобяване' && /до 500 м/.test(btn.title), tag + 'копчето в „Дубликати“: ' + btn.text);
+    check(btn.text === 'Изчисти преди сглобяване' && /до 1000 м/.test(btn.title), tag + 'копчето в „Дубликати“: ' + btn.text);
     const pendBefore = e2.pend;
     await pe.click('#cleanBtn');
     const e3 = await est();
@@ -2699,8 +2699,8 @@ function barFits() {
       return [0.8, 3.4].map(km => S.tracks.filter(t => { const m = Core.nearestOnTrack(t, 42.6, 24.70 + km * 1000 / (111195 * Math.cos(42.6 * Math.PI / 180)));
         return m.dist < 12 && A.byTrack[t.id].some(s => s.kind === 'part' && m.d > s.a && m.d < s.b); }).map(t => t.name).join()); });
     check(e3.pend === 0 && e3.marks === 0 && JSON.stringify(kept) === '["EL.gpx","EL.gpx"]', tag + 'изчистване: маркери не остават, от всяка група остава едно копие (' + kept + ')');
-    check(e3.gaps.length === 1 && e3.gaps[0] > 500 && e3.bridges === 1, tag + 'изчистване: дупката от 60 м е свързана, тази над 500 м остава отворена ' + JSON.stringify(e3.gaps));
-    check(new RegExp('^Махнати застъпени тракове: ' + pendBefore + ' · свързани дупки: 1\\. "Отмени" връща всичко\\. 1 дупка над 500\\sм остава отворена - затвори я с чертаене\\.$').test(e3.toast), tag + 'съобщението: ' + e3.toast);
+    check(e3.gaps.length === 1 && e3.gaps[0] > 1000 && e3.bridges === 1, tag + 'изчистване: дупката от 60 м е свързана, тази над 1000 м остава отворена ' + JSON.stringify(e3.gaps));
+    check(new RegExp('^Махнати застъпени тракове: ' + pendBefore + ' · свързани дупки: 1\\. "Отмени" връща всичко\\. 1 дупка над 1000\\sм остава отворена - затвори я с чертаене\\.$').test(e3.toast), tag + 'съобщението: ' + e3.toast);
     check(e3.undo === e2.undo + 1, tag + 'цялото изчистване е един отпечатък за „Отмени“ (' + e2.undo + ' -> ' + e3.undo + ')');
     if (true) { await pe.setViewportSize({ width: 1280, height: 800 }); await pe.screenshot({ path: path.join(OUT, 'clean-14-1280.png'), fullPage: false }); }
     await pe.click('#undoBtn');
@@ -2908,7 +2908,7 @@ function barFits() {
     await p15.click('#setBtn');
     const sd = await p15.evaluate(() => ({ open: document.querySelector('#dlgSettings').open, tabs: [...document.querySelectorAll('#dlgSettings [data-settab]')].map(b => b.textContent.trim()),
       alpha: document.querySelector('#setAlpha').value, alphaT: document.querySelector('#setAlphaVal').textContent, gap: document.querySelector('#setGap').value, cols: document.querySelectorAll('#setColors input[type="color"]').length }));
-    check(sd.open && sd.tabs.join('|') === 'Менюта|Дупки|Цветове' && sd.alpha === '50' && sd.alphaT === '50%' && sd.gap === '100' && sd.cols === 11, tag + '„Настройки“: раздели ' + sd.tabs.join(', ') + ', прозрачност ' + sd.alphaT + ', праг ' + sd.gap + ' м, ' + sd.cols + ' цвята');
+    check(sd.open && sd.tabs.join('|') === 'Менюта|Дупки|Цветове' && sd.alpha === '50' && sd.alphaT === '50%' && sd.gap === '500' && sd.cols === 11, tag + '„Настройки“: раздели ' + sd.tabs.join(', ') + ', прозрачност ' + sd.alphaT + ', праг ' + sd.gap + ' м, ' + sd.cols + ' цвята');
     await p15.screenshot({ path: path.join(OUT, 'settings-150.png') });
     await p15.keyboard.press('Escape');
 
@@ -2996,7 +2996,7 @@ function barFits() {
     const rs = await p15.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-route-a').trim());
     check(rs === '#1d3f9e', tag + '„Нулирай цветовете“ връща цвета на темата: ' + rs);
     await p15.click('#setReset');
-    check(await p15.evaluate(() => __gpxk.SET.alpha === 50 && __gpxk.SET.gap === 100 && document.querySelector('#setAlpha').value === '50'), tag + '„Връщане по подразбиране“: 50% и 100 м');
+    check(await p15.evaluate(() => __gpxk.SET.alpha === 50 && __gpxk.SET.gap === 500 && document.querySelector('#setAlpha').value === '50'), tag + '„Връщане по подразбиране“: 50% и 500 м (1.9)');
     await p15.keyboard.press('Escape');
 
     // „Проверка за дубликати“ (1.6: винаги видима, с брояч): при маркиран дубликат казва колко са; без маркер отчита остатъка.
@@ -3283,11 +3283,11 @@ function barFits() {
     await p17.click('#undoBtn');
     check(await p17.evaluate(() => __gpxk.A.pend.length === 1 && !(__gpxk.S.tracks[1].skips || []).length), tag + '„Отмени“ връща дубликата');
 
-    // Колекция от прави: P (0-2000 м), Q (2060-3500 м), R (3580-5000 м), T (5450-6000 м), V (6550-7500 м) по една линия на изток.
+    // Колекция от прави: P (0-2000 м), Q (2060-3500 м), R (3580-5000 м), T (5450-6000 м), V (7200-8150 м; 1.9: на 1200 м от T) по една линия на изток.
     await p17.evaluate(() => {
       const lat0 = 42.6, lon0 = 24.8, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
       const mk = (id, x0, x1, c) => { const pts = []; for (let x = x0; x <= x1 + 0.01; x += 10) pts.push([Math.round((lat0) * 1e6) / 1e6, Math.round((lon0 + x / kx) * 1e7) / 1e7, 500]); return { id, name: 'Права ' + id, title: 'Права ' + id, color: c, pts, breaks: [], wpts: [], dels: [], skips: [], joins: [], links: [], visible: true, created: Date.now() }; };
-      __gpxk.S.tracks.splice(0, __gpxk.S.tracks.length, mk('P', 0, 2000, 0), mk('Q', 2060, 3500, 1), mk('R', 3580, 5000, 2), mk('T', 5450, 6000, 3), mk('V', 6550, 7500, 4));
+      __gpxk.S.tracks.splice(0, __gpxk.S.tracks.length, mk('P', 0, 2000, 0), mk('Q', 2060, 3500, 1), mk('R', 3580, 5000, 2), mk('T', 5450, 6000, 3), mk('V', 7200, 8150, 4));
       const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); r.items = [];
       window.__x = x => [lat0, lon0 + x / kx];
       __gpxk.reanalyze();
@@ -3319,16 +3319,16 @@ function barFits() {
     await click(3510); await click(3570);
     const c3 = await coll();
     check(/P:Q\/2000-0\/0/.test(c3.links) && /Q:R\/1440-0\/0/.test(c3.links) && c3.items === 0 && c3.gPts === 0, tag + 'втората дупка се затваря отделно, първата връзка не мръдва: ' + c3.links);
-    // Таван 500 м: на 450 м връзката се прави (с връх по средата), на 550 м - не.
+    // Таван (1.9: 1000 м): на 450 м връзката се прави (с връх по средата), на 1200 м - не.
     await at(5225, 15);
     await click(5005); await click(5225); await click(5445);
     const c4 = await coll();
-    check(/R:T\/1420-0\/1/.test(c4.links), tag + 'връзка 450 м (под 500 м) през три точки: краищата прилепват, средната е връх: ' + c4.links);
-    await at(6275, 15);
-    await click(6005); await click(6545);
+    check(/R:T\/1420-0\/1/.test(c4.links), tag + 'връзка 450 м (под тавана) през три точки: краищата прилепват, средната е връх: ' + c4.links);
+    await at(6600, 15);
+    await click(6005); await click(7195);
     const c5 = await coll();
-    check(!/T:V/.test(c5.links) && c5.ends.includes('T550') && c5.ends.includes('V0') && /над 500\s?м връзка не се чертае/.test(c5.toast) && c5.pend === 0, tag + 'над 500 м връзка не се чертае (550 м): ' + c5.toast);
-    // „Изрязване“: махнатото се свързва направо, маршрутът не се пипа; над 500 м краищата остават открити.
+    check(!/T:V/.test(c5.links) && c5.ends.includes('T550') && c5.ends.includes('V0') && /над 1000\s?м връзка не се чертае/.test(c5.toast) && c5.pend === 0, tag + 'над 1000 м връзка не се чертае (1200 м): ' + c5.toast);
+    // „Изрязване“: махнатото се свързва направо, маршрутът не се пипа; над 1000 м краищата остават открити.
     await at(600, 15);
     await p17.click('[data-mode="cut"]');
     await click(500); await click(700);
@@ -3336,12 +3336,12 @@ function barFits() {
     const c6 = await coll();
     check(JSON.stringify(c6.dels[0]) === '[[500,700]]' && JSON.stringify(c6.joins[0]) === '[[500,700]]' && c6.items === 0 && /права връзка/.test(c6.toast) && !c6.ends.some(e => /^P(500|700)$/.test(e)),
       tag + '„Изрязване“ маха частта и свързва двата края направо (P 500-700 м), маршрутът не е пипнат: ' + c6.toast);
-    await at(2600, 14);
+    await at(2775, 14);
     await p17.click('[data-mode="cut"]');
-    await click(2200); await click(3000);
+    await click(2150); await click(3400);
     await p17.click('[data-act="cut-ok"]');
     const c7 = await coll();
-    check(c7.dels[1].length === 1 && !c7.joins[1].length && /над 500\s?м/.test(c7.toast), tag + '„Изрязване“ над 500 м: краищата остават открити: ' + c7.toast);
+    check(c7.dels[1].length === 1 && !c7.joins[1].length && /над 1000\s?м/.test(c7.toast), tag + '„Изрязване“ над 1000 м (1250 м): краищата остават открити: ' + c7.toast);
     await p17.click('#undoBtn');
     // „Местене“ и „Махане“ пипат върховете на траковете (отблизо) и на връзките.
     await p17.click('[data-mode="move"]');
@@ -3477,6 +3477,8 @@ function barFits() {
     // Менюто на трака: „Удължи/Скъси“ точно под „Добави в маршрута“, по ред за всеки свободен край, с разстоянието; без размазване.
     await at(1003, 450, 15);
     const mW = await menuAt(1003, 700);
+    // 1.9: редовете „Свържи с най-близката линия“ (extNear) се гледат в проверките на 1.9.
+    mW.btns = mW.btns.filter(b => !/^extNear:/.test(b));
     check(mW.btns[0] === 'add:Добави в маршрута' && mW.btns[1] === 'ext:Удължи/Скъси · края свободен край · 300 м' && mW.btns[2] === 'ext:Удължи/Скъси · началото свободен край · 900 м' && mW.btns.filter(b => /^ext:/.test(b)).length === 2,
       tag + 'менюто на W: „Удължи/Скъси“ под „Добави в маршрута“, ред за всеки свободен край: ' + mW.btns.join(' | '));
     const al = /rgba?\(([^)]+)\)/.exec(mW.bg), sl = /\/\s*([\d.]+)\s*\)/.exec(mW.bg), alpha = al && !/color\(/.test(mW.bg) ? +(al[1].split(/[ ,/]+/).filter(Boolean)[3] || 1) : sl ? +sl[1] : 1;
@@ -3565,6 +3567,106 @@ function barFits() {
     check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
     check(!e18.length, tag + 'конзолата е чиста' + (e18.length ? ': ' + e18.join(' | ') : ''));
     await c18.close();
+  }
+
+  // ---- 1.9: един таван от 1000 м вместо три по 500 м; „Свържи с най-близката линия“ на свободния край с един клик
+  // (855 м - истински връх в чуждата линия); „Настройки“ - 500 м по подразбиране, до 1000. Синтетика: правите P, N, F. ----
+  {
+    const tag = '1.9: ';
+    const c19 = await browser.newContext({ viewport: { width: 1280, height: 800 }, menus: true, dupMenu: true });
+    const p19 = await c19.newPage();
+    const e19 = [];
+    p19.on('pageerror', e => e19.push('pageerror: ' + e.message));
+    p19.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) e19.push('console: ' + m.text()); });
+    await p19.goto(url);
+    await p19.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+    const frame = () => p19.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // Таванът и прагът в ядрото.
+    const cv = await p19.evaluate(() => [Core.GAP_CEIL_M, Core.AUTO_GAP_MAX, Core.GAP_BRIDGE_MAX_M, Core.LINK_MAX, Core.AUTO_GAP_DEF, __gpxk.SET.gap]);
+    check(JSON.stringify(cv) === '[1000,1000,1000,1000,500,500]', tag + 'един таван 1000 м (самозатваряне, пръстен, връзка), прагът по подразбиране 500 м: ' + JSON.stringify(cv));
+    // P (0-2000 м на изток), N (север, началото му е на 855 м над средата на P), F (началото е на 1200 м под края на P).
+    await p19.evaluate(() => {
+      const lat0 = 42.6, lon0 = 24.8, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
+      window.__x = (x, y) => [lat0 + (y || 0) / ky, lon0 + x / kx];
+      window.__X = p => Math.round((p[1] - lon0) * kx); window.__Y = p => Math.round((p[0] - lat0) * ky);
+      const poly = v => { const o = [__x(v[0][0], v[0][1]).concat([500])];
+        for (let i = 1; i < v.length; i++) { const a = v[i - 1], b = v[i], k = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10));
+          for (let j = 1; j <= k; j++) o.push(__x(a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k).map(v => Math.round(v * 1e7) / 1e7).concat([500])); }
+        return o; };
+      const mk = (id, v, c) => ({ id, name: 'Права ' + id, title: 'Права ' + id, color: c, pts: poly(v), breaks: [], wpts: [], dels: [], skips: [], joins: [], links: [], visible: true, created: Date.now() });
+      __gpxk.S.tracks.splice(0, __gpxk.S.tracks.length, mk('P', [[0, 0], [2000, 0]], 0), mk('N', [[1000, 855], [1000, 1855]], 1), mk('F', [[2000, -1200], [2000, -2200]], 2));
+      const r = __gpxk.S.routes.find(x => x.id === __gpxk.S.curId); r.items = [];
+      __gpxk.reanalyze();
+    });
+    const scr = (x, y) => p19.evaluate(q => { const g = __x(q[0], q[1]), p = __gpxk.map.project(g[0], g[1]), r = document.querySelector('#map').getBoundingClientRect(); return { x: r.left + p.x, y: r.top + p.y }; }, [x, y]);
+    const at = async (x, y, z) => { await p19.evaluate(q => { const p = __x(q[0], q[1]); __gpxk.map.setView(p[0], p[1], q[2]); }, [x, y, z]); await frame(); };
+    const menuAt = async (x, y) => { const q = await scr(x, y); await p19.mouse.click(q.x, q.y); await p19.waitForFunction(() => !document.querySelector('#objMenu').hidden);
+      return p19.evaluate(() => [...document.querySelectorAll('#objMenu #omBtns button')].map(b => b.dataset.omk + ':' + b.textContent.replace(/\s+/g, ' ').trim())); };
+    const st = () => p19.evaluate(() => { const S = __gpxk.S, r = Math.round, T = id => S.tracks.find(t => t.id === id);
+      S.tracks.forEach(t => Core.prep(t));
+      return { len: S.tracks.map(t => t.id + r(t.len)).join(' '), n: S.tracks.map(t => t.pts.length).join(','), ends: Core.openEnds(S.tracks, S.tol).map(e => e.trackId + r(e.d)).join(','),
+        firstN: [__X(T('N').pts[0]), __Y(T('N').pts[0])], hj: S.tracks.map(t => (t.hj || []).length).join(''), ext: JSON.stringify(T('N').ext || []),
+        hand: __gpxk.A.junctions.filter(j => j.hand).map(j => [__X([j.lat, j.lon]), __Y([j.lat, j.lon]), j.branches.length]), gaps: __gpxk.A.gaps.length,
+        toast: document.querySelector('#toast').textContent, menu: !document.querySelector('#objMenu').hidden, extOn: !!__gpxk.ui.ext }; });
+    const s0 = await st();
+    check(s0.ends === 'P0,P2000,N0,N1000,F0,F1000', tag + 'свободните краища: ' + s0.ends);
+    // Менюто на N: „Свържи с най-близката линия“ под „Добави в маршрута“, над „Удължи/Скъси“, с името и разстоянието.
+    await at(1000, 1000, 15);
+    const mN = await menuAt(1000, 1300);
+    check(mN[0] === 'add:Добави в маршрута' && mN[1] === 'extNear:Свържи с най-близката линия свободен край · Права P · 855 м' && mN[2] === 'ext:Удължи/Скъси · началото свободен край · 855 м' && mN.filter(b => /^extNear:/.test(b)).length === 1,
+      tag + 'менюто на N: „Свържи с най-близката линия · 855 м“ точно под „Добави в маршрута“, „Удължи/Скъси“ остава: ' + mN.join(' | '));
+    await p19.screenshot({ path: path.join(OUT, 'near-menu-190.png') });
+    // Един клик: N тръгва по правата до най-близкото място от P, там в P има истински връх и разклонение с ръка.
+    await p19.click('#objMenu [data-omk="extNear"]');
+    await frame();
+    const s1 = await st();
+    check(!s1.menu && !s1.extOn && JSON.stringify(s1.firstN) === '[1000,0]' && /N1855/.test(s1.len) && /P2000/.test(s1.len) && s1.hj === '100' && s1.ends === 'P0,P2000,N1855,F0,F1000',
+      tag + 'клик: N стига до P (+855 м, без влачене), в P е вмъкнат връх, краят на N вече не е свободен: ' + JSON.stringify([s1.len, s1.firstN, s1.ends]));
+    check(s1.hand.length === 1 && s1.hand[0][0] === 1000 && Math.abs(s1.hand[0][1]) <= 1 && s1.hand[0][2] === 3 && s1.gaps === 0 && /^\[\{"a":0,"b":855/.test(s1.ext),
+      tag + 'разклонение с ръка при 1000 м на P (три клона), 855-те м са в t.ext и не са дупка: ' + JSON.stringify([s1.hand, s1.ext, s1.gaps]));
+    check(/^Разклонение: „Права N“ стига до „Права P“ \(\+855\s?м\)\. „Отмени“ го връща\.$/.test(s1.toast), tag + 'съобщението: ' + s1.toast);
+    await p19.screenshot({ path: path.join(OUT, 'near-joined-190.png') });
+    await p19.click('#undoBtn');
+    const s2 = await st();
+    check(s2.len === s0.len && s2.n === s0.n && s2.ends === s0.ends && s2.hj === '000', tag + '„Отмени“ връща N и P както бяха: ' + s2.len);
+    // F: най-близката линия е на 1200 м - над тавана: ред за един клик няма, „Удължи/Скъси“ остава за ръката.
+    await at(2000, -1600, 15);
+    const mF = await menuAt(2000, -1800);
+    check(!mF.some(b => /^extNear:/.test(b)) && mF.some(b => b === 'ext:Удължи/Скъси · началото свободен край · 1,20 км'),
+      tag + 'краят на F е на 1200 м от P - над тавана няма „Свържи с най-близката линия“, „Удължи/Скъси“ стои: ' + mF.join(' | '));
+    await p19.keyboard.press('Escape');
+    // 390 px: менюто с новия ред се побира.
+    await p19.setViewportSize({ width: 390, height: 844 });
+    await at(1000, 1000, 15);
+    const mN3 = await menuAt(1000, 1300);
+    const fit = await p19.evaluate(() => { const r = document.querySelector('#objMenu').getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), w: innerWidth, sw: document.documentElement.scrollWidth }; });
+    check(mN3[1] === 'extNear:Свържи с най-близката линия свободен край · Права P · 855 м' && fit.l >= 0 && fit.r <= fit.w && fit.sw <= fit.w, tag + '390 px: менюто с „Свържи с най-близката линия“ се побира: ' + JSON.stringify(fit));
+    await p19.screenshot({ path: path.join(OUT, 'near-menu-190-390.png') });
+    await p19.keyboard.press('Escape');
+    await p19.setViewportSize({ width: 1280, height: 800 });
+    // „Настройки“ → „Дупки“: 500 по подразбиране, полето поема 1000, над тавана се стяга до 1000; бележката казва тавана и подразбирането.
+    await p19.click('#setBtn');
+    await p19.click('#dlgSettings [data-settab="gaps"]');
+    const g0 = await p19.evaluate(() => { const i = document.querySelector('#setGap'); return { v: i.value, max: i.maxLength, note: document.querySelector('[data-i18n="set.gap.note"]').textContent }; });
+    check(g0.v === '500' && g0.max === 4 && /Таван 1000 м, по подразбиране 500 м\./.test(g0.note), tag + '„Затваряй сами дупките до“: 500 м, полето поема 4 цифри, бележката: ' + JSON.stringify(g0));
+    await p19.fill('#setGap', '1000');
+    const g1 = await p19.evaluate(() => ({ set: __gpxk.SET.gap, stored: JSON.parse(localStorage.getItem('gpxk.settings')).gap }));
+    await p19.fill('#setGap', '1500');
+    await p19.evaluate(() => document.querySelector('#setGap').dispatchEvent(new Event('change', { bubbles: true })));
+    const g2 = await p19.evaluate(() => ({ set: __gpxk.SET.gap, v: document.querySelector('#setGap').value }));
+    check(g1.set === 1000 && g1.stored === 1000 && g2.set === 1000 && g2.v === '1000', tag + 'въведени 1000 остават 1000; 1500 се стяга до тавана 1000: ' + JSON.stringify([g1, g2]));
+    await p19.screenshot({ path: path.join(OUT, 'settings-gap-190.png') });
+    await p19.click('#setReset');
+    check(await p19.evaluate(() => __gpxk.SET.gap === 500 && document.querySelector('#setGap').value === '500'), tag + '„Връщане по подразбиране“ връща 500 м');
+    await p19.keyboard.press('Escape');
+    // Двата езика.
+    const keys = ['om.near', 'om.near.sub', 'set.gap.note', 'msg.autoClosed.1', 'msg.autoClosed.n', 'mode.cut.title', 'mode.add.title', 'cut.sub', 'dups.clean.title', 'dups.note2', 'hint'];
+    const lang = await p19.evaluate(ks => ({ miss: ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }),
+      old: ks.filter(k => /500 (м|m)\b/.test((I18N.all[k] || []).join(' ')) && k !== 'set.gap.note'), ac: I18N.all['msg.autoClosed.1'] }), keys);
+    check(!lang.miss.length && !lang.old.length && lang.ac[0] === 'Дупка (до {max}) е затворена сама.' && lang.ac[1] === 'A gap (up to {max}) closed by itself.',
+      tag + 'низовете са на двата езика, без стария таван от 500 м, „Дупка (до …) е затворена сама“' + (lang.miss.length || lang.old.length ? ': ' + JSON.stringify(lang) : ''));
+    check(!e19.length, tag + 'конзолата е чиста' + (e19.length ? ': ' + e19.join(' | ') : ''));
+    await c19.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));

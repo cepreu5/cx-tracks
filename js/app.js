@@ -1128,7 +1128,7 @@
       if (h.g.link) return U.esc(T('tip.link')) + ' · <b>' + U.dist(h.g.len) + '</b><br>' + U.esc(T('tip.clickRemove'));
       return U.esc(T('tip.part', { n: h.g.no })) + ' · <b>' + U.km(h.g.len) + '</b><br>' + U.esc(h.g.bad ? T('tip.invalid', { why: h.g.badWhy }) : T('tip.itemMenu'));
     }
-    if (h.kind === 'gap') return U.esc(T('tip.gap')) + ' <b>' + U.dist(h.gap.d) + '</b><br>' + U.esc(Core.canBridge(h.gap) ? T('tip.gapClick') : T('tip.gapLong', { max: U.dist(Core.GAP_BRIDGE_MAX_M) }));
+    if (h.kind === 'gap') return U.esc(T('tip.gap')) + ' <b>' + U.dist(h.gap.d) + '</b><br>' + U.esc(Core.canBridge(h.gap) ? T('tip.gapClick') : T('tip.gapLong', { max: ceilM(Core.GAP_BRIDGE_MAX_M) }));
     if (h.kind === 'fork') {
       var f = forkOf(h.j);
       return U.esc(T('tip.junction')) + ' · ' + U.esc(T.n('n.branches', h.j.branches.length)) + '<br>' +
@@ -1347,7 +1347,7 @@
      се свързва направо; по-дългите остават за чертане. Един отпечатък за "Отмени" за всичко. */
   function cleanRoute() {
     var lc = liveCheck();
-    if (!A.pend.length && !(G && G.gaps.some(Core.canBridge)) && !lc.overlaps.length && !lc.holes.length) { toast(T(G && G.gaps.length ? 'msg.cleanLongOnly' : 'msg.cleanNone', { max: U.dist(Core.GAP_BRIDGE_MAX_M) })); return; }
+    if (!A.pend.length && !(G && G.gaps.some(Core.canBridge)) && !lc.overlaps.length && !lc.holes.length) { toast(T(G && G.gaps.length ? 'msg.cleanLongOnly' : 'msg.cleanNone', { max: ceilM(Core.GAP_BRIDGE_MAX_M) })); return; }
     pushUndo();
     var n = 0;
     // Махането може да покаже нов чакащ участък - още един кръг, но не безкрайно.
@@ -1371,7 +1371,7 @@
     if (nh) routeChanged(true);
     var nl = G ? G.gaps.length : 0;
     toast(T('msg.cleaned', { n: n, g: nb }) + (no ? ' ' + T.n('msg.cleanedOvl', no) : '') + (nh ? ' ' + T.n('msg.cleanedHoles', nh) : '') +
-      (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: U.dist(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl || no || nh ? 6000 : undefined);
+      (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: ceilM(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl || no || nh ? 6000 : undefined);
   }
   /* 1.5: дупките до прага от „Настройки“ (1.9: по подразбиране 500 м, таван 1000 м) се затварят сами след махнат
      дубликат, махнато излишно разклонение и изтрит участък - празна връзка с autoClose: влиза в маршрута
@@ -1387,7 +1387,7 @@
     }).length;
     if (!n && !hs.length) return '';
     routeChanged(!n);
-    return ' ' + T.n('msg.autoClosed', n + extra, { max: U.dist(max) });
+    return ' ' + T.n('msg.autoClosed', n + extra, { max: ceilM(max) });
   }
   // Махната затворена сама дупка остава отворена: следващото действие не я затваря пак.
   function keepOpen(it) {
@@ -1426,7 +1426,7 @@
   // Клик върху пръстена (или пунктира) на дупка: до Core.GAP_BRIDGE_MAX_M се свързва направо, по-дългата остава за чертане.
   function ringGap(gp) {
     if (Core.canBridge(gp)) bridgeGap(gp);
-    else toast(T('msg.gapLong', { d: U.dist(gp.d), max: U.dist(Core.GAP_BRIDGE_MAX_M) }));
+    else toast(T('msg.gapLong', { d: U.dist(gp.d), max: ceilM(Core.GAP_BRIDGE_MAX_M) }));
   }
   /* 1.7: „Добавяне“ пипа колекцията, не маршрута. Само чертането на избрана дупка в маршрута („Начертай“ при
      дупката, „Затвори с чертане“) слага точки в маршрута; иначе точките стават връзка в колекцията (addCollPoint). */
@@ -1484,7 +1484,7 @@
     var len = U.lengthOf([best.e1.pt].concat(inner).concat([best.e2.pt]));
     ui.addPts = [];
     if (len > Core.LINK_MAX) {
-      toast(T('msg.linkLong', { d: U.dist(len), max: U.dist(Core.LINK_MAX) }), true, 6000);
+      toast(T('msg.linkLong', { d: U.dist(len), max: ceilM(Core.LINK_MAX) }), true, 6000);
       map.redraw();
       return;
     }
@@ -1628,6 +1628,8 @@
     tg.len = U.hav(x.e.pt[0], x.e.pt[1], tg.pt[0], tg.pt[1]);
     return tg.len <= Core.LINK_MAX ? tg : null;
   }
+  // 1.9: таванът и прагът се пишат в метри, както в „Настройки“ („до 1000 м“, не „до 1,00 км“).
+  function ceilM(m) { return Math.round(m) + ' ' + T('unit.m'); }
   function extCommit(e, tg) {
     var t = track(e.trackId);
     if (!t || !tg || tg.kind === 'none') return;
@@ -1931,7 +1933,7 @@
     ui.drawTarget = null;
     // 1.7: тракът продължава с права връзка през махнатото (до Core.LINK_MAX) - в колекцията не остава празно място.
     var jn = cutJoin(t, a, b);
-    toast(T(jn.joined ? 'msg.cutJoined' : jn.d ? 'msg.cutLong' : 'msg.cutDone', { len: U.km(b - a), name: t.name, d: U.dist(jn.d || 0), max: U.dist(Core.LINK_MAX) }), false, jn.d && !jn.joined ? 7000 : 5000);
+    toast(T(jn.joined ? 'msg.cutJoined' : jn.d ? 'msg.cutLong' : 'msg.cutDone', { len: U.km(b - a), name: t.name, d: U.dist(jn.d || 0), max: ceilM(Core.LINK_MAX) }), false, jn.d && !jn.joined ? 7000 : 5000);
     ui.cut = null;
     updateCutBox();
     analyzeNow();
@@ -2186,7 +2188,7 @@
     hideObjMenu();
     $('#tip').hidden = true;
     if (m === 'cut') toast(T('msg.cutMode'));
-    else if (m === 'add') toast(ui.drawTarget != null ? T('msg.addLink') : T('msg.addColl', { max: U.dist(Core.LINK_MAX) }), false, 6000);
+    else if (m === 'add') toast(ui.drawTarget != null ? T('msg.addLink') : T('msg.addColl', { max: ceilM(Core.LINK_MAX) }), false, 6000);
     else if (m === 'move' || m === 'remove') toast(T(m === 'move' ? 'msg.moveColl' : 'msg.removeColl'));
     map.redraw();
   }
