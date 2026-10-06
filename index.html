@@ -245,11 +245,11 @@
         <p class="dups-sum small" id="dupsSkipped"></p>
         <p class="dups-sum small" id="dupsGaps" hidden></p>
         <div class="row">
-          <button class="btn sm pri" data-act="clean-route" id="cleanBtn" data-i18n="dups.clean" data-i18n-title="dups.clean.title" title="Маха всички застъпени участъци, като от всяка група остава по едно копие (както клик върху маркер), и свързва направо отворените дупки до 500 м (по-дългите остават за чертане). &quot;Отмени&quot; връща всичко наведнъж." disabled>Изчисти преди сглобяване</button>
+          <button class="btn sm pri" data-act="clean-route" id="cleanBtn" data-i18n="dups.clean" data-i18n-title="dups.clean.title" title="Маха всички застъпени участъци, като от всяка група остава по едно копие (както клик върху маркер), и свързва направо отворените дупки до 1000 м (по-дългите остават за чертане). &quot;Отмени&quot; връща всичко наведнъж." disabled>Изчисти преди сглобяване</button>
           <button class="btn sm" data-act="dup-check" id="dupCheckBtn" data-i18n-title="dc.btn.title" title="Трите условия за готова колекция: маркирани дубликати, застъпвания без маркер (под прага от 100 м, разминаване над отклонението, къс завой на косата) и отворени малки дупки. Броячът е на живо; копчето показва списъка."><span data-i18n="dc.btn">Проверка за дубликати</span> <span class="dc-n num" id="dcCount"></span></button>
         </div>
         <div id="dupCheckRes" class="dupcheck" role="status" aria-live="polite" hidden></div>
-        <p class="muted small"><span data-i18n="dups.note1">Участък, който минава по-близо от </span><b class="tolVal"></b><span data-i18n="dups.note2"> до вече приетото трасе, получава маркер по средата си. Числото в маркера казва колко застъпени участъка събира кликът; посочването (на телефон - задържането) осветява удвоения участък. Клик върху маркера маха застъпените участъци от маршрута и от картата, като остава едно копие; "Отмени" ги връща. Дупка, по-къса от отклонението, се затваря сама; по-дългата получава кехлибарен пръстен, който я свързва направо, ако е до 500 м. Отклонението се сменя с полето "Отклонение" в лентата.</span></p>
+        <p class="muted small"><span data-i18n="dups.note1">Участък, който минава по-близо от </span><b class="tolVal"></b><span data-i18n="dups.note2"> до вече приетото трасе, получава маркер по средата си. Числото в маркера казва колко застъпени участъка събира кликът; посочването (на телефон - задържането) осветява удвоения участък. Клик върху маркера маха застъпените участъци от маршрута и от картата, като остава едно копие; "Отмени" ги връща. Дупка, по-къса от отклонението, се затваря сама; по-дългата получава кехлибарен пръстен, който я свързва направо, ако е до 1000 м. Отклонението се сменя с полето "Отклонение" в лентата.</span></p>
         </div>
       </section>
     </div>
@@ -463,8 +463,8 @@
       <p class="muted small" data-i18n="set.alpha.note">Важи за трите менюта над картата: на разклонението, на участъка и на точката. При 50% тракът под менюто се вижда, а буквите се четат. 0% - плътно меню.</p>
     </section>
     <section class="set-pane" data-setpane="gaps" role="tabpanel" hidden>
-      <label class="set-row"><span data-i18n="set.gap">Затваряй сами дупките до</span><input type="text" id="setGap" class="num" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" value="100"><span data-i18n="unit.m">м</span></label>
-      <p class="muted small" data-i18n="set.gap.note">0 значи никога: всички дупки остават с пръстен и с двата бутона. Таван 500 м. Важи след махнат дубликат, махнато излишно разклонение и изтрит участък; затворената сама дупка е тънка прекъсната линия - в маршрута и в .gpx е, но не е част.</p>
+      <label class="set-row"><span data-i18n="set.gap">Затваряй сами дупките до</span><input type="text" id="setGap" class="num" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off" value="500"><span data-i18n="unit.m">м</span></label>
+      <p class="muted small" data-i18n="set.gap.note">0 значи никога: всички дупки остават с пръстен и с двата бутона. Таван 1000 м, по подразбиране 500 м. Важи след махнат дубликат, махнато излишно разклонение и изтрит участък; затворената сама дупка е тънка прекъсната линия - в маршрута и в .gpx е, но не е част.</p>
     </section>
     <section class="set-pane" data-setpane="colors" role="tabpanel" hidden>
       <div class="set-colors" id="setColors"></div>

@@ -1373,7 +1373,7 @@
     toast(T('msg.cleaned', { n: n, g: nb }) + (no ? ' ' + T.n('msg.cleanedOvl', no) : '') + (nh ? ' ' + T.n('msg.cleanedHoles', nh) : '') +
       (nl ? ' ' + T.n('msg.cleanedLong', nl, { max: U.dist(Core.GAP_BRIDGE_MAX_M) }) : ''), false, nl || no || nh ? 6000 : undefined);
   }
-  /* 1.5: малките дупки (до прага от „Настройки“, по подразбиране 100 м) се затварят сами след махнат
+  /* 1.5: дупките до прага от „Настройки“ (1.9: по подразбиране 500 м, таван 1000 м) се затварят сами след махнат
      дубликат, махнато излишно разклонение и изтрит участък - празна връзка с autoClose: влиза в маршрута
      и в .gpx, но не е част. По-дългите остават с пръстена. Връща добавката към съобщението ('' - нищо). */
   function autoClose() {
@@ -1455,7 +1455,7 @@
     return ui.openEnds.ends;
   }
   function endsNear(ends, p) {
-    var R = Math.min(Core.LINK_MAX / 2, Math.max(ADD_SNAP_M, ADD_SNAP * map.metersPerPixel()));
+    var R = Math.min(Core.LINK_SNAP_M, Math.max(ADD_SNAP_M, ADD_SNAP * map.metersPerPixel()));
     return ends.map(function (e) { return { e: e, d: U.hav(p.lat, p.lon, e.pt[0], e.pt[1]) }; })
       .filter(function (x) { return x.d <= R; }).sort(function (a, b) { return a.d - b.d; });
   }
@@ -1613,6 +1613,20 @@
       return { kind: 'junc', trackId: o.id, d: ln.d, pt: ln.pt, dist: ln.dist };
     }
     return { kind: 'new', pt: [p.lat, p.lon] };
+  }
+  /* 1.9 „Свържи с най-близката линия“: каквото би станало, ако точката с кръстчето се пусне в най-близкото място от
+     друга линия (x.near от extRows) - разклонение, а до края на парчето (Core.JOIN_MIN) свързване на двата края.
+     null - няма линия или е над Core.LINK_MAX (тогава остава „Удължи/Скъси“ с ръка). */
+  function nearTarget(x) {
+    var n = x.near, o = n && track(String(n.trackId).replace(/~$/, ''));
+    if (!o) return null;
+    var op = Core.partAt(o, n.d), tg = { kind: 'junc', trackId: o.id, d: n.d, pt: n.pt, dist: n.dist };
+    if (op) {
+      var end = n.d - op[0] < op[1] - n.d ? op[0] : op[1];
+      if (Math.abs(n.d - end) < Core.JOIN_MIN && !(o.id === x.e.trackId && Math.abs(end - x.e.d) <= 1)) tg = { kind: 'join', trackId: o.id, d: end, pt: Core.pointAt(o, end), dist: n.dist };
+    }
+    tg.len = U.hav(x.e.pt[0], x.e.pt[1], tg.pt[0], tg.pt[1]);
+    return tg.len <= Core.LINK_MAX ? tg : null;
   }
   function extCommit(e, tg) {
     var t = track(e.trackId);
@@ -2010,8 +2024,12 @@
     }
     btns[0].cls = 'pri';
     // 1.8: „Удължи/Скъси“ - точно под първото копче, по един ред за всеки свободен край на трака.
-    if (t) extRows(t).forEach(function (x) {
-      var mid = x.e.d > 1 && x.e.d < t.len - 1;
+    // 1.9: над него „Свържи с най-близката линия“ - един клик, ако най-близката линия е до тавана (Core.LINK_MAX).
+    var xr = t ? extRows(t) : [], nears = xr.map(nearTarget), nn = nears.filter(Boolean).length;
+    xr.forEach(function (x, xi) {
+      var mid = x.e.d > 1 && x.e.d < t.len - 1, tg = nears[xi];
+      if (tg) btns.push({ key: 'extNear', label: T('om.near') + (nn > 1 ? ' · ' + T(x.e.side === 'b' ? 'om.ext.b' : 'om.ext.a') : ''),
+        sub: T('om.near.sub', { name: trackLabel(track(tg.trackId)), d: U.dist(tg.len) }), run: function () { extCommit(x.e, tg); } });
       btns.push({ key: 'ext', label: T('om.ext', { end: T(x.e.side === 'b' ? 'om.ext.b' : 'om.ext.a') }) + (mid ? ' · ' + U.kmShort(x.e.d) : ''),
         sub: x.near ? T('om.ext.sub', { d: U.dist(x.near.dist) }) : T('om.ext.free'), run: function () { startExt(x.e); } });
     });
