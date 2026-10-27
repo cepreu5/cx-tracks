@@ -410,9 +410,10 @@
     stroke(ctx, C.casing, w + 3);
     stroke(ctx, color, w, dash);
   }
+  // Номерът на част от маршрута - квадрат, за да се различава от кръглите маркери на дубликатите.
   function badge(ctx, x, y, text, fill, r) {
     r = r || 10;
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.rect(x - r, y - r, r * 2, r * 2);
     ctx.fillStyle = fill; ctx.fill();
     ctx.lineWidth = 2; ctx.strokeStyle = C.casing; ctx.stroke();
     ctx.fillStyle = C.casing;
