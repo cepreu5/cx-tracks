@@ -198,11 +198,22 @@
     set: function (k, v) { try { localStorage.setItem('gpxk.' + k, JSON.stringify(v)); } catch (e) { /* пълно или забранено */ } }
   };
 
+  /* Завъртането на целия кадър в изглед „Картина“ по ъгъла на посоката (същия, по който се
+     върти и картата): градусите за CSS са обратни (-a), за да сочи нагоре посоката a, а слоят
+     се увеличава леко, за да не остават празни ъгли - 1 при север нагоре, около 1,14 при 52°,
+     както в макета на плана. Надписите се противовъртат на същия ъгъл (+a), за да се четат
+     изправени: това е -deg от върнатото. */
+  function picTurn(a) {
+    var b = isFinite(a) ? Number(a) : 0;
+    return { deg: b ? -b : 0, scale: 1 + 0.18 * Math.abs(Math.sin(b * Math.PI / 180)) };
+  }
+
   window.U = {
     num: num, km: km, kmShort: kmShort, meters: meters, dist: dist, pct: pct,
     date: date, dateShort: dateShort, dateDots: dateDots, duration: duration,
     hav: hav, bearing: bearing, dirName: dirName, cumulative: cumulative, lengthOf: lengthOf,
     boundsOf: boundsOf, projectSeg: projectSeg, uid: uid, esc: esc, debounce: debounce,
-    slug: slug, download: download, cssVar: cssVar, DB: DB, LS: LS, RAD: RAD, list: list
+    slug: slug, download: download, cssVar: cssVar, DB: DB, LS: LS, RAD: RAD, list: list,
+    picTurn: picTurn
   };
 })();

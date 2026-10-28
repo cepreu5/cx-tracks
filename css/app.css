@@ -317,7 +317,11 @@ body.walkbar-on .toast { bottom: 118px; }
 .toast.err { background: var(--app-danger); color: var(--app-surface); }
 
 /* Запазената картина върху мястото на картата */
-.picview { position: absolute; inset: 0; z-index: 16; background: var(--app-map-bg); }
+/* overflow: hidden - при завъртян кадър нищо не излиза извън екрана (ъглите на слоя се режат оттук) */
+.picview { position: absolute; inset: 0; z-index: 16; background: var(--app-map-bg); overflow: hidden; }
+/* Слоят, който се върти: цялата картина с линиите и точките, около центъра на екрана (transform-origin 50% 50%).
+   Ъгълът и лекото увеличение ги слага turnPic() в js/app.js; при север нагоре няма transform. */
+.pic-turn { position: absolute; inset: 0; transform-origin: 50% 50%; will-change: transform; }
 .pic-scroll { position: absolute; inset: 0; overflow: auto; -webkit-overflow-scrolling: touch; padding-top: 92px; }
 body.bar-hidden .pic-scroll { padding-top: 0; }
 .pic-inner { position: relative; margin: 0 auto; }
@@ -327,6 +331,10 @@ body.bar-hidden .pic-scroll { padding-top: 0; }
 .pic-ctl { position: absolute; right: 10px; bottom: 26px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .pic-ctl .btn.ico { width: 38px; padding-left: 0; padding-right: 0; background: var(--app-overlay); }
 .pic-ctl .pic-one { font-size: 12px; font-weight: 600; font-family: var(--app-mono); }
+/* „Север / Посока“ в „Картина“: същата пилула като на картата, най-горе в колоната на копчетата.
+   Слотът е display:contents, за да е копчето ред на самата колона (подредбата и отстоянията идват от .pic-ctl). */
+.pic-compass-slot { display: contents; }
+.pic-compass { position: relative; right: auto; top: auto; }
 
 /* Под картата - всичко останало, скролва се */
 .panel { max-width: 1240px; margin: 0 auto; padding: 14px 14px 40px; }

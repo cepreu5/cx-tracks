@@ -143,9 +143,16 @@
     <button type="button" class="btn sm om-cancel" data-om="cancel" data-i18n="act.cancel">Отказ</button>
   </div>
   <div id="picView" class="picview" hidden>
-    <div id="picScroll" class="pic-scroll"><div id="picInner" class="pic-inner"><img id="picImg" data-i18n-alt="pic.alt" alt="Запазена картина на маршрута"><svg id="picSvg"></svg></div></div>
+    <!-- Целият кадър се върти на едно място („Север / Посока“): снимката, линиите, точките и кръгчето
+         за положението са в един слой и се въртят заедно около центъра на екрана, а надписите се
+         противовъртат, за да се четат изправени. Виж turnPic() в js/app.js. -->
+    <div id="picTurn" class="pic-turn"><div id="picScroll" class="pic-scroll"><div id="picInner" class="pic-inner"><img id="picImg" data-i18n-alt="pic.alt" alt="Запазена картина на маршрута"><svg id="picSvg"></svg></div></div></div>
     <!-- Колона като "+ / − / Центрирай / ▣" на картата: "Към картата", "1:1" и "▣" (цялата картина) - не стига до стрелката нагоре -->
     <div class="pic-ctl">
+      <!-- „Север / Посока“ и в този изглед, като на картата: същият избор върти и картата, и картината.
+           Слотът е с display:contents, за да е в колоната до „Към картата“, „1:1“ и „▣“, без да е
+           сред трите квадратни копчета на колоната. -->
+      <div class="pic-compass-slot"><button id="picNorthBtn" class="compass pic-compass" type="button" data-act="north" data-i18n-title="compass.pic.north.title" data-i18n-aria="compass.pic.north.aria" title="Върни север нагоре в картината" aria-label="Север - върни север нагоре в картината" hidden><span class="rose" aria-hidden="true"><i class="needle"></i><b class="n" data-i18n="compass.n">С</b></span><span id="picNorthLbl" data-i18n="orient.north">Север</span></button></div>
       <button class="btn ico" data-act="pic-close" id="picCloseBtn" data-i18n-title="pic.close" data-i18n-aria="pic.close" title="Към картата" aria-label="Към картата"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z"/><path d="M9 4.5v12.7M15 6.8v12.7"/></svg></button>
       <button class="btn ico pic-one" data-act="pic-1" data-i18n-title="pic.one" data-i18n-aria="pic.one" title="1:1 - точка за точка" aria-label="1:1 - точка за точка">1:1</button>
       <button class="btn ico" data-act="pic-fit" id="picFitBtn" data-i18n-title="pic.fit" data-i18n-aria="pic.fit" title="Цялата картина" aria-label="Цялата картина">&#9635;</button>
