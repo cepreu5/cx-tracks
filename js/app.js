@@ -33,7 +33,7 @@
     mode: 'select', hover: null, hl: null, cut: null, drawTarget: null, sel: null,
     undo: [], base: U.LS.get('base', 'sat'), labels: U.LS.get('labels', true), vtxShow: U.LS.get('vtxShow', true),
     grade: U.LS.get('grade', true), fold: U.LS.get('fold', {}), follower: null, pos: null, prog: null, followView: 'map',
-    autoCenter: true, pin: null, profHover: null, picUrl: null, picMeta: null,
+    autoCenter: true, pin: null, profHover: null, picUrl: null, picMeta: null, picLabels: [], picAt: null,
     orient: U.LS.get('orient', 'heading') === 'north' ? 'north' : 'heading', heading: null, lastWalk: null, lastPos: null, rot: 0, nameJob: null,
     awake: U.LS.get('awake', true) !== false, om: null, redundant: []
   };
@@ -2862,7 +2862,7 @@
     v.hidden = !show;
     ui.followView = show ? 'pic' : 'map';
     $$('#followBar [data-view]').forEach(function (b) { b.classList.toggle('on', b.dataset.view === ui.followView); });
-    if (show) { picFit(); drawPicOverlay(); }
+    if (show) { picFit(); drawPicOverlay(); turnPic(); }
   }
   function picFit(one) {
     var m = ui.picMeta; if (!m) return;
@@ -2876,6 +2876,8 @@
     if (one && ui.pos) {
       var q = Snapshot.toPic(m, ui.pos.lat, ui.pos.lon);
       sc.scrollLeft = q[0] - avW / 2; sc.scrollTop = q[1] - avH / 2;
+      // Това скролване е програмно - не се брои за дръпване с пръст (виж bind, „Картина“).
+      ui.picAt = { l: sc.scrollLeft, t: sc.scrollTop };
     }
   }
   function drawPicOverlay() {
@@ -2913,6 +2915,36 @@
       out.push('<text x="' + (q[0] + 16 * s) + '" y="' + (q[1] - 12 * s) + '" font-size="' + 15 * s + '" font-weight="700" fill="' + '#1f1d1a' + '" stroke="' + C.casing + '" stroke-width="' + 4 * s + '" paint-order="stroke" font-family="sans-serif">' + U.esc(label) + '</text>');
     }
     svg.innerHTML = out.join('');
+    // Надписите (имената на точките и „Тук си“) се помнят с котвите си, за да се противъртат
+    // при завъртян кадър и да се четат изправени.
+    ui.picLabels = [];
+    Array.prototype.forEach.call(svg.querySelectorAll('text'), function (el) {
+      ui.picLabels.push({ el: el, x: el.getAttribute('x'), y: el.getAttribute('y') });
+    });
+    turnPic();
+  }
+
+  /* Завъртането на изгледа „Картина“: същото състояние като на картата (ui.rot), затова „Север / Посока“
+     е един избор за двата изгледа. Целият кадър - снимка, линии, точки и кръгчето за положението - е в
+     един слой (#picTurn) и се върти наведнъж около центъра на екрана; нищо не се върти само.
+     Надписите в SVG-а се противовъртат около собствената си котва, за да останат изправени, а слоят се
+     увеличава леко (U.picTurn), за да не остават празни ъгли. При север нагоре няма transform - изгледът
+     е точно същият като преди. */
+  function turnPic() {
+    var t = $('#picTurn');
+    if (!t) return;
+    var r = ui.rot || 0, turn = U.picTurn(r);
+    t.style.transform = r ? 'rotate(' + turn.deg.toFixed(2) + 'deg) scale(' + turn.scale.toFixed(3) + ')' : '';
+    var back = (-turn.deg).toFixed(2);
+    (ui.picLabels || []).forEach(function (x) {
+      x.el.setAttribute('transform', r ? 'rotate(' + back + ' ' + x.x + ' ' + x.y + ')' : '');
+    });
+  }
+
+  /* Дръпването с пръст (или мишка) в „Картина“ спира автоматичното въртене по движението - точно както
+     дръпването на картата. „Посока“ го включва пак. */
+  function picDragged() {
+    if (ui.follower && ui.followView === 'pic') ui.autoCenter = false;
   }
 
   // ---- Следене ----
@@ -3266,9 +3298,10 @@
     if (j < 0) return null;
     return U.bearing(rec[j][0], rec[j][1], rec[i][0], rec[i][1]);
   }
-  // При следене в изглед "Карта" посоката сочи нагоре - докато картата не е дръпната встрани.
+  // При следене посоката на движение сочи нагоре - и на картата, и в „Картина“ (един и същ ъгъл за
+  // двата изгледа), докато изгледът не е дръпнат встрани.
   function followBearing() {
-    if (ui.follower && ui.followView === 'map' && ui.autoCenter && ui.orient === 'heading' && ui.heading != null) map.setBearing(ui.heading);
+    if (ui.follower && ui.autoCenter && ui.orient === 'heading' && ui.heading != null) map.setBearing(ui.heading);
   }
   function setOrient(o) {
     ui.orient = o === 'north' ? 'north' : 'heading';
@@ -3276,28 +3309,36 @@
     $$('#followBar [data-orient]').forEach(function (b) { b.classList.toggle('on', b.dataset.orient === ui.orient); });
     // И извън следене: "Север" изправя картата, "Посока" я връща към последната известна посока.
     if (ui.orient === 'north') map.setBearing(0);
-    else if (ui.heading != null && (!ui.follower || ui.followView === 'map')) {
+    else if (ui.heading != null) {
+      // „Посока“ включва пак автоматичното въртене по движението - и в „Карта“, и в „Картина“.
       if (ui.follower) ui.autoCenter = true;
       map.setBearing(ui.heading);
     }
     showCompass();
   }
-  /* Стрелката "С" и двурежимното копче върху картата: "Север", докато картата е завъртяна;
-     "Посока", докато е север-нагоре, а посоката на движение е известна (и след "Стоп").
-     Без известна посока - само "Север", и то само при завъртяна карта. */
+  /* Стрелката "С" и двурежимното копче - върху картата и в изглед „Картина“ (един и същ вид и един и същ
+     избор): "Север", докато кадърът е завъртян; "Посока", докато е север-нагоре, а посоката на движение е
+     известна (и след "Стоп"). Без известна посока - само "Север", и то само при завъртян кадър. */
   function showCompass(rot) {
     if (rot != null) ui.rot = rot;
-    var b = $('#northBtn'), r = ui.rot || 0;
+    var r = ui.rot || 0;
     var offer = r ? 'north' : ui.heading != null ? 'heading' : '';
-    b.hidden = !offer;
-    b.dataset.offer = offer;
-    $('#northLbl').textContent = offer === 'heading' ? T('orient.heading') : T('orient.north');
-    b.setAttribute('aria-label', offer === 'heading' ? T('compass.heading.aria') : T('compass.north.aria'));
-    b.title = offer === 'heading' ? T('compass.heading.title') : T('compass.north.title');
-    b.style.setProperty('--rose', (-r).toFixed(1) + 'deg');
+    [[$('#northBtn'), $('#northLbl'), ''], [$('#picNorthBtn'), $('#picNorthLbl'), '.pic']].forEach(function (x) {
+      var b = x[0], lbl = x[1], k = x[2];
+      if (!b || !lbl) return;
+      b.hidden = !offer;
+      b.dataset.offer = offer;
+      lbl.textContent = offer === 'heading' ? T('orient.heading') : T('orient.north');
+      b.setAttribute('aria-label', offer === 'heading' ? T('compass' + k + '.heading.aria') : T('compass' + k + '.north.aria'));
+      b.title = offer === 'heading' ? T('compass' + k + '.heading.title') : T('compass' + k + '.north.title');
+      b.style.setProperty('--rose', (-r).toFixed(1) + 'deg');
+    });
+    turnPic();
   }
-  function northUp() {
-    setOrient($('#northBtn').dataset.offer === 'heading' ? 'heading' : 'north');
+  // Което и от двете копчета „Север / Посока“ е натиснато - върши същото.
+  function northUp(el) {
+    var b = el && el.dataset ? el : $('#northBtn');
+    setOrient(b.dataset.offer === 'heading' ? 'heading' : 'north');
   }
   /* "Центрирай" (долу вдясно, при "+" и "−"): върху положението от GPS. При следене връща и
      автоматичното центриране и посоката; извън следене - последното известно положение,
@@ -3661,7 +3702,7 @@
       case 'walk-gpx-done': if (ui.lastWalk) { var lt = track(ui.lastWalk.trackId); walkGpx(ui.lastWalk.pts, ui.lastWalk.name, ui.lastWalk.title, lt ? lt.wpts : ui.lastWalk.wpts); } break;
       case 'walk-point': askPoint(); break;
       case 'center': centerMe(); break;
-      case 'north': northUp(); break;
+      case 'north': northUp(el); break;
       case 'walkbar-close': if (ui.lastWalk) { ui.lastWalk.bar = false; U.DB.set('lastWalk', ui.lastWalk); } showWalk(); break;
       case 'walk-forget': forgetWalk(); $('#followPanel').hidden = true; break;
       case 'live-save': liveDone('save'); break;
@@ -3753,6 +3794,24 @@
     $('#dlgWalk').addEventListener('close', function () { ui.walkJob = null; });
     $$('#followBar [data-view]').forEach(function (b) { b.addEventListener('click', function () { showPic(b.dataset.view === 'pic'); followBearing(); }); });
     $$('#followBar [data-orient]').forEach(function (b) { b.addEventListener('click', function () { setOrient(b.dataset.orient); }); });
+    /* Дръпването в „Картина“ спира автоматичното въртене по движението (както на картата): всичко,
+       което мести изгледа - скрол, влачене с пръст или мишка, отнет жест при скрол - се брои за дръпване.
+       Програмното скролване на „1:1“ не се брои: то оставя ui.picAt на мястото, което е сложило. */
+    (function () {
+      var sc = $('#picScroll'), down = null;
+      sc.addEventListener('scroll', function () {
+        if (ui.picAt && Math.abs(sc.scrollLeft - ui.picAt.l) < 1 && Math.abs(sc.scrollTop - ui.picAt.t) < 1) return;
+        picDragged();
+      }, { passive: true });
+      sc.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY }; });
+      sc.addEventListener('pointermove', function (e) {
+        if (!down) return;
+        if (Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y) > 8) { down = null; picDragged(); }
+      });
+      sc.addEventListener('pointerup', function () { down = null; });
+      // Отнет жест: браузърът пое влаченето за скрол - това също е дръпване.
+      sc.addEventListener('pointercancel', function () { down = null; picDragged(); });
+    })();
 
     $('#routeName').addEventListener('input', function (e) {
       cur().name = e.target.value.trim() || T('route.def');

@@ -52,6 +52,30 @@ function rotState() {
     northAng: ang([north.x - c.x, north.y - c.y]), roundTrip: Math.hypot(again.x - c.x - 37, again.y - c.y + 51)
   };
 }
+// Изглед „Картина“ (1.9.3): завъртането на целия кадър, надписите и копчето „Север / Посока“.
+function picState() {
+  const v = document.querySelector('#picView'), tr = document.querySelector('#picTurn'), b = document.querySelector('#picNorthBtn');
+  const cs = getComputedStyle(tr), tf = cs.transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : cs.transform, m = new DOMMatrixReadOnly(tf);
+  const rr = tr.getBoundingClientRect(), og = (cs.transformOrigin || '').split(' ').map(parseFloat);
+  const img = document.querySelector('#picImg').getBoundingClientRect(), svg = document.querySelector('#picSvg').getBoundingClientRect(), br = b.getBoundingClientRect();
+  const texts = [...document.querySelectorAll('#picSvg text')].map(el => {
+    const r = el.getBoundingClientRect(), a = (el.getAttribute('transform') || '').match(/rotate\(([-0-9.]+)/);
+    return { ratio: r.height ? r.width / r.height : 0, back: a ? parseFloat(a[1]) : 0, x: +el.getAttribute('x'), y: +el.getAttribute('y') };
+  });
+  return {
+    shown: !v.hidden, deg: Math.atan2(m.b, m.a) * 180 / Math.PI, scale: Math.hypot(m.a, m.b),
+    rot: __gpxk.map.getBearing(), rotTo: __gpxk.map.rotTo, heading: __gpxk.ui.heading, auto: __gpxk.ui.autoCenter, orient: __gpxk.ui.orient,
+    // Колко далеч е центърът на завъртане от центъра на кутията на слоя: 0 - върти се около центъра на екрана.
+    origin: Math.hypot(og[0] - (rr.left + rr.width / 2), og[1] - (rr.top + rr.height / 2)),
+    clip: getComputedStyle(v).overflow === 'hidden',
+    // Снимката, линиите и точките са в един и същ слой, точно една върху друга.
+    layer: tr.contains(document.querySelector('#picImg')) && tr.contains(document.querySelector('#picSvg')) &&
+      Math.abs(img.left - svg.left) < 1 && Math.abs(img.top - svg.top) < 1 && Math.abs(img.width - svg.width) < 1,
+    texts,
+    btn: { shown: !b.hidden && br.width > 0, text: b.textContent.trim(), offer: b.dataset.offer, aria: b.getAttribute('aria-label'), label: b.querySelector('.n').textContent,
+      onScreen: br.right <= innerWidth + 0.5 && br.left >= 0 && br.bottom <= innerHeight + 0.5 && br.top >= 0 }
+  };
+}
 // Копчето "Следене / Стоп" върху картата: видимо, текст, състояние и място спрямо "Лента" и контролите вдясно.
 function fabState() {
   const b = document.querySelector('#followMapBtn'), r = b.getBoundingClientRect(), t = document.querySelector('.mapctl.tr').getBoundingClientRect();
@@ -453,6 +477,63 @@ function barFits() {
   check(rs.auto && angDiff(rs.rot, rs.heading) < 0.5 && posPx < 1, '"Центрирай" връща и центъра, и посоката (' + rs.rot.toFixed(1) + '°, ' + posPx.toFixed(2) + ' px от центъра)');
   await page.click('#followBar [data-view="pic"]');
   check(await page.isVisible('#picView') && await page.evaluate(() => document.querySelectorAll('#picSvg circle').length > 0), 'следене върху запазената картина: положението е върху нея');
+  // ---- 1.9.3: „Картина“ се върти цяла - снимка, линии, точки и кръгчето заедно, около центъра на екрана ----
+  await settled(page);
+  const turnG = d => ((d % 360) + 360) % 360;
+  const pv = await page.evaluate(picState);
+  check(pv.shown && pv.rot > 1 && angDiff(turnG(pv.deg), turnG(360 - pv.rot)) < 0.6 && pv.scale > 1.05,
+    '1.9.3: в „Картина“ целият кадър е завъртян по посоката на движение - ' + pv.rot.toFixed(1) + '° нагоре, слоят на ' + pv.deg.toFixed(1) + '°, увеличен x' + pv.scale.toFixed(2));
+  check(pv.layer && pv.clip && pv.origin < 1.5,
+    '1.9.3: снимката, линиите, точките и кръгчето са в един слой, който се върти около центъра на екрана и не пуска нищо извън екрана (отстояние на центъра ' + pv.origin.toFixed(2) + ' px)');
+  const upN = pv.texts.filter(t => t.ratio > 3).length;
+  check(pv.texts.length > 0 && upN === pv.texts.length && pv.texts.every(t => Math.abs(t.back - pv.rot) < 0.6),
+    '1.9.3: надписите са изправени при завъртян кадър - надписи: ' + pv.texts.length + ', противовъртени на ' + (pv.texts[0] || {}).back + '° при ' + pv.rot.toFixed(1) + '° завъртане на кадъра');
+  check(pv.btn.shown && pv.btn.offer === 'north' && /Север/.test(pv.btn.text) && /картината/.test(pv.btn.aria) && pv.btn.onScreen && pv.btn.label === 'С',
+    '1.9.3: „Север / Посока“ има и в „Картина“ - вижда се, предлага „Север“ и сочи север: ' + JSON.stringify(pv.btn));
+  // На 390 px същото копче се побира в колоната и не застъпва трите квадратни копчета.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForFunction(() => document.querySelector('#picTurn').getBoundingClientRect().width > 300, null, { timeout: 3000 }).catch(() => {});
+  const pvS = await page.evaluate(() => {
+    const b = document.querySelector('#picNorthBtn').getBoundingClientRect();
+    const bs = [...document.querySelectorAll('.pic-ctl > button')].map(x => x.getBoundingClientRect());
+    const hit = (p, q) => !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top);
+    return { shown: b.width > 0 && b.left >= 0 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5, clear: bs.every(q => !hit(b, q)), square: bs.every(q => Math.round(q.width) === 38), w: Math.round(b.width) };
+  });
+  check(pvS.shown && pvS.clear && pvS.square, '1.9.3, 390 px: „Север“ се побира в колоната на картината и не застъпва „Към картата“, „1:1“ и „▣“: ' + JSON.stringify(pvS));
+  await page.screenshot({ path: path.join(OUT, 'pic-turn-390.png') });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForTimeout(200);
+  // „Север“ връща кадъра на 0°, „Посока“ пак го води по движението.
+  await page.click('#picNorthBtn');
+  await settled(page);
+  const pvN = await page.evaluate(picState);
+  check(pvN.rot === 0 && Math.abs(pvN.deg) < 0.01 && pvN.orient === 'north' && pvN.btn.offer === 'heading' && /Посока/.test(pvN.btn.text) && pvN.texts.every(t => Math.abs(t.back) < 0.01),
+    '1.9.3: „Север“ в „Картина“ изправя кадъра на 0° - слоят без завъртане, надписите без противовъртане, копчето предлага „Посока“');
+  await page.click('#picNorthBtn');
+  await settled(page);
+  const pvH = await page.evaluate(picState);
+  check(pvH.auto && pvH.orient === 'heading' && pvH.rot > 1 && angDiff(pvH.rot, pvH.heading) < 0.5,
+    '1.9.3: „Посока“ в „Картина“ пак завърта кадъра по движението (' + pvH.rot.toFixed(1) + '°, посока ' + (pvH.heading || 0).toFixed(1) + '°)');
+  // Дръпването с пръст (тук с мишката) спира автоматичното въртене; „Посока“ го включва пак.
+  const rotPic = pvH.rot;
+  const pc = await page.evaluate(() => { const r = document.querySelector('#picView').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
+  await page.mouse.move(pc.x, pc.y); await page.mouse.down(); await page.mouse.move(pc.x - 80, pc.y - 50, { steps: 5 }); await page.mouse.up();
+  check(await page.evaluate(() => !__gpxk.ui.autoCenter), '1.9.3: дръпването в „Картина“ спира автоматичното въртене');
+  const recPic = await page.evaluate(() => __gpxk.ui.follower.rec.length);
+  await ctx.setGeolocation({ latitude: 42.5040, longitude: 24.7020 });
+  await page.waitForFunction(n => __gpxk.ui.follower.rec.length > n, recPic, { timeout: 10000 });
+  await settled(page);
+  const pvD = await page.evaluate(picState);
+  check(!pvD.auto && Math.abs(pvD.rotTo - rotPic) < 0.01 && angDiff(pvD.heading, rotPic) > 30,
+    '1.9.3: дръпнатата картина не се върти по новата посока (' + pvD.heading.toFixed(1) + '°), остава ' + pvD.rotTo.toFixed(1) + '°');
+  await page.click('#picNorthBtn');
+  await settled(page);
+  await page.click('#picNorthBtn');
+  await settled(page);
+  const pvR = await page.evaluate(picState);
+  check(pvR.auto && angDiff(pvR.rot, pvR.heading) < 0.5 && angDiff(pvR.rot, rotPic) > 30,
+    '1.9.3: „Посока“ пак включва автоматичното въртене - кадърът тръгва по новата посока (' + pvR.rot.toFixed(1) + '°)');
+  await page.screenshot({ path: path.join(OUT, 'pic-turn-1280.png') });
   await page.screenshot({ path: path.join(OUT, 'follow-pic-1280.png') });
   await page.click('#followBar [data-view="map"]');
   await page.screenshot({ path: path.join(OUT, 'follow-map-1280.png') });
