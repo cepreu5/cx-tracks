@@ -7,6 +7,10 @@
   var U = window.U, Core = window.Core;
   var OFF_LIMIT = 30; // над толкова метра встрани - предупреждение
   var ON_LIMIT = 20;  // до толкова метра от линията точката е "върху трака" (за следата през дупка)
+  // До толкова метра встрани точката още се връзва към маршрута с права до най-близкото му място -
+  // същият таван, до който приложението свързва нещата по маршрута (Core.GAP_CEIL_M). По-далечна
+  // точка вече не е на маршрута и следата до нея си остава права.
+  var REJOIN_MAX = 1000;
   var RETRY_MS = 8000; // след връщане на екрана: още един опит, ако дотогава няма положение
 
   function Follower(cb) {
@@ -165,11 +169,15 @@
       return w;
     },
 
-    /* Следата между последната записана точка и новата: точките на маршрута помежду им, ако и двете
-       са до ON_LIMIT м от линията му. Напред по посоката на маршрута (при затворен кръг - през края
-       му към началото), назад само по отворен маршрут. Час - разпределен по разстояние между часовете
-       на двете точки; височина - от профила на маршрута на мястото на точката по него (cb.ele), без профил -
-       от самия трак, а без нито едно - по права между двете измерени, ако ги има; точност - празна. */
+    /* Следата между последната записана точка и новата върви по маршрута, все едно сме се движили по него.
+       Всяка от двете точки се връзва към маршрута на най-близкото си място по него: точка върху маршрута
+       (до ON_LIMIT м) ляга точно на него, а точка встрани се свързва с него с права линия по най-краткия
+       път. Между двете места по маршрута следата минава по самия маршрут - напред по посоката му (при
+       затворен кръг през края към началото), назад само по отворен маршрут. Затова и когато и двете точки
+       са встрани, следата излиза от маршрута до всяка от тях с права линия, а между двете минава по него.
+       Час - разпределен по разстояние между часовете на двете точки; височина - от профила на маршрута на
+       мястото по него (cb.ele), без профил - от самия трак, а без нито едно - по права между измерените;
+       точност - празна. */
     bridge: function (last, p) {
       var geo = this.cb.route ? this.cb.route() : null;
       var pts = geo && geo.pts, cum = geo && geo.cum;
@@ -179,16 +187,24 @@
       var a = last && this.lastOn && this.lastOn.geo === geo ? this.lastOn : null, b = null, dir = 1;
       if (last && !a) {
         var na = Core.nearestOn(pts, cum, last[0], last[1]);
-        if (na && na.dist <= ON_LIMIT) a = { d: na.d };
+        if (na && na.dist <= REJOIN_MAX && !Core.atLineEnd(pts, na)) a = { d: na.d, dist: na.dist, lat: na.lat, lon: na.lon };
       }
       if (a) {
         b = Core.alongOn(pts, cum, a.d, p[0], p[1], ON_LIMIT, 1, loop);
         if (!b && !loop) { b = Core.alongOn(pts, cum, a.d, p[0], p[1], ON_LIMIT, -1, false); dir = -1; }
+        if (!b) {
+          // Точката е встрани от маршрута: излиза се до най-близкото му място с права линия.
+          // Посоката пак се решава по местата им по маршрута, а не от неуспешното търсене назад.
+          // Точка отвъд края на маршрута не се връзва - там следата просто продължава направо.
+          var nb = Core.nearestOn(pts, cum, p[0], p[1]);
+          if (nb && nb.dist <= REJOIN_MAX && !Core.atLineEnd(pts, nb)) {
+            b = nb; dir = loop || nb.d >= a.d ? 1 : -1;
+          }
+        }
       } else {
         b = Core.nearestOn(pts, cum, p[0], p[1]);
-        if (b && b.dist > ON_LIMIT) b = null;
       }
-      this.lastOn = b ? { geo: geo, d: b.d } : null;
+      this.lastOn = b ? { geo: geo, d: b.d, dist: b.dist || 0, lat: b.lat, lon: b.lon } : null;
       if (!a || !b) return [];
       var idx = [], i;
       if (dir < 0) { for (i = n; i >= 0; i--) if (cum[i] < a.d && cum[i] > b.d) idx.push(i); }
@@ -199,18 +215,27 @@
         var same = U.hav(pts[0][0], pts[0][1], pts[n][0], pts[n][1]) < 1;
         for (i = same ? 1 : 0; i <= n; i++) if (cum[i] < b.d) idx.push(i);
       }
-      if (!idx.length) return [];
-      var way = [last].concat(idx.map(function (j) { return pts[j]; }), [p]), s = [0];
-      for (i = 1; i < way.length; i++) s.push(s[i - 1] + U.hav(way[i - 1][0], way[i - 1][1], way[i][0], way[i][1]));
+      // Пътят: двете измерени точки, местата, на които всяка ляга на маршрута (ако е встрани), и върховете
+      // на маршрута помежду им. d - мястото по маршрута, за височината и часовете.
+      var nodes = [{ p: last, d: a.d }];
+      if ((a.dist || 0) > 0.5) nodes.push({ p: [a.lat, a.lon], d: a.d });
+      idx.forEach(function (j) { nodes.push({ p: pts[j], d: cum[j] }); });
+      if ((b.dist || 0) > 0.5) nodes.push({ p: [b.lat, b.lon], d: b.d });
+      nodes.push({ p: p, d: b.d });
+      if (nodes.length < 3) return [];
+      var s = [0], cb = this.cb;
+      for (i = 1; i < nodes.length; i++) {
+        var q0 = nodes[i - 1].p, q1 = nodes[i].p;
+        s.push(s[i - 1] + U.hav(q0[0], q0[1], q1[0], q1[1]));
+      }
       var S = s[s.length - 1] || 1, out = [];
-      var cb = this.cb;
-      for (i = 1; i < way.length - 1; i++) {
-        var f = s[i] / S, j = idx[i - 1];
-        var e = cb.ele ? cb.ele(geo, cum[j]) : null;
-        if (e == null) e = pts[j][2];
+      for (i = 1; i < nodes.length - 1; i++) {
+        var f = s[i] / S, v = nodes[i].p;
+        var e = cb.ele ? cb.ele(geo, nodes[i].d) : null;
+        if (e == null) e = v[2];
         e = e != null && isFinite(e) ? Math.round(e * 10) / 10 :
           last[2] != null && p[2] != null ? Math.round(last[2] + f * (p[2] - last[2])) : null;
-        out.push([Math.round(way[i][0] * 1e6) / 1e6, Math.round(way[i][1] * 1e6) / 1e6, e,
+        out.push([Math.round(v[0] * 1e6) / 1e6, Math.round(v[1] * 1e6) / 1e6, e,
           Math.round(last[3] + f * (p[3] - last[3])), null]);
       }
       return out;
@@ -240,5 +265,6 @@
   window.Follower = Follower;
   window.Follower.OFF_LIMIT = OFF_LIMIT;
   window.Follower.ON_LIMIT = ON_LIMIT;
+  window.Follower.REJOIN_MAX = REJOIN_MAX;
   window.Follower.RETRY_MS = RETRY_MS;
 })();

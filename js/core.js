@@ -1382,7 +1382,7 @@
     var p = pts[best.i], q = pts[best.i + 1];
     return {
       d: cum[best.i] + best.t * (cum[best.i + 1] - cum[best.i]),
-      dist: Math.sqrt(best.d2), i: best.i,
+      dist: Math.sqrt(best.d2), i: best.i, t: best.t,
       lat: p[0] + best.t * (q[0] - p[0]), lon: p[1] + best.t * (q[1] - p[1])
     };
   }
@@ -1425,6 +1425,12 @@
     };
   }
   function nearestOnTrack(t, lat, lon) { prep(t); return nearestOn(t.pts, t._cum, lat, lon); }
+
+  // Място, което е в самия край на линията (началото или краят) - точка отвъд края на маршрута не се
+  // връзва за него: следата там просто продължава направо, вместо да се връща назад до края.
+  function atLineEnd(pts, m) {
+    return !m || (m.i <= 0 && m.t <= 0) || (m.i >= pts.length - 2 && m.t >= 1);
+  }
 
   // Каква част от [a,b] на трака е под дубликат или изтрит участък.
   function invalidShare(item, analysis) {
@@ -1869,7 +1875,7 @@
   }
 
   window.Core = {
-    prep: prep, analyze: analyze, slice: slice, pointAt: pointAt, nearestOn: nearestOn, alongOn: alongOn,
+    prep: prep, analyze: analyze, slice: slice, pointAt: pointAt, nearestOn: nearestOn, alongOn: alongOn, atLineEnd: atLineEnd,
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
     trackBounds: trackBounds, overlap: overlap, ROUTE_GAP: ROUTE_GAP, LINK_MIN: LINK_MIN, DUP_BRIDGE: DUP_BRIDGE,
     routeForks: routeForks, switchFork: switchFork, branchProbe: branchProbe, probeK: probeK, PROBE: PROBE, SELF_ANGLE: SELF_ANGLE,

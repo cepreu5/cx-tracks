@@ -3255,9 +3255,16 @@
      записани точки (те са поне на 5 м една от друга). При стоене остава последната. */
   function moveHeading(pos, rec) {
     if (pos.heading != null && isFinite(pos.heading) && !(pos.speed != null && pos.speed < 0.5)) return pos.heading;
-    var n = rec.length;
-    if (n < 2) return null;
-    return U.bearing(rec[n - 2][0], rec[n - 2][1], rec[n - 1][0], rec[n - 1][1]);
+    // Посоката се смята между двете последни измерени положения: вмъкнатите по маршрута точки (с празна
+    // точност) описват завоите, а последният отрязък е късото отбиване до маршрута - от него посоката
+    // би сочила встрани от движението.
+    var i = rec.length - 1;
+    while (i >= 0 && rec[i][4] == null) i--;
+    if (i < 1) return null;
+    var j = i - 1;
+    while (j >= 0 && rec[j][4] == null) j--;
+    if (j < 0) return null;
+    return U.bearing(rec[j][0], rec[j][1], rec[i][0], rec[i][1]);
   }
   // При следене в изглед "Карта" посоката сочи нагоре - докато картата не е дръпната встрани.
   function followBearing() {

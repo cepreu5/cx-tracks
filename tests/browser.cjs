@@ -41,7 +41,11 @@ function rotState() {
   const back = m.unproject(c.x + 37, c.y - 51), again = m.project(back.lat, back.lon);
   return {
     rot: m.getBearing(), rotTo: m.rotTo, heading: __gpxk.ui.heading, auto: __gpxk.ui.autoCenter, orient: __gpxk.ui.orient,
-    recHd: n > 1 ? U.bearing(rec[n - 2][0], rec[n - 2][1], rec[n - 1][0], rec[n - 1][1]) : null,
+    // Посоката по записа - между двете последни измерени положения, както я смята и приложението
+    // (вмъкнатите по маршрута точки са с празна точност и последният отрязък е отбиването до маршрута).
+    recHd: (() => { let i = rec.length - 1; while (i >= 0 && rec[i][4] == null) i--; if (i < 1) return null;
+      let j = i - 1; while (j >= 0 && rec[j][4] == null) j--; if (j < 0) return null;
+      return U.bearing(rec[j][0], rec[j][1], rec[i][0], rec[i][1]); })(),
     btnShown: !b.hidden && b.getBoundingClientRect().width > 0, btnText: b.textContent.trim(), letter: b.querySelector('.n').textContent,
     letterAng: ang([let_.left + let_.width / 2 - (rose.left + rose.width / 2), let_.top + let_.height / 2 - (rose.top + rose.height / 2)]),
     letterUpright: Math.abs(let_.width - let_.height) < 6 && let_.width < 20,
@@ -1131,9 +1135,11 @@ function barFits() {
   // Версия: в дъното и в името на кеша от sw.js.
   const verText = (await p5.textContent('#appVersion')).trim();
   const ver = (verText.match(/^\d+\.\d+\.\d+/) || [''])[0];
-  check(ver === '1.9.0' && await p5.isVisible('#appVersion') && /^Версия 1\.9\.0 · \d+ \S+ \d{4}$/.test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim());
+  // Версията се чете от js/version.js - единственото място, където се пише, за да не остарява тестът.
+  const srcVer = (fs.readFileSync(path.join(ROOT, 'js/version.js'), 'utf8').match(/GPXK_VERSION = '([^']+)'/) || [])[1];
+  check(!!srcVer && ver === srcVer && await p5.isVisible('#appVersion') && new RegExp('^Версия ' + srcVer.replace(/\./g, '\\.') + ' · \\d+ \\S+ \\d{4}$').test((await p5.textContent('.foot .ver')).trim()), 'дъното показва версията: ' + (await p5.textContent('.foot .ver')).trim() + ' (в version.js ' + srcVer + ')');
   const swCache = (() => { const ctx = { importScripts: f => vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx), addEventListener: () => {} }; ctx.self = ctx; vm.createContext(ctx); vm.runInContext(fs.readFileSync(path.join(ROOT, 'sw.js'), 'utf8') + ';this.__c = CACHE;', ctx); return ctx.__c; })();
-  check(swCache === 'gpxk-v31-1.9.0' && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
+  check(swCache === 'gpxk-v31-' + srcVer && swCache === 'gpxk-v31-' + ver, 'sw.js именува кеша със същата версия: ' + swCache);
   const liveCaches = await p5.evaluate(() => navigator.serviceWorker.ready.then(() => new Promise(r => { const t0 = Date.now(); (function poll() { caches.keys().then(k => (k.length || Date.now() - t0 > 8000) ? r(k) : setTimeout(poll, 100)); })(); })));
   check(liveCaches.length === 1 && liveCaches[0] === swCache, 'в браузъра работникът е създал кеш ' + JSON.stringify(liveCaches));
   // Бутоните са неактивни, когато няма какво да изчистят.
@@ -1611,22 +1617,39 @@ function barFits() {
   const ins10c = insOf(c10.add), along10c = U_hav(42.5046, 24.71, 42.51, 24.71) + U_hav(42.51, 24.71, 42.51, 24.7135);
   check(c10.calls === b10.calls && ins10c.length > 5 && ins10c.every(p => p.off < 1 && p.acc == null) && near(ins10c, 42.51, 24.71) && tUp(c10.add), 'дупка при буден екран: ' + ins10c.length + ' междинни точки по маршрута, с завоя, растящи часове');
   check(Math.abs(c10.len - b10.len - along10c) < 10, 'буден екран: дължината расте по маршрута с ' + Math.round(c10.len - b10.len) + ' м (по трака ' + Math.round(along10c) + ')');
-  // (3) Точка на 50 м встрани от маршрута - права линия, и към нея, и обратно към трака.
+  // (3) Точка на 50 м встрани от маршрута (1.9.2): следата върви по маршрута до най-близкото му място и
+  // оттам излиза с права линия до точката. Обратно към трака - пак така: права до маршрута, после по него.
+  const projOf = (lat, lon) => p10.evaluate(([a, b]) => { const G = __gpxk.G, m = Core.nearestOn(G.pts, G.cum, a, b); return { dist: m.dist, d: m.d, lat: m.lat, lon: m.lon }; }, [lat, lon]);
+  const pr3 = await projOf(42.51045, 24.7145), pd3 = (await p10.evaluate(([a, b]) => { const G = __gpxk.G, m = Core.nearestOn(G.pts, G.cum, a, b); return m.d; }, [42.51, 24.7135]));
   await ctx10.setGeolocation({ latitude: 42.51045, longitude: 24.7145 });
   await growTo(p10, c10.n);
   const d10 = await st10(c10.n);
+  const ins10d = insOf(d10.add);
+  const wantD = Math.abs(pr3.d - pd3) + pr3.dist;
+  check(pr3.dist > 45 && d10.n > c10.n + 1 && ins10d.length >= 1 && ins10d.every(p => p.off < 1) &&
+    Math.abs(d10.len - c10.len - wantD) < 12,
+  'точка на ' + Math.round(pr3.dist) + ' м встрани: следата върви по маршрута до най-близкото място (' + ins10d.length +
+  ' междинни по него), после права до точката; +' + Math.round(d10.len - c10.len) + ' м (по маршрута ' +
+  Math.round(Math.abs(pr3.d - pd3)) + ' + права ' + Math.round(pr3.dist) + ')');
+  check(ins10d.length && near(ins10d, pr3.lat, pr3.lon), 'междинната точка е точно най-близкото място по маршрута, не права от предишната');
+  // Връщане на трака: от точката встрани права до маршрута, после по него.
   await ctx10.setGeolocation({ latitude: 42.51, longitude: 24.7175 });
   await growTo(p10, d10.n);
   const e10 = await st10(d10.n);
-  check(d10.n === c10.n + 1 && Math.abs(d10.len - c10.len - U_hav(42.51, 24.7135, 42.51045, 24.7145)) < 2 && d10.add[0].off > 45, 'точка на ' + Math.round(d10.add[0].off) + ' м встрани: права линия, без междинни точки');
-  check(e10.n === d10.n + 1 && Math.abs(e10.len - d10.len - U_hav(42.51045, 24.7145, 42.51, 24.7175)) < 2, 'от точката встрани обратно на трака: пак права линия');
+  const ins10e = insOf(e10.add);
+  const pr3b = await projOf(42.51, 24.7175), pd3b = await p10.evaluate(([a, b]) => { const G = __gpxk.G, m = Core.nearestOn(G.pts, G.cum, a, b); return m.d; }, [42.51045, 24.7145]);
+  // Излизането от предишната точка встрани до маршрута (права) + минаването по маршрута до новата.
+  const wantE = pr3.dist + Math.abs(pr3b.d - pd3b);
+  check(e10.n > d10.n + 1 && ins10e.length >= 1 && Math.abs(e10.len - d10.len - wantE) < 12,
+  'от точката встрани обратно на трака: права до маршрута, после по него; +' + Math.round(e10.len - d10.len) + ' м (права ' + Math.round(pr3.dist) + ' + по маршрута ' + Math.round(Math.abs(pr3b.d - pd3b)) + ')');
   // Дупката се чертае кехлибарено на пунктир; измереното (кратка крачка) - зелено.
   await ctx10.setGeolocation({ latitude: 42.51, longitude: 24.7177 });
   await growTo(p10, e10.n);
   const frame = pg => pg.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   const cols = await p10.evaluate(() => ({ gap: U.cssVar('--app-walk-gap'), walked: U.cssVar('--app-walked') }));
   const gapLine = await p10.evaluate(([i, j]) => __gpxk.ui.follower.rec.slice(i, j).map(p => [p[0], p[1]]), [b10.n - 1, c10.n]);
-  const offLine = [[42.51, 24.7135], [42.51045, 24.7145], [42.51, 24.7175]];
+  // Следата до точката встрани и обратно (1.9.2): по маршрута, с права до точката и от нея.
+  const offLine = await p10.evaluate(([i, j]) => __gpxk.ui.follower.rec.slice(i, j).map(p => [p[0], p[1]]), [c10.n - 1, e10.n]);
   await p10.evaluate(() => __gpxk.map.setView(42.5075, 24.713, 16));
   await frame(p10);
   const pxGap = await p10.evaluate(([l, a, b]) => lineColors(l, a, b), [gapLine, cols.gap, cols.walked]);
