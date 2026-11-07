@@ -512,7 +512,6 @@ I18N.add({
   'imp.addedDups': [' · дубликати по картата: {n} (клик върху маркер маха дубликата)', ' · duplicates on the map: {n} (clicking a marker removes the duplicate)'],
   'imp.collLoaded': ['Колекцията е заредена', 'Collection loaded'],
   'imp.asDefault': ['Запомни го като дефолт', 'Remember it as the default'],
-  'imp.defName': ['Име на дефолта; празно - името на файла', 'Default name; empty - the file name'],
   'imp.defSaved': ['Дефолтът е записан: {name}', 'Default saved: {name}'],
   'imp.defNoGpx': ['Дефолт се помни само от .gpx файл - колекция .json не се пази', 'Only a .gpx file can be remembered as the default - a .json collection is not saved'],
   'msg.routeEmpty': ['Маршрутът е празен - клик върху трак го слага в маршрута.', 'The route is empty - clicking a track adds it to the route.'],
