@@ -3556,13 +3556,26 @@
 
   // ---- Свиващи се панели ----
   // "Части в маршрута", "Точки", "Тракове-източници", "Дубликати" и "Изрязано от тракове" са свити, докато не се отворят; помни се в браузъра.
+  // Заглавният бутон и тялото на един панел - само неговите, не на вложен в него акордеон
+  // (указанията в картата „Маршрут“ са акордеон в акордеон).
+  function foldOwn(c, sel) {
+    var found = null;
+    Array.prototype.some.call(c.querySelectorAll(sel), function (x) {
+      if (x.closest('[data-fold]') === c) { found = x; return true; }
+      return false;
+    });
+    return found;
+  }
   function applyFolds() {
     $$('[data-fold]').forEach(function (c) {
       var open = ui.fold[c.dataset.fold] === true;
       c.classList.toggle('open', open);
-      $('.fold-t', c).setAttribute('aria-expanded', open ? 'true' : 'false');
-      $('.fold-b', c).hidden = !open;
+      foldOwn(c, '.fold-t').setAttribute('aria-expanded', open ? 'true' : 'false');
+      foldOwn(c, '.fold-b').hidden = !open;
     });
+    // Профилът е платно: скрито тяло е с ширина 0 и графиката излиза празна, затова се рисува
+    // отново, когато картата „Маршрут“ е отворена (и при старт, ако е оставена отворена).
+    if (ui.fold.sum === true) drawProfile();
   }
   function toggleFold(key) {
     ui.fold[key] = ui.fold[key] !== true;
@@ -3744,7 +3757,7 @@
       if (b && !b.disabled) { e.preventDefault(); onAction(b.dataset.act, b); }
     });
     $$('[data-fold]').forEach(function (c) {
-      $('.fold-t', c).addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); toggleFold(c.dataset.fold); });
+      foldOwn(c, '.fold-t').addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); toggleFold(c.dataset.fold); });
     });
     $$('#tools [data-mode]').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
     $$('.mapctl .seg.base button').forEach(function (b) {
