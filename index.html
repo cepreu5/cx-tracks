@@ -447,6 +447,18 @@
   </form>
 </dialog>
 
+<!-- 1.9.6: потвърждението е прозорец в приложението - браузърният въпрос не се показва на телефона -->
+<dialog id="dlgYes" class="dlg dlg-sm">
+  <form method="dialog" id="yesForm">
+    <h3 data-i18n="yes.h">Потвърждение</h3>
+    <p id="yesText" class="yes-text"></p>
+    <div class="row end">
+      <button class="btn" type="submit" value="no" id="yesNo" data-i18n="act.cancel">Отказ</button>
+      <button class="btn pri" type="submit" value="yes" id="yesOk" data-i18n="yes.ok">Изтрий</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog id="dlgRings" class="dlg dlg-sm">
   <form method="dialog" id="ringsForm">
     <h3><span data-i18n="rings.h">Излишни пръстени</span> <span class="num muted" id="ringsN">(0)</span></h3>

@@ -2208,12 +2208,36 @@
     analyzeNow(); saveNow();
     toast(T.n('msg.namesCleared', S.tracks.length));
   }
+  /* 1.9.6: потвърждението е прозорец в самото приложение. Браузърният въпрос не се
+     показва в инсталираното приложение на телефона и връща „не“, затова изтриването
+     мълчеше. Връща Promise<boolean>. */
+  function askYes(msg) {
+    var d = $('#dlgYes');
+    $('#yesText').textContent = msg;
+    d.returnValue = '';           // стара стойност от предишния път не се брои
+    return new Promise(function (resolve) {
+      function done() {
+        /* „close“ идва със задача, не веднага. Ако дотогава прозорецът е отворен наново,
+           това е закъснялото „close“ на предишния път - не е нашето и се пропуска. */
+        if (d.open) return;
+        d.removeEventListener('close', done);
+        var ok = d.returnValue === 'yes';
+        d.returnValue = '';
+        resolve(ok);
+      }
+      d.addEventListener('close', done);
+      if (!d.open) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+      $('#yesOk').focus();
+    });
+  }
   function deleteTrack(t) {
     var usedIn = S.routes.filter(function (r) { return r.items.some(function (it) { return it.trackId === t.id; }); }).length;
-    if (!confirm(T('confirm.delTrack', { name: t.name }) + (usedIn ? ' ' + T('confirm.usedIn', { n: usedIn }) : ''))) return;
-    pushUndo(true);
-    S.tracks = S.tracks.filter(function (x) { return x.id !== t.id; });
-    analyzeNow(); saveNow();
+    askYes(T('confirm.delTrack', { name: t.name }) + (usedIn ? ' ' + T('confirm.usedIn', { n: usedIn }) : '')).then(function (ok) {
+      if (!ok) return;
+      pushUndo(true);
+      S.tracks = S.tracks.filter(function (x) { return x.id !== t.id; });
+      analyzeNow(); saveNow();
+    });
   }
 
   // ---- Излишните пръстени: списък с отметки, нищо не пада без потвърждение ----
@@ -3623,27 +3647,32 @@
   }
   function deleteRoute(id) {
     var r = S.routes.filter(function (x) { return x.id === id; })[0];
-    if (!r || !confirm(T('confirm.delRoute', { name: r.name }))) return;
-    S.routes = S.routes.filter(function (x) { return x.id !== id; });
-    U.DB.del('snap:' + id);
-    if (S.curId === id) { S.curId = null; openRoute(cur().id); }
-    else { renderRoutes(); saveSoon(); }
+    if (!r) return;
+    askYes(T('confirm.delRoute', { name: r.name })).then(function (ok) {
+      if (!ok) return;
+      S.routes = S.routes.filter(function (x) { return x.id !== id; });
+      U.DB.del('snap:' + id);
+      if (S.curId === id) { S.curId = null; openRoute(cur().id); }
+      else { renderRoutes(); saveSoon(); }
+    });
   }
   // 1.9.5: „Изтрий“ в „Записани маршрути“ маха всички наведнъж. Траковете остават,
   // на тяхно място остава един празен маршрут, а „Отмени“ връща целия списък.
   function clearRoutes() {
     if (!S.routes.length) return;
-    if (!confirm(T('confirm.delAllRoutes', { n: S.routes.length }))) return;
-    pushUndo(true);
-    S.routes.forEach(function (x) { U.DB.del('snap:' + x.id); });
-    S.routes = [];
-    S.curId = null;
-    ui.cut = null; ui.sel = null; ui.drawTarget = null; ui.hl = null;
-    hidePointMenu();
-    cur();                       // нов празен маршрут
-    analyzeNow();                // вътре се преизчертават панелът, списъкът и картата
-    saveNow();
-    toast(T('msg.routesCleared'));
+    askYes(T('confirm.delAllRoutes', { n: S.routes.length })).then(function (ok) {
+      if (!ok) return;
+      pushUndo(true);
+      S.routes.forEach(function (x) { U.DB.del('snap:' + x.id); });
+      S.routes = [];
+      S.curId = null;
+      ui.cut = null; ui.sel = null; ui.drawTarget = null; ui.hl = null;
+      hidePointMenu();
+      cur();                       // нов празен маршрут
+      analyzeNow();                // вътре се преизчертават панелът, списъкът и картата
+      saveNow();
+      toast(T('msg.routesCleared'));
+    });
   }
 
   // ---- Изчистване ----
