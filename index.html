@@ -180,7 +180,11 @@
     </div>
   </section>
 
-  <section class="card summary">
+  <section class="card summary fold" id="sumCard" data-fold="sum">
+    <div class="card-head">
+      <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="sumBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="sum.h">Маршрут</span></button></h2>
+    </div>
+    <div class="fold-b" id="sumBody" hidden>
     <div class="stats" id="stats">
       <div><small data-i18n="st.len">Дължина</small><b class="num" id="sLen">-</b></div>
       <div><small data-i18n="st.up">Изкачване</small><b class="num" id="sUp">-</b></div>
@@ -197,6 +201,7 @@
       <label class="chk"><input type="checkbox" id="gradeToggle" checked> <span data-i18n="prof.pct">Наклон в проценти</span></label>
     </div>
     <div class="profile"><canvas id="profile" data-i18n-aria="prof.aria" aria-label="Профил на височината"></canvas></div>
+    </div>
     <div class="actions">
       <button class="btn" data-act="export-gpx" data-i18n="act.exportGpx">Изнеси .gpx</button>
       <button class="btn" data-act="picture" data-i18n="act.picture">Картина</button>
@@ -204,7 +209,12 @@
       <button class="btn follow-btn" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
       <label class="tol"><span data-i18n="bar.tol">Отклонение</span> <input type="text" class="tolInput num" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="20" autocomplete="off" data-i18n-aria="tol.aria" data-i18n-title="tol.title" aria-label="Максимално допустимо отклонение в метри" title="Отклонение в метри, от 0 до 999. Enter прилага."> <span class="tol-unit" data-i18n="unit.m">м</span></label>
     </div>
-    <p class="hint" data-i18n="hint">Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Режимът „Изрязване“ маха с две точки по линията произволна част от трака - завинаги, както „Изтрий участъка“; „Отмени“ я връща. Посочването на ред в списъка светва същия сегмент на картата.</p>
+    <div class="fold hint-fold" data-fold="hint">
+      <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="hintBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="hint.h">Как се работи</span></button></h2>
+      <div class="fold-b" id="hintBody" hidden>
+      <p class="hint" data-i18n="hint">Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Режимът „Изрязване“ маха с две точки по линията произволна част от трака - завинаги, както „Изтрий участъка“; „Отмени“ я връща. Посочването на ред в списъка светва същия сегмент на картата.</p>
+      </div>
+    </div>
   </section>
 
   <div class="cols">
@@ -262,18 +272,23 @@
     </div>
   </div>
 
-  <section class="card" id="picCard">
-    <h2 data-i18n="piccard.h">Запазена картина</h2>
+  <section class="card fold" id="picCard" data-fold="pic">
+    <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="picBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="piccard.h">Запазена картина</span></button></h2>
+    <div class="fold-b" id="picBody" hidden>
     <div id="picInfo" class="muted small" data-i18n="pic.none">Още няма картина за този маршрут. Копчето "Картина" я прави и я пази заедно с обхвата ѝ.</div>
     <div class="row">
       <button class="btn sm" data-act="picture" data-i18n="piccard.make">Направи картина</button>
       <button class="btn sm" data-act="pic-open" id="picOpenBtn" disabled data-i18n="piccard.open">Покажи върху картината</button>
     </div>
+    </div>
   </section>
 
-  <section class="card">
-    <div class="lib-head">
-      <h2><span data-i18n="routes.h">Записани маршрути</span> <span class="num muted" id="routesCount">(0)</span></h2>
+  <section class="card fold" id="routesCard" data-fold="routes">
+    <div class="card-head">
+      <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="routesFoldBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="routes.h">Записани маршрути</span> <span class="num muted" id="routesCount">(0)</span></button></h2>
+    </div>
+    <div class="fold-b" id="routesFoldBody" hidden>
+    <div class="row lib-filter">
       <input id="routeFilter" type="search" data-i18n-placeholder="routes.filter" data-i18n-aria="routes.filter.aria" placeholder="Търси по име" aria-label="Търси маршрут по име">
     </div>
     <div class="row">
@@ -286,6 +301,7 @@
         <thead><tr><th data-i18n="routes.th.name">Име</th><th class="r" data-i18n="st.len">Дължина</th><th class="r" data-i18n="st.up">Изкачване</th><th data-i18n="routes.th.mod">Последна промяна</th><th data-i18n="routes.th.act">Действия</th></tr></thead>
         <tbody id="routesBody"></tbody>
       </table>
+    </div>
     </div>
   </section>
 

@@ -21,6 +21,15 @@ const server = http.createServer((req, res) => {
 
 let failures = 0;
 function check(ok, msg) { console.log((ok ? 'OK   ' : 'FAIL ') + msg); if (!ok) failures++; }
+// 1.9.4: „Записани маршрути“, „Запазена картина“ и картата „Маршрут“ са акордеони, свити по подразбиране.
+// Проверките, които цъкат нещо в тялото им, първо отварят панела - както би направил човек.
+async function openFold(pg, ...keys) {
+  await pg.evaluate(ks => ks.forEach(k => {
+    const c = document.querySelector('[data-fold="' + k + '"]');
+    const t = c && c.querySelector('.fold-t');
+    if (t && t.getAttribute('aria-expanded') !== 'true') t.click();
+  }), keys);
+}
 // Изпълняват се в страницата.
 // Групата горе вляво ("Лента", "Следене"; 1.6: без "↓") срещу реда горе вдясно: първото копче е на реда, групата не застъпва реда.
 function handleRow() {
@@ -626,6 +635,7 @@ function barFits() {
   check(await page.isVisible('#dlgName') && await page.inputValue('#fileName') === defName, 'панелът след "Стоп": същият прозорец за име');
   const [wdl3] = await Promise.all([page.waitForEvent('download'), page.press('#fileName', 'Enter')]);
   check(wdl3.suggestedFilename() === defName + '.gpx', 'панелът след "Стоп": сваля ' + wdl3.suggestedFilename());
+  await openFold(page, 'routes');
   const rowSel = '#routesBody tr[data-route="' + (walkRec && walkRec.id) + '"]';
   check(!!walkRec && (await page.textContent(rowSel)).includes(walkRec.name), 'отделният запис се вижда в "Записани маршрути": ' + (walkRec && (await page.textContent(rowSel)).replace(/\s+/g, ' ')));
   await page.click(rowSel + ' [data-rt="open"]');
@@ -648,6 +658,7 @@ function barFits() {
   check(sv1.n === sv0.n && sv1.same === 1 && sv1.name === 'Моят маршрут' && sv1.input === 'Моят маршрут' && /Моят маршрут/.test(sv1.row) && sv1.first, '"Запази": текущият маршрут е преименуван в "Записани маршрути", най-горе, без втори запис (' + sv0.n + ' → ' + sv1.n + ')');
   check(/Свален Моят маршрут\.gpx/.test(sv1.toast) && /Записани маршрути/.test(sv1.toast), '"Запази": съобщението казва и двете - ' + sv1.toast);
   // "GPX" в реда на записан маршрут - същият прозорец.
+  await openFold(page, 'routes');
   await page.click('#routesBody tr[data-route="' + sv0.id + '"] [data-rt="gpx"]');
   check(await page.evaluate(() => document.querySelector('#dlgName').open && __gpxk.ui.nameJob.kind === 'route') && await page.inputValue('#fileName') === 'Моят маршрут' && await page.textContent('#nameOk') === 'Свали', '"GPX" в реда на записан маршрут отваря прозореца за име');
   const [drw] = await Promise.all([page.waitForEvent('download'), page.press('#fileName', 'Enter')]);
@@ -1317,6 +1328,55 @@ function barFits() {
   await p5.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
   r1 = await rs5();
   check(r1.tracks === r0.tracks && r1.items === r0.items, 'върнатото е записано и след презареждане');
+  // 1.9.4: още четири панела на началния екран се сгъват по същия начин - „Запазена картина“,
+  // „Записани маршрути“, картата „Маршрут“ с числата и профила и дългите указания в нея.
+  const NEWF = [['#picCard', 'picBody'], ['#routesCard', 'routesFoldBody'], ['#sumCard', 'sumBody'], ['.hint-fold', 'hintBody']];
+  const newFoldSt = () => p5.evaluate(F => F.map(([c, id]) => {
+    const card = document.querySelector(c), b = document.getElementById(id), t = card.querySelector('h2 .fold-t');
+    const tr = t.getBoundingClientRect();
+    return { open: !b.hidden && b.getBoundingClientRect().height > 0, aria: t.getAttribute('aria-expanded'), ac: t.getAttribute('aria-controls'), id,
+      fits: tr.height > 0 && tr.width > 0 && tr.right <= innerWidth + 0.5 && tr.left >= -0.5,
+      free: !document.querySelector('.fold-b').contains(t) };
+  }), NEWF);
+  let nf = await newFoldSt();
+  check(nf.every(f => !f.open && f.aria === 'false' && f.ac === f.id && f.fits && f.free), '1.9.4: „Запазена картина“, „Записани маршрути“, „Маршрут“ и „Как се работи“ са свити при отваряне, със свои бутони и тела ' + JSON.stringify(nf.map(f => [f.id, f.open, f.aria, f.ac])));
+  // Редът с копчетата не влиза в свиваното тяло: вижда се и при свита карта „Маршрут“.
+  const acts5 = await p5.evaluate(() => {
+    const a = document.querySelector('#sumCard .actions'), ar = a.getBoundingClientRect();
+    const btns = ['export-gpx', 'picture', 'save', 'follow'].map(x => { const b = a.querySelector('[data-act="' + x + '"]'), r = b.getBoundingClientRect(); return !!b && !b.disabled && r.height > 0 && r.width > 0; });
+    return { sumClosed: document.getElementById('sumBody').hidden, vis: !a.hidden && ar.height > 0 && ar.width > 0 && ar.top >= 0, btns, tol: !!a.querySelector('.tolInput') && a.querySelector('.tolInput').getBoundingClientRect().width > 0 };
+  });
+  check(acts5.sumClosed && acts5.vis && acts5.btns.every(Boolean) && acts5.tol, '1.9.4: при свита карта „Маршрут“ редът „Изнеси .gpx“, „Картина“, „Запази“, „Следене“ и полето „Отклонение“ остават на екрана ' + JSON.stringify(acts5));
+  // Профилът е платно: отварянето на картата трябва да го нарисува с истинската ширина, не с нулева.
+  const profSt = () => p5.evaluate(() => {
+    const cv = document.getElementById('profile'), box = cv.parentNode.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio || 1, 3), ctx = cv.getContext('2d');
+    let ink = 0;
+    if (cv.width && cv.height) { const d = ctx.getImageData(0, 0, cv.width, cv.height).data; for (let i = 3; i < d.length; i += 4) if (d[i]) ink++; }
+    return { box: Math.round(box.width), w: cv.width, want: Math.round(box.width * dpr), ink };
+  });
+  await p5.click('#sumCard > .card-head .fold-t');
+  nf = await newFoldSt();
+  const pf5 = await profSt();
+  check(nf[2].open && nf[2].aria === 'true' && pf5.box > 300 && pf5.w === pf5.want && pf5.ink > 500, '1.9.4: отварянето на „Маршрут“ показва числата и рисува профила с истинската ширина ' + JSON.stringify(pf5));
+  await p5.click('#sumCard .hint-fold .fold-t');
+  nf = await newFoldSt();
+  check(nf[3].open && nf[3].aria === 'true' && await p5.isVisible('#hintBody .hint'), '1.9.4: „Как се работи“ се отваря и показва същите указания');
+  check(await p5.evaluate(() => { const h = document.querySelector('.hint-fold'), w = document.querySelector('#sumCard').getBoundingClientRect(); const r = h.getBoundingClientRect(); return r.left >= w.left - 0.5 && r.right <= w.right + 0.5; }), '1.9.4: „Как се работи“ стои в рамките на картата, без втора рамка извън нея');
+  await p5.click('#picCard .fold-t'); await p5.click('#routesCard .fold-t');
+  nf = await newFoldSt();
+  check(nf[0].open && nf[1].open && nf[0].aria === 'true' && nf[1].aria === 'true' && await p5.isVisible('#routeFilter') && await p5.isVisible('#routesCount'), '1.9.4: „Запазена картина“ и „Записани маршрути“ се отварят, търсенето е в тялото, броят остава в заглавието');
+  await p5.click('#picCard .fold-t'); await p5.click('#routesCard .fold-t'); await p5.click('#sumCard > .card-head .fold-t');
+  nf = await newFoldSt();
+  check(nf.slice(0, 3).every(f => !f.open && f.aria === 'false') && nf.some(f => f.open), '1.9.4: втори клик свива всеки от новите панели');
+  // Състоянието се помни и след презареждане (отворени са всичките четири).
+  await p5.click('#picCard .fold-t'); await p5.click('#routesCard .fold-t'); await p5.click('#sumCard > .card-head .fold-t');
+  await p5.reload();
+  await p5.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
+  nf = await newFoldSt();
+  check(nf.every(f => f.open && f.aria === 'true'), '1.9.4: четирите нови панела са както са оставени след презареждане ' + JSON.stringify(nf.map(f => f.open)));
+  const pf5b = await profSt();
+  check(pf5b.box > 300 && pf5b.w === pf5b.want && pf5b.ink > 500, '1.9.4: профилът се рисува с истинската ширина и при старт с отворена карта „Маршрут“ ' + JSON.stringify(pf5b));
   for (const [c] of FOLDS) await p5.click(c + ' .fold-t');
   await p5.screenshot({ path: path.join(OUT, 'panels-1280.png'), fullPage: true });
   await p5.setViewportSize({ width: 390, height: 800 });
@@ -1748,6 +1808,7 @@ function barFits() {
   // След "Стоп": записът на изминатото, отворен като маршрут - дупката е кехлибарена и на картата, и в "Картина" (.png).
   const cur10 = await p10.evaluate(() => __gpxk.S.curId);
   const wr10 = await p10.evaluate(() => { const S = __gpxk.S, t = S.tracks[S.tracks.length - 1]; return S.routes.find(r => r.items.length === 1 && r.items[0].trackId === t.id).id; });
+  await openFold(p10, 'routes');
   await p10.click('#routesBody tr[data-route="' + wr10 + '"] [data-rt="open"]');
   await p10.evaluate(() => { __gpxk.map.setBearing(0); __gpxk.map.setView(42.5075, 24.713, 16); });
   await p10.waitForFunction(() => __gpxk.map.rot === 0);
@@ -1773,6 +1834,7 @@ function barFits() {
   }, [gapLine, cols.gap, cols.walked]);
   check(!!pngPix && pngPix.n > 20 && pngPix.n1 > pngPix.n * 0.25, '"Картина" (.png): дупката е кехлибарена на пунктир - ' + JSON.stringify(pngPix) + (pngPix ? '' : ' ' + await p10.textContent('#picMsg')));
   await p10.keyboard.press('Escape');
+  await openFold(p10, 'routes');
   await p10.click('#routesBody tr[data-route="' + cur10 + '"] [data-rt="open"]');
   // (4) Затворен кръг: новото положение е 240 м назад по маршрута, а следата върви напред - почти цялата обиколка.
   const sq = line(42.52, 24.70, 42.52, 24.71, 30).concat(line(42.52, 24.71, 42.53, 24.71, 30).slice(1), line(42.53, 24.71, 42.53, 24.70, 30).slice(1), line(42.53, 24.70, 42.52, 24.70, 30).slice(1));

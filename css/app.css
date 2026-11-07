@@ -354,6 +354,16 @@ body.bar-hidden .pic-scroll { padding-top: 0; }
 .fold > .card-head { margin: 0; flex-wrap: wrap; row-gap: 6px; }
 .fold.open > .card-head { margin-bottom: 8px; }
 .fold > .card-head h2 { flex: 1 1 auto; min-width: 0; margin: 0; }
+/* Вложен акордеон (указанията в картата „Маршрут“): отворената външна карта не дава отстъп на вътрешното заглавие. */
+.fold .fold h2 { margin-bottom: 0; }
+.fold.open .fold.open h2 { margin-bottom: 8px; }
+/* Указанията: един ред отгоре ги дели от копчетата, без втора рамка и без отстъпи в картата. */
+.hint-fold { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--app-line); }
+.hint-fold .fold-t { justify-content: flex-start; }
+.hint-fold .hint { margin: 0; }
+/* Търсенето в „Записани маршрути“ е първото в тялото и заема целия ред. */
+.lib-filter { margin-top: 0; }
+.lib-filter input { flex: 1 1 160px; min-width: 0; }
 .card-head .head-acts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
 .card-head .head-acts .btn { margin-left: 0; }
 .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
@@ -548,6 +558,7 @@ td .num, td.num { font-family: var(--app-mono); }
   .follow-stats > div:nth-child(-n+2) { border-bottom: 1px solid var(--app-line); }
   .cutbox { width: calc(100% - 110px); left: 10px; transform: none; }
   .lib-head input { width: 100%; margin-left: 0; }
+  .lib-filter input { flex: 1 1 100%; }
   .walk-w { display: none; }
   .follow-row { flex-wrap: wrap; row-gap: 4px; gap: 4px 5px; }
   .follow-row .seg button { padding-left: 7px; padding-right: 7px; }
