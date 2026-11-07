@@ -3862,32 +3862,29 @@ function barFits() {
     const names = () => p20.evaluate(() => __gpxk.S.tracks.map(t => t.name).sort().join(','));
     await p20.goto(url); await rdy();
 
-    // (1) Отметката и полето в прозореца за внасяне.
+    // (1) Отметката в прозореца за внасяне - поле за име вече няма (1.9.7).
     await p20.click('#empty [data-act="add-tracks"]');
     await p20.waitForFunction(() => document.querySelector('#dlgImport').open);
-    const i0 = await p20.evaluate(() => ({ dis: document.querySelector('#impDefName').disabled, lab: document.querySelector('#impDefault').closest('label').textContent.trim(), ph: document.querySelector('#impDefName').getAttribute('placeholder') }));
+    const i0 = await p20.evaluate(() => ({ field: !!document.querySelector('#impDefName'), lab: document.querySelector('#impDefault').closest('label').textContent.trim() }));
     await p20.check('#impDefault');
-    const i1 = await p20.evaluate(() => document.querySelector('#impDefName').disabled);
-    check(i0.dis && !i1 && i0.lab === 'Запомни го като дефолт' && i0.ph === 'Име на дефолта; празно - името на файла',
-      tag + 'в прозореца за внасяне: отметка „Запомни го като дефолт“ и поле за име, което работи само при сложена отметка: ' + JSON.stringify([i0, i1]));
+    check(!i0.field && i0.lab === 'Запомни го като дефолт',
+      tag + 'в прозореца за внасяне има само отметка „Запомни го като дефолт“, поле за име няма: ' + JSON.stringify(i0));
 
-    // Внасяне с отметка и изписано име: пази се самият .gpx файл, съобщението го казва, полето се изчиства.
+    // Внасяне с отметка: пази се самият .gpx файл, името идва от файла, отметката се вдига.
     const f1 = writeGpx('DEF1', line(42.5, 24.70, 42.5, 24.725, 100));
-    await p20.fill('#impDefName', 'Планина 2026');
     await p20.setInputFiles('#fileInput', f1);
     await hasToast('Дефолтът е записан: ');
     await p20.waitForFunction(() => __gpxk.S.tracks.length === 1);
     await p20.keyboard.press('Escape');
     await p20.waitForFunction(() => !document.querySelector('#dlgImport').open && !document.querySelector('#dlgRings').open);
-    const d1 = await p20.evaluate(() => { const q = { chk: document.querySelector('#impDefault').checked, val: document.querySelector('#impDefName').value,
-      dis: document.querySelector('#impDefName').disabled, toast: document.querySelector('#toast').textContent, ui: __gpxk.ui.defColl && __gpxk.ui.defColl.name,
-      coll: null }; return U.DB.get('collection').then(c => { q.coll = c ? c.tracks.length : -1; return q; }); });
+    const d1 = await p20.evaluate(() => { const q = { chk: document.querySelector('#impDefault').checked, toast: document.querySelector('#toast').textContent,
+      ui: __gpxk.ui.defColl && __gpxk.ui.defColl.name, coll: null }; return U.DB.get('collection').then(c => { q.coll = c ? c.tracks.length : -1; return q; }); });
     const g1 = await defSt();
-    check(g1 && g1.name === 'Планина 2026' && JSON.stringify(g1.files) === '["DEF1.gpx"]' && g1.blobs[0] === 'true:true' && typeof g1.at === 'number' &&
-      d1.ui === 'Планина 2026' && d1.toast === 'Дефолтът е записан: Планина 2026' && !d1.chk && d1.val === '' && d1.dis && d1.coll === 1,
-      tag + 'внасяне с отметка: пази се самият .gpx файл (байтовете) с изписаното име, съобщението го казва, отметката и полето се изчистват: ' + JSON.stringify([g1, d1]));
+    check(g1 && g1.name === 'DEF1.gpx' && JSON.stringify(g1.files) === '["DEF1.gpx"]' && g1.blobs[0] === 'true:true' && typeof g1.at === 'number' &&
+      d1.ui === 'DEF1.gpx' && d1.toast === 'Дефолтът е записан: DEF1.gpx' && !d1.chk && d1.coll === 1,
+      tag + 'внасяне с отметка: пази се самият .gpx файл (байтовете) с името на файла, съобщението го казва, отметката се вдига: ' + JSON.stringify([g1, d1]));
 
-    // Внасяне с отметка и празно поле: дефолтът носи името на файла.
+    // Второ внасяне с отметка: дефолтът носи името на новия файл.
     const f2 = writeGpx('DEF2', line(42.6, 24.70, 42.6, 24.73, 100));
     await tick(true);
     await p20.setInputFiles('#fileInput', f2);
@@ -3895,7 +3892,7 @@ function barFits() {
     await p20.waitForFunction(() => __gpxk.S.tracks.length === 2);
     const g2 = await defSt();
     check(g2 && g2.name === 'DEF2.gpx' && JSON.stringify(g2.files) === '["DEF2.gpx"]' && g2.blobs[0] === 'true:true',
-      tag + 'празно поле - дефолтът носи името на файла (ново внасяне с отметка заменя стария дефолт): ' + JSON.stringify(g2));
+      tag + 'дефолтът носи името на файла (ново внасяне с отметка заменя стария дефолт): ' + JSON.stringify(g2));
     const defNames2 = await p20.evaluate(() => { const S = __gpxk.S; return S.tracks.filter(t => t.name === 'DEF2.gpx').map(t => t.name).join(',') || 'DEF2.gpx'; });
 
     // (2) Внасяне без отметка не пипа дефолта.
@@ -4003,7 +4000,7 @@ function barFits() {
     check(r4.dis && r4.cnt === '(0)', tag + 'без нито един записан маршрут „Изтрий“ е изключен: ' + JSON.stringify(r4));
 
     // Двата езика.
-    const keys = ['imp.asDefault', 'imp.defName', 'imp.defSaved', 'imp.defNoGpx', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared', 'yes.h', 'yes.ok'];
+    const keys = ['imp.asDefault', 'imp.defSaved', 'imp.defNoGpx', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared', 'yes.h', 'yes.ok'];
     const miss = await p20.evaluate(ks => ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }), keys);
     check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
     const en = await p20.evaluate(() => { I18N.setPref('en');

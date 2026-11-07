@@ -118,10 +118,9 @@
       return false;
     });
   }
-  // Името на дефолта: изписаното в полето, иначе имената на внесените файлове (до около 60 знака).
+  // Името на дефолта: имената на внесените файлове (до около 60 знака). Поле за име няма -
+  // дефолтът е един и носи името на файла, който е внесен.
   function defNameFrom(names) {
-    var inp = $('#impDefName'), typed = inp ? String(inp.value || '').trim() : '';
-    if (typed) return typed;
     var s = (names || []).filter(function (n) { return n; }).join(', ');
     return s.length > 60 ? s.slice(0, 59).replace(/[\s,]+$/, '') + '…' : s;
   }
@@ -2776,7 +2775,6 @@
         if ($('#impDefault').checked) {
           var dname = defNameFrom(defFiles.map(function (x) { return x.name; }));
           $('#impDefault').checked = false;
-          if ($('#impDefName')) { $('#impDefName').value = ''; $('#impDefName').disabled = true; }
           if (defFiles.length) saveDefaultGpx(defFiles.map(function (x) { return { name: x.name, blob: x }; }), dname);
           else toast(T('imp.defNoGpx'), true);
         }
@@ -3915,12 +3913,6 @@
     });
     $('#labelsToggle').addEventListener('change', function (e) { ui.labels = e.target.checked; U.LS.set('labels', ui.labels); applyLayers(); });
     $('#vtxToggle').checked = ui.vtxShow;
-    // 1.9.5: полето за име на дефолта работи само при сложена отметка „Запомни го като дефолт“.
-    $('#impDefault').addEventListener('change', function (e) {
-      var n = $('#impDefName');
-      n.disabled = !e.target.checked;
-      if (!e.target.checked) n.value = '';
-    });
     $('#vtxToggle').addEventListener('change', function (e) { ui.vtxShow = e.target.checked; U.LS.set('vtxShow', ui.vtxShow); map.redraw(); });
     $('#gradeToggle').checked = ui.grade;
     $('#gradeToggle').addEventListener('change', function (e) { ui.grade = e.target.checked; U.LS.set('grade', ui.grade); drawProfile(); });
