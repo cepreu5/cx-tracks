@@ -3014,9 +3014,11 @@ function barFits() {
     await p15.goto(url);
     await p15.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
     // Празният екран: едно копче, прозорецът приема и .gpx, и колекция; долното „Зареди колекция“ го няма.
-    const em = await p15.evaluate(() => ({ btns: [...document.querySelectorAll('#empty button')].map(b => b.dataset.act + ':' + b.textContent.trim()), load: document.querySelectorAll('[data-act="load-collection"]').length,
+    // 1.9.5: второто копче „Зареди дефолт“ също е в попъпа, но е скрито, докато няма записан дефолт.
+    const em = await p15.evaluate(() => ({ btns: [...document.querySelectorAll('#empty button')].filter(b => !b.hidden).map(b => b.dataset.act + ':' + b.textContent.trim()),
+      all: [...document.querySelectorAll('#empty button')].map(b => b.dataset.act), load: document.querySelectorAll('[data-act="load-collection"]').length,
       exp: document.querySelectorAll('#tracksCard [data-act="export-collection"]').length, add: document.querySelectorAll('#tracksCard [data-act="add-tracks"]').length }));
-    check(em.btns.length === 1 && em.btns[0] === 'add-tracks:Добави .gpx или колекция' && em.load === 0 && em.exp === 1 && em.add === 0, tag + 'празният екран има едно копче „Добави .gpx или колекция“, „Зареди колекция“ го няма никъде, „Изнеси колекцията“ остава (1.6: „Добави тракове“ в панела стана „Изтрий имената“): ' + JSON.stringify(em));
+    check(em.btns.length === 1 && em.btns[0] === 'add-tracks:Добави .gpx или колекция' && JSON.stringify(em.all) === '["add-tracks","load-default"]' && em.load === 0 && em.exp === 1 && em.add === 0, tag + 'празният екран има едно видимо копче „Добави .gpx или колекция“ („Зареди дефолт“ е скрито, докато няма дефолт), „Зареди колекция“ го няма никъде, „Изнеси колекцията“ остава (1.6: „Добави тракове“ в панела стана „Изтрий имената“): ' + JSON.stringify(em));
     await p15.click('#empty [data-act="add-tracks"]');
     check(await p15.evaluate(() => document.querySelector('#dlgImport').open && /\.json/.test(document.querySelector('#fileInput').accept)), tag + 'копчето отваря прозореца, който приема .gpx и колекция (.json)');
     // Синтетични тракове: P (2 км на изток), B върху P (маркер), Q - късо съвпадение с P без маркер, X1/X2 пресичат P на 60 м едно от друго.
@@ -3833,6 +3835,177 @@ function barFits() {
       tag + 'низовете са на двата езика, без стария таван от 500 м, „Дупка (до …) е затворена сама“' + (lang.miss.length || lang.old.length ? ': ' + JSON.stringify(lang) : ''));
     check(!e19.length, tag + 'конзолата е чиста' + (e19.length ? ': ' + e19.join(' | ') : ''));
     await c19.close();
+  }
+
+
+  // ---- 1.9.5: дефолтна колекция (отметка в прозореца за внасяне, пази се самият .gpx файл, разчита се
+  // пак при празна колекция, втори бутон в празния попъп) и „Изтрий“ за всички записани маршрути с „Отмени“ ----
+  {
+    const tag = '1.9.5: ';
+    const c20 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const p20 = await c20.newPage();
+    const e20 = [];
+    p20.on('pageerror', e => e20.push('pageerror: ' + e.message));
+    p20.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) e20.push('console: ' + m.text()); });
+    const rdy = () => p20.waitForFunction(() => window.__gpxk && window.__gpxk.ready, null, { timeout: 15000 });
+    const frame = () => p20.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    // Отметката „Запомни го като дефолт“ - като човек: цъкната и полето отключва.
+    const tick = on => p20.evaluate(v => { const c = document.querySelector('#impDefault'); c.checked = v; c.dispatchEvent(new Event('change', { bubbles: true })); }, on);
+    const hasToast = s => p20.waitForFunction(t => document.querySelector('#toast').textContent.indexOf(t) === 0, s, { timeout: 15000 });
+    // Записаният дефолт: име, дата и самите .gpx файлове (байтове), не копие на колекцията.
+    const defSt = () => p20.evaluate(() => U.DB.get('defaultGpx').then(d => d ? { name: d.name, at: d.at, files: d.files.map(f => f.name),
+      blobs: d.files.map(f => (f.blob instanceof Blob) + ':' + (f.blob.size > 0)) } : null));
+    // Частите на всички маршрути - за сверка след „Отмени“.
+    const itemsSig = () => p20.evaluate(() => __gpxk.S.routes.map(r => r.items.map(it => [it.type, it.trackId, Math.round(it.a), Math.round(it.b)].join(':')).join('|')).filter(Boolean).sort().join(' / '));
+    const names = () => p20.evaluate(() => __gpxk.S.tracks.map(t => t.name).sort().join(','));
+    await p20.goto(url); await rdy();
+
+    // (1) Отметката и полето в прозореца за внасяне.
+    await p20.click('#empty [data-act="add-tracks"]');
+    await p20.waitForFunction(() => document.querySelector('#dlgImport').open);
+    const i0 = await p20.evaluate(() => ({ dis: document.querySelector('#impDefName').disabled, lab: document.querySelector('#impDefault').closest('label').textContent.trim(), ph: document.querySelector('#impDefName').getAttribute('placeholder') }));
+    await p20.check('#impDefault');
+    const i1 = await p20.evaluate(() => document.querySelector('#impDefName').disabled);
+    check(i0.dis && !i1 && i0.lab === 'Запомни го като дефолт' && i0.ph === 'Име на дефолта; празно - името на файла',
+      tag + 'в прозореца за внасяне: отметка „Запомни го като дефолт“ и поле за име, което работи само при сложена отметка: ' + JSON.stringify([i0, i1]));
+
+    // Внасяне с отметка и изписано име: пази се самият .gpx файл, съобщението го казва, полето се изчиства.
+    const f1 = writeGpx('DEF1', line(42.5, 24.70, 42.5, 24.725, 100));
+    await p20.fill('#impDefName', 'Планина 2026');
+    await p20.setInputFiles('#fileInput', f1);
+    await hasToast('Дефолтът е записан: ');
+    await p20.waitForFunction(() => __gpxk.S.tracks.length === 1);
+    await p20.keyboard.press('Escape');
+    await p20.waitForFunction(() => !document.querySelector('#dlgImport').open && !document.querySelector('#dlgRings').open);
+    const d1 = await p20.evaluate(() => { const q = { chk: document.querySelector('#impDefault').checked, val: document.querySelector('#impDefName').value,
+      dis: document.querySelector('#impDefName').disabled, toast: document.querySelector('#toast').textContent, ui: __gpxk.ui.defColl && __gpxk.ui.defColl.name,
+      coll: null }; return U.DB.get('collection').then(c => { q.coll = c ? c.tracks.length : -1; return q; }); });
+    const g1 = await defSt();
+    check(g1 && g1.name === 'Планина 2026' && JSON.stringify(g1.files) === '["DEF1.gpx"]' && g1.blobs[0] === 'true:true' && typeof g1.at === 'number' &&
+      d1.ui === 'Планина 2026' && d1.toast === 'Дефолтът е записан: Планина 2026' && !d1.chk && d1.val === '' && d1.dis && d1.coll === 1,
+      tag + 'внасяне с отметка: пази се самият .gpx файл (байтовете) с изписаното име, съобщението го казва, отметката и полето се изчистват: ' + JSON.stringify([g1, d1]));
+
+    // Внасяне с отметка и празно поле: дефолтът носи името на файла.
+    const f2 = writeGpx('DEF2', line(42.6, 24.70, 42.6, 24.73, 100));
+    await tick(true);
+    await p20.setInputFiles('#fileInput', f2);
+    await hasToast('Дефолтът е записан: ');
+    await p20.waitForFunction(() => __gpxk.S.tracks.length === 2);
+    const g2 = await defSt();
+    check(g2 && g2.name === 'DEF2.gpx' && JSON.stringify(g2.files) === '["DEF2.gpx"]' && g2.blobs[0] === 'true:true',
+      tag + 'празно поле - дефолтът носи името на файла (ново внасяне с отметка заменя стария дефолт): ' + JSON.stringify(g2));
+    const defNames2 = await p20.evaluate(() => { const S = __gpxk.S; return S.tracks.filter(t => t.name === 'DEF2.gpx').map(t => t.name).join(',') || 'DEF2.gpx'; });
+
+    // (2) Внасяне без отметка не пипа дефолта.
+    const f3 = writeGpx('DEF3', line(42.64, 24.70, 42.64, 24.74, 100));
+    await p20.setInputFiles('#fileInput', f3);
+    await p20.waitForFunction(() => __gpxk.S.tracks.length === 3);
+    await p20.waitForFunction(() => U.DB.get('collection').then(c => !!c && c.tracks.length === 3).catch(() => false), null, { timeout: 5000 });
+    const g3 = await defSt();
+    check(g3 && g3.name === 'DEF2.gpx' && JSON.stringify(g3.files) === '["DEF2.gpx"]', tag + 'внасяне без отметка не пипа дефолта: ' + JSON.stringify(g3));
+
+    // (3) При старт с непразна колекция дефолтът не се добавя: остава това от последната сесия.
+    const threeNames = await names();
+    await p20.reload(); await rdy();
+    const n2 = await p20.evaluate(() => ({ n: __gpxk.S.tracks.length, names: __gpxk.S.tracks.map(t => t.name).sort().join(','), toast: document.querySelector('#toast').textContent, ui: __gpxk.ui.defColl && __gpxk.ui.defColl.name }));
+    check(n2.n === 3 && n2.names === threeNames && n2.toast === '' && n2.ui === 'DEF2.gpx',
+      tag + 'старт с непразна колекция: файловете на дефолта не се разчитат пак - остават същите 3 трака, нищо не се съобщава, но името му се знае: ' + JSON.stringify([n2, threeNames]));
+
+    // (4) При празна колекция (след „Нов“) презареждането разчита файла пак и го записва като работна колекция.
+    await p20.evaluate(() => document.querySelector('[data-act="clear-tracks"]').click());
+    await p20.waitForFunction(() => __gpxk.S.tracks.length === 0);
+    await p20.waitForFunction(() => U.DB.get('collection').then(c => !!c && c.tracks.length === 0).catch(() => false), null, { timeout: 5000 });
+    await p20.reload(); await rdy();
+    const n3 = await p20.evaluate(() => ({ n: __gpxk.S.tracks.length, names: __gpxk.S.tracks.map(t => t.name).sort().join(','), toast: document.querySelector('#toast').textContent,
+      empty: document.querySelector('#empty').hidden, defBtn: document.querySelector('#defBtn').hidden }));
+    check(n3.n === 1 && n3.names === defNames2 && n3.toast === 'Зареден е дефолтът: DEF2.gpx' && n3.empty && !n3.defBtn,
+      tag + 'празна колекция: презареждането разчита .gpx файла пак (тракът се връща), съобщава кой е и скрива попъпа „Тук ще се появи маршрутът“: ' + JSON.stringify([n3, defNames2]));
+    check(await p20.evaluate(() => U.DB.get('collection').then(c => !!c && c.tracks.length === 1)), tag + 'зареденият дефолт е записан и като работна колекция');
+
+    // Втори бутон в празния попъп: вижда се при записан дефолт и връща файла на мястото на празната колекция.
+    await p20.evaluate(() => document.querySelector('[data-act="clear-tracks"]').click());
+    await frame();
+    const b1 = await p20.evaluate(() => { const b = document.querySelector('#defBtn'), r = b.getBoundingClientRect();
+      return { empty: !document.querySelector('#empty').hidden, shown: !b.hidden && r.width > 0 && r.height > 0, txt: b.textContent.trim(), title: b.title }; });
+    check(b1.empty && b1.shown && b1.txt === 'Зареди дефолт' && b1.title === 'Зареди дефолта „DEF2.gpx“',
+      tag + 'в празния попъп има втори бутон „Зареди дефолт“ с името на файла в надписа при посочване: ' + JSON.stringify(b1));
+    await p20.click('#defBtn');
+    await hasToast('Зареден е дефолтът: ');
+    await p20.waitForFunction(() => __gpxk.S.tracks.length === 1);
+    const b2 = await p20.evaluate(() => ({ n: __gpxk.S.tracks.length, names: __gpxk.S.tracks.map(t => t.name).sort().join(','), toast: document.querySelector('#toast').textContent, empty: document.querySelector('#empty').hidden }));
+    check(b2.names === defNames2 && b2.toast === 'Зареден е дефолтът: DEF2.gpx' && b2.empty,
+      tag + 'клик върху „Зареди дефолт“ разчита файла пак на мястото на празната колекция: ' + JSON.stringify(b2));
+
+    // Без записан дефолт вторият бутон не излиза.
+    await p20.evaluate(() => U.DB.del('defaultGpx'));
+    await p20.evaluate(() => document.querySelector('[data-act="clear-tracks"]').click());
+    await p20.waitForFunction(() => U.DB.get('collection').then(c => !!c && c.tracks.length === 0 && c.routes.every(r => !r.items.length)).catch(() => false), null, { timeout: 5000 });
+    await p20.reload(); await rdy();
+    const b3 = await p20.evaluate(() => ({ n: __gpxk.S.tracks.length, empty: !document.querySelector('#empty').hidden, hidden: document.querySelector('#defBtn').hidden, ui: __gpxk.ui.defColl }));
+    check(b3.n === 0 && b3.empty && b3.hidden && !b3.ui,
+      tag + 'без записан дефолт и с празна колекция второто копче в попъпа не излиза: ' + JSON.stringify(b3));
+
+    // ---- „Изтрий“ в „Записани маршрути“: всички наведнъж, с потвърждение, и „Отмени“ ги връща ----
+    const f5 = writeGpx('DEF5', line(42.62, 24.70, 42.62, 24.75, 120));
+    await p20.setInputFiles('#fileInput', f5);
+    await p20.waitForFunction(() => __gpxk.S.tracks.length === 1 && __gpxk.A.parts.length >= 1);
+    await p20.keyboard.press('Escape');
+    await p20.evaluate(() => { const d = document.querySelector('#dlgImport'); if (d.open) d.close(); const g = document.querySelector('#dlgRings'); if (g.open) g.close(); });
+    await p20.evaluate(() => { const S = __gpxk.S, t = S.tracks[0], r = S.routes.find(x => x.id === S.curId);
+      Core.prep(t); r.items = [{ type: 'part', trackId: t.id, a: 0, b: t.len, rev: false }]; __gpxk.refresh(); });
+    const sig0 = await itemsSig();
+    await p20.evaluate(() => document.querySelector('[data-act="new-route"]').click());
+    await frame();
+    const r0 = await p20.evaluate(() => ({ n: __gpxk.S.routes.length, dis: document.querySelector('#clearRoutesBtn').disabled, cnt: document.querySelector('#routesCount').textContent,
+      txt: document.querySelector('#clearRoutesBtn').textContent.trim(), title: document.querySelector('#clearRoutesBtn').getAttribute('title'),
+      head: !!document.querySelector('#routesCard .card-head #clearRoutesBtn') }));
+    check(r0.n === 2 && !r0.dis && r0.cnt === '(2)' && r0.txt === 'Изтрий' && r0.head && r0.title.indexOf('Маха всички записани маршрути наведнъж') === 0 && sig0,
+      tag + '„Изтрий“ стои в заглавието на „Записани маршрути“ и е включен при два маршрута: ' + JSON.stringify([r0, sig0]));
+
+    // „Отказ“ в потвърждението не маха нищо.
+    p20.once('dialog', d => d.dismiss());
+    await p20.click('#clearRoutesBtn');
+    await frame();
+    const r1 = await p20.evaluate(() => ({ n: __gpxk.S.routes.length, cnt: document.querySelector('#routesCount').textContent }));
+    check(r1.n === 2 && r1.cnt === '(2)', tag + '„Отказ“ в потвърждението не маха нищо: ' + JSON.stringify(r1));
+
+    // Един клик и потвърждение: нула записани маршрута, на тяхно място един празен, траковете остават.
+    p20.once('dialog', d => d.accept());
+    await p20.click('#clearRoutesBtn');
+    await p20.waitForFunction(() => __gpxk.S.routes.length === 1, null, { timeout: 5000 });
+    const r2 = await p20.evaluate(() => ({ n: __gpxk.S.routes.length, items: __gpxk.S.routes.reduce((a, r) => a + r.items.length, 0),
+      tracks: __gpxk.S.tracks.length, toast: document.querySelector('#toast').textContent, undo: !document.querySelector('#undoBtn').disabled, cnt: document.querySelector('#routesCount').textContent }));
+    check(r2.n === 1 && r2.items === 0 && r2.tracks === 1 && r2.cnt === '(1)' && r2.toast === 'Всички записани маршрути са махнати' && r2.undo,
+      tag + 'клик и потвърждение: нула записани маршрута, на тяхно място един празен, траковете остават: ' + JSON.stringify(r2));
+
+    // „Отмени“ връща и двата маршрута с частите им.
+    await p20.click('#undoBtn');
+    await p20.waitForFunction(() => __gpxk.S.routes.length === 2, null, { timeout: 5000 });
+    const r3 = await p20.evaluate(() => { const S = __gpxk.S;
+      return { n: S.routes.length, items: S.routes.map(r => r.items.length).sort().join(','), cur: !!S.routes.find(r => r.id === S.curId) }; });
+    const sig1 = await itemsSig();
+    check(r3.n === 2 && r3.items === '0,1' && r3.cur && sig1 === sig0,
+      tag + '„Отмени“ връща и двата маршрута с частите им: ' + JSON.stringify([r3, sig1]));
+
+    // Без нито един записан маршрут копчето е изключено.
+    const r4 = await p20.evaluate(() => { __gpxk.S.routes = [];
+      document.querySelector('#routeFilter').dispatchEvent(new Event('input', { bubbles: true }));
+      return { dis: document.querySelector('#clearRoutesBtn').disabled, cnt: document.querySelector('#routesCount').textContent }; });
+    check(r4.dis && r4.cnt === '(0)', tag + 'без нито един записан маршрут „Изтрий“ е изключен: ' + JSON.stringify(r4));
+
+    // Двата езика.
+    const keys = ['imp.asDefault', 'imp.defName', 'imp.defSaved', 'imp.defNoGpx', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared'];
+    const miss = await p20.evaluate(ks => ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }), keys);
+    check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
+    const en = await p20.evaluate(() => { I18N.setPref('en');
+      return { chk: document.querySelector('[data-i18n="imp.asDefault"]').textContent.trim(), clear: document.querySelector('#clearRoutesBtn').textContent.trim(),
+        cnf: I18N.t('confirm.delAllRoutes', { n: 3 }), cleared: I18N.t('msg.routesCleared'), loaded: I18N.t('def.loaded', { name: 'X' }), load: I18N.t('def.load.title', { name: 'X' }) }; });
+    check(en.chk === 'Remember it as the default' && en.clear === 'Delete' && en.cnf === 'Remove all 3 saved routes? Tracks stay; Undo brings them back.' &&
+      en.cleared === 'All saved routes removed' && en.loaded === 'Default loaded: X' && en.load === 'Load the default “X”',
+      tag + 'на английски отметката, копчето и съобщенията: ' + JSON.stringify(en));
+    await p20.evaluate(() => I18N.setPref('bg'));
+    check(!e20.length, tag + 'конзолата е чиста' + (e20.length ? ': ' + e20.join(' | ') : ''));
+    await c20.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));
