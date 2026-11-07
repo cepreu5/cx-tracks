@@ -2633,8 +2633,10 @@ function barFits() {
     await pr.mouse.click(ry.x, ry.y);
     const mn = await menuState(), nt0 = await pr.evaluate(() => __gpxk.S.tracks.length);
     check(nt0 === 4 && mn.open && mn.sub === 'RX.gpx × RY.gpx' && mn.btns.some(b => /^Изтрий близкия трак „RY\.gpx“ \(18\sм\)$/.test(b)), '1.3.0: близкият трак само се предлага в менюто на разклонението (всички 4 тракове са тук): ' + JSON.stringify(mn.btns));
-    pr.once('dialog', d => d.accept());
     await pr.click('#objMenu [data-omk="near"]');
+    await pr.waitForFunction(() => document.querySelector('#dlgYes').open, null, { timeout: 5000 });
+    await pr.click('#yesOk');
+    await pr.waitForFunction(() => __gpxk.S.tracks.length === 3, null, { timeout: 5000 });
     const nt1 = await pr.evaluate(() => __gpxk.S.tracks.map(t => t.name).join());
     await pr.click('#undoBtn');
     const nt2 = await pr.evaluate(() => __gpxk.S.tracks.length);
@@ -3962,16 +3964,23 @@ function barFits() {
     check(r0.n === 2 && !r0.dis && r0.cnt === '(2)' && r0.txt === 'Изтрий' && r0.head && r0.title.indexOf('Маха всички записани маршрути наведнъж') === 0 && sig0,
       tag + '„Изтрий“ стои в заглавието на „Записани маршрути“ и е включен при два маршрута: ' + JSON.stringify([r0, sig0]));
 
-    // „Отказ“ в потвърждението не маха нищо.
-    p20.once('dialog', d => d.dismiss());
+    // „Отказ“ в потвърждението не маха нищо. 1.9.6: пита прозорецът в приложението, не браузърът.
     await p20.click('#clearRoutesBtn');
+    await p20.waitForFunction(() => document.querySelector('#dlgYes').open, null, { timeout: 5000 });
+    const y1 = await p20.evaluate(() => ({ h: document.querySelector('#dlgYes h3').textContent.trim(), txt: document.querySelector('#yesText').textContent,
+      no: document.querySelector('#yesNo').textContent.trim(), ok: document.querySelector('#yesOk').textContent.trim() }));
+    check(y1.h === 'Потвърждение' && y1.txt.indexOf('Да махна ли всички записани маршрути (2)') === 0 && y1.no === 'Отказ' && y1.ok === 'Изтрий',
+      tag + '1.9.6: потвърждението е прозорец в приложението и казва какво пада: ' + JSON.stringify(y1));
+    await p20.click('#yesNo');
     await frame();
     const r1 = await p20.evaluate(() => ({ n: __gpxk.S.routes.length, cnt: document.querySelector('#routesCount').textContent }));
     check(r1.n === 2 && r1.cnt === '(2)', tag + '„Отказ“ в потвърждението не маха нищо: ' + JSON.stringify(r1));
 
     // Един клик и потвърждение: нула записани маршрута, на тяхно място един празен, траковете остават.
-    p20.once('dialog', d => d.accept());
+    // 1.9.6: потвърждението минава през #dlgYes, не през диалога на браузъра.
     await p20.click('#clearRoutesBtn');
+    await p20.waitForFunction(() => document.querySelector('#dlgYes').open, null, { timeout: 5000 });
+    await p20.click('#yesOk');
     await p20.waitForFunction(() => __gpxk.S.routes.length === 1, null, { timeout: 5000 });
     const r2 = await p20.evaluate(() => ({ n: __gpxk.S.routes.length, items: __gpxk.S.routes.reduce((a, r) => a + r.items.length, 0),
       tracks: __gpxk.S.tracks.length, toast: document.querySelector('#toast').textContent, undo: !document.querySelector('#undoBtn').disabled, cnt: document.querySelector('#routesCount').textContent }));
@@ -3994,7 +4003,7 @@ function barFits() {
     check(r4.dis && r4.cnt === '(0)', tag + 'без нито един записан маршрут „Изтрий“ е изключен: ' + JSON.stringify(r4));
 
     // Двата езика.
-    const keys = ['imp.asDefault', 'imp.defName', 'imp.defSaved', 'imp.defNoGpx', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared'];
+    const keys = ['imp.asDefault', 'imp.defName', 'imp.defSaved', 'imp.defNoGpx', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared', 'yes.h', 'yes.ok'];
     const miss = await p20.evaluate(ks => ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }), keys);
     check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
     const en = await p20.evaluate(() => { I18N.setPref('en');

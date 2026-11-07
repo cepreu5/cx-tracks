@@ -332,6 +332,8 @@ I18N.add({
   'picd.labels': ['Надписи', 'Labels'],
   'picd.file': ['Файл: ', 'File: '],
   'act.cancel': ['Отказ', 'Cancel'],
+  'yes.h': ['Потвърждение', 'Confirm'],
+  'yes.ok': ['Изтрий', 'Delete'],
   'picd.both': ['Свали картина + .gpx', 'Download picture + .gpx'],
   'picd.make': ['Свали картината (.png)', 'Download the picture (.png)'],
   'live.x': ['Затвори - записът остава до следващото отваряне', 'Close - the record stays until the next time you open the app'],

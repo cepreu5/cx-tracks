@@ -496,6 +496,7 @@ td .num, td.num { font-family: var(--app-mono); }
 .dlg::backdrop { background: rgba(0, 0, 0, 0.35); }
 .dlg h3 { margin: 0 0 12px; font-size: 16px; }
 .dlg-sm { width: min(420px, calc(100% - 24px)); }
+.dlg .yes-text { margin: 0 0 14px; line-height: 1.45; }
 .name-row { gap: 8px; align-items: center; margin-bottom: 12px; }
 .name-row input { flex: 1; min-width: 0; font: inherit; padding: 6px 10px; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); background: var(--app-surface); color: var(--app-ink); }
 .dlg .row .sp { flex: 1; }
