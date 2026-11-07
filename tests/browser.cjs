@@ -4000,7 +4000,7 @@ function barFits() {
     check(r4.dis && r4.cnt === '(0)', tag + 'без нито един записан маршрут „Изтрий“ е изключен: ' + JSON.stringify(r4));
 
     // Двата езика.
-    const keys = ['imp.asDefault', 'imp.defSaved', 'imp.defNoGpx', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared', 'yes.h', 'yes.ok'];
+    const keys = ['imp.asDefault', 'imp.defSaved', 'imp.defNone', 'def.load', 'def.load.title', 'def.loaded', 'def.name', 'routes.clear', 'routes.clear.title', 'confirm.delAllRoutes', 'msg.routesCleared', 'yes.h', 'yes.ok'];
     const miss = await p20.evaluate(ks => ks.filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }), keys);
     check(!miss.length, tag + 'всички ' + keys.length + ' нови низа са на български и на английски' + (miss.length ? ': липсват ' + miss.join(', ') : ''));
     const en = await p20.evaluate(() => { I18N.setPref('en');
@@ -4012,6 +4012,91 @@ function barFits() {
     await p20.evaluate(() => I18N.setPref('bg'));
     check(!e20.length, tag + 'конзолата е чиста' + (e20.length ? ': ' + e20.join(' | ') : ''));
     await c20.close();
+  }
+
+  // ---- 1.9.8: дефолтът може да е и цяла .json колекция, не само .gpx файл ----
+  {
+    const tag = '1.9.8: ';
+    const c21 = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const p21 = await c21.newPage();
+    const e21 = [];
+    p21.on('pageerror', e => e21.push('pageerror: ' + e.message));
+    p21.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text()) && !/api\.opentopodata\.org/.test(m.text())) e21.push('console: ' + m.text()); });
+    const rdy = () => p21.waitForFunction(() => window.__gpxk && window.__gpxk.ready, null, { timeout: 15000 });
+    const frame = () => p21.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const hasToast = s => p21.waitForFunction(t => document.querySelector('#toast').textContent.indexOf(t) === 0, s, { timeout: 15000 });
+    const shut = () => p21.evaluate(() => ['#dlgImport', '#dlgRings', '#dlgYes'].forEach(s => { const d = document.querySelector(s); if (d && d.open) d.close(); }));
+    const defSt = () => p21.evaluate(() => U.DB.get('defaultGpx').then(d => d ? { name: d.name, files: d.files.map(f => f.name), blob: d.files.map(f => f.blob instanceof Blob && f.blob.size > 0) } : null));
+    // Колекция .json, както изглежда изнесеният файл: един трак (101 точки) и един маршрут.
+    const collFile = path.join(OUT, 'defkoll.json');
+    fs.writeFileSync(collFile, JSON.stringify({ format: 'gpx-konstruktor-kolekciya', version: 1, tol: 20,
+      tracks: [{ id: 'coll-1', name: 'KOLEKCIYA-A', color: 0, pts: line(42.70, 24.70, 42.70, 24.74, 100), breaks: [], wpts: [], dels: [], skips: [], openGaps: [], joins: [], links: [], visible: true, created: 1 }],
+      routes: [{ id: 'coll-r1', name: 'Marshrut ot kolekciya', created: 1, modified: 1, items: [], walks: [] }], curId: 'coll-r1' }));
+    await p21.goto(url); await rdy();
+
+    // (1) Внасяне на колекция с отметка: пази се самият .json файл, името идва от файла.
+    await p21.click('#empty [data-act="add-tracks"]');
+    await p21.waitForFunction(() => document.querySelector('#dlgImport').open);
+    await p21.check('#impDefault');
+    await p21.setInputFiles('#fileInput', collFile);
+    await hasToast('Дефолтът е записан: ');
+    await p21.waitForFunction(() => __gpxk.S.tracks.length === 1);
+    const g1 = await defSt();
+    check(g1 && g1.name === 'defkoll.json' && JSON.stringify(g1.files) === '["defkoll.json"]' && g1.blob[0],
+      tag + 'внасяне на колекция .json с отметка: пази се самият файл (байтовете) и името му: ' + JSON.stringify(g1));
+    const t1 = await p21.evaluate(() => ({ toast: document.querySelector('#toast').textContent, name: __gpxk.S.tracks[0].name, pts: __gpxk.S.tracks[0].pts.length, routes: __gpxk.S.routes.length }));
+    check(t1.toast === 'Дефолтът е записан: defkoll.json' && t1.name === 'KOLEKCIYA-A' && t1.pts === 101 && t1.routes >= 1,
+      tag + 'колекцията влезе цялата - тракът с точките и маршрутът ѝ - и съобщението казва името на файла: ' + JSON.stringify(t1));
+    await shut();
+
+    // (2) „Нов“ и презареждане: празната колекция се пълни пак от .json файла.
+    await p21.evaluate(() => document.querySelector('[data-act="clear-tracks"]').click());
+    await p21.waitForFunction(() => __gpxk.S.tracks.length === 0);
+    await p21.waitForFunction(() => U.DB.get('collection').then(c => !!c && c.tracks.length === 0).catch(() => false), null, { timeout: 5000 });
+    await p21.reload(); await rdy();
+    const n2 = await p21.evaluate(() => ({ n: __gpxk.S.tracks.length, names: __gpxk.S.tracks.map(t => t.name).join(','), pts: __gpxk.S.tracks[0].pts.length,
+      toast: document.querySelector('#toast').textContent, empty: document.querySelector('#empty').hidden, routes: __gpxk.S.routes.length }));
+    check(n2.n === 1 && n2.names === 'KOLEKCIYA-A' && n2.pts === 101 && n2.toast === 'Зареден е дефолтът: defkoll.json' && n2.empty && n2.routes >= 1,
+      tag + 'празна колекция: презареждането разчита .json файла пак (тракът с точките и маршрутът се връщат), съобщава името и скрива попъпа: ' + JSON.stringify(n2));
+
+    // (3) Бутонът „Зареди дефолт“ излиза и при .json дефолт и носи името му.
+    await p21.evaluate(() => document.querySelector('[data-act="clear-tracks"]').click());
+    await p21.waitForFunction(() => __gpxk.S.tracks.length === 0);
+    await frame();
+    const b1 = await p21.evaluate(() => { const b = document.querySelector('#defBtn'), r = b.getBoundingClientRect();
+      return { empty: !document.querySelector('#empty').hidden, shown: !b.hidden && r.width > 0 && r.height > 0, title: b.title }; });
+    check(b1.empty && b1.shown && b1.title === 'Зареди дефолта „defkoll.json“',
+      tag + 'в празния попъп „Зареди дефолт“ излиза и когато дефолтът е колекция .json: ' + JSON.stringify(b1));
+    await p21.click('#defBtn');
+    await hasToast('Зареден е дефолтът: ');
+    await p21.waitForFunction(() => __gpxk.S.tracks.length === 1);
+    const b2 = await p21.evaluate(() => ({ name: __gpxk.S.tracks[0].name, pts: __gpxk.S.tracks[0].pts.length, toast: document.querySelector('#toast').textContent,
+      empty: document.querySelector('#empty').hidden }));
+    check(b2.name === 'KOLEKCIYA-A' && b2.pts === 101 && b2.toast === 'Зареден е дефолтът: defkoll.json' && b2.empty,
+      tag + 'клик върху „Зареди дефолт“ връща колекцията от .json файла: ' + JSON.stringify(b2));
+
+    // (4) Смесено внасяне (.gpx и .json наведнъж) с отметка: помнят се и двата файла и се връщат заедно.
+    await p21.evaluate(() => { document.querySelector('#impDefault').checked = true; });
+    await p21.setInputFiles('#fileInput', [writeGpx('MIX', line(42.80, 24.70, 42.80, 24.73, 100)), collFile]);
+    await hasToast('Дефолтът е записан: ');
+    await p21.waitForFunction(() => __gpxk.S.tracks.length === 2);
+    await shut();
+    const g4 = await defSt();
+    check(g4 && JSON.stringify(g4.files) === '["MIX.gpx","defkoll.json"]' && g4.blob.every(Boolean) && g4.name === 'MIX.gpx, defkoll.json',
+      tag + 'смесено внасяне с отметка: дефолтът пази и .gpx, и .json файла, името е двете имена: ' + JSON.stringify(g4));
+    await p21.evaluate(() => document.querySelector('[data-act="clear-tracks"]').click());
+    await p21.waitForFunction(() => __gpxk.S.tracks.length === 0);
+    await p21.waitForFunction(() => U.DB.get('collection').then(c => !!c && c.tracks.length === 0).catch(() => false), null, { timeout: 5000 });
+    await p21.reload(); await rdy();
+    const n5 = await p21.evaluate(() => ({ n: __gpxk.S.tracks.length, names: __gpxk.S.tracks.map(t => t.name).sort().join(','), toast: document.querySelector('#toast').textContent }));
+    check(n5.n === 2 && n5.names === 'KOLEKCIYA-A,MIX.gpx' && n5.toast === 'Зареден е дефолтът: MIX.gpx, defkoll.json',
+      tag + 'празна колекция: и двата файла на дефолта се разчитат пак - тракът от .gpx и този от .json: ' + JSON.stringify(n5));
+
+    // (5) Двата езика за новия низ.
+    const miss = await p21.evaluate(() => ['imp.defNone'].filter(k => { const e = I18N.all[k]; return !e || !e[0] || !e[1] || e[0] === e[1]; }));
+    check(!miss.length, tag + 'новият низ за нечетящ се файл е на двата езика' + (miss.length ? ': липсва ' + miss.join(', ') : ''));
+    check(!e21.length, tag + 'конзолата е чиста' + (e21.length ? ': ' + e21.join(' | ') : ''));
+    await c21.close();
   }
 
   check(errors.length === 0, 'конзолата е чиста' + (errors.length ? ': ' + errors.join(' | ') : ''));
