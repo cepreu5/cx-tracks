@@ -513,6 +513,10 @@ td .num, td.num { font-family: var(--app-mono); }
 .drop.over { background: var(--app-surface-2); }
 .drop input { max-width: 100%; font-size: 12.5px; }
 .import-msg { margin-top: 10px; font-size: 13px; }
+/* 1.9.5: отметката „Запомни го като дефолт“ и полето за име на дефолта. */
+.imp-def { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 2px; }
+.imp-def input[type="text"] { font: inherit; font-size: 13px; padding: 6px 10px; border: 1px solid var(--app-line); border-radius: var(--app-radius-sm); background: var(--app-surface); color: var(--app-ink); }
+.imp-def input[type="text"]:disabled { opacity: .5; }
 .import-msg .err { border-left: 3px solid var(--app-warn); background: var(--app-warn-soft); padding: 8px 10px; border-radius: var(--app-radius-sm); margin-bottom: 6px; }
 .import-msg .ok { border-left: 3px solid var(--app-ok); padding: 6px 10px; margin-bottom: 6px; }
 .opts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }

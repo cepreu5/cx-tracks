@@ -35,7 +35,9 @@
     grade: U.LS.get('grade', true), fold: U.LS.get('fold', {}), follower: null, pos: null, prog: null, followView: 'map',
     autoCenter: true, pin: null, profHover: null, picUrl: null, picMeta: null, picLabels: [], picAt: null,
     orient: U.LS.get('orient', 'heading') === 'north' ? 'north' : 'heading', heading: null, lastWalk: null, lastPos: null, rot: 0, nameJob: null,
-    awake: U.LS.get('awake', true) !== false, om: null, redundant: []
+    awake: U.LS.get('awake', true) !== false, om: null, redundant: [],
+    // 1.9.5: дефолтната колекция - само името и датата ѝ; самите .gpx файлове стоят в базата под 'defaultGpx'.
+    defColl: null
   };
   var map;
 
@@ -96,6 +98,87 @@
       toast(T('msg.saveFail'), true);
     });
   }
+
+  // ---- Дефолтна колекция (1.9.5) ----
+  // Пази се САМИЯТ внесен .gpx файл - байтовете му (Blob) и името - под ключ 'defaultGpx'.
+  // При празна колекция файловете се разчитат пак през същия GPX.parse, така че няма втори формат
+  // и няма таван на размера. Път до файла няма (браузърът не отваря файл по път), затова байтовете
+  // стоят в IndexedDB, а в интерфейса се показва само името.
+  function saveDefaultGpx(files, name) {
+    if (!files || !files.length) return Promise.resolve(false);
+    name = name || files.map(function (f) { return f.name; }).join(', ') || T('def.name');
+    var at = Date.now();
+    return U.DB.set('defaultGpx', { name: name, at: at, files: files }).then(function () {
+      ui.defColl = { name: name, at: at };
+      updateDefBtn();
+      toast(T('imp.defSaved', { name: name }));
+      return true;
+    }).catch(function () {
+      toast(T('msg.saveFail'), true);
+      return false;
+    });
+  }
+  // Името на дефолта: изписаното в полето, иначе имената на внесените файлове (до около 60 знака).
+  function defNameFrom(names) {
+    var inp = $('#impDefName'), typed = inp ? String(inp.value || '').trim() : '';
+    if (typed) return typed;
+    var s = (names || []).filter(function (n) { return n; }).join(', ');
+    return s.length > 60 ? s.slice(0, 59).replace(/[\s,]+$/, '') + '…' : s;
+  }
+  // Копчето „Зареди дефолт“ в празния попъп: вижда се само когато има записан дефолт.
+  function updateDefBtn() {
+    var b = $('#defBtn');
+    if (!b) return;
+    b.hidden = !ui.defColl;
+    b.title = ui.defColl ? T('def.load.title', { name: ui.defColl.name }) : '';
+  }
+  // Записът на дефолта, ако го има (иначе null).
+  function readDef() {
+    return U.DB.get('defaultGpx').then(function (d) {
+      return d && Array.isArray(d.files) && d.files.length ? d : null;
+    }).catch(function () { return null; });
+  }
+  // Разчита отново внесените .gpx файлове и ги слага в колекцията - както при внасяне.
+  function addDefFiles(files) {
+    var chain = Promise.resolve(), n = 0;
+    (files || []).forEach(function (f) {
+      chain = chain.then(function () {
+        return readFile(f.blob).then(function (text) {
+          var res = GPX.parse(text.replace(/^﻿/, '').trim(), f.name);
+          res.tracks.forEach(function (t) {
+            var tr = { id: U.uid(), name: t.name, title: t.title, color: nextColor(), pts: t.pts, breaks: t.breaks, wpts: t.wpts, visible: true, created: Date.now() };
+            Core.prep(tr);
+            S.tracks.push(tr);
+            n++;
+          });
+        }).catch(function (e) {
+          console.error(e);
+          toast(T('err.read'), true);
+        });
+      });
+    });
+    return chain.then(function () { return n; });
+  }
+  // Зарежда дефолта на мястото на текущата колекция (не се слива с нея). Връща броя влезли тракове.
+  function loadDefaultColl() {
+    return readDef().then(function (d) {
+      if (!d) { ui.defColl = null; updateDefBtn(); return 0; }
+      ui.defColl = { name: d.name || T('def.name'), at: d.at || null };
+      updateDefBtn();
+      return addDefFiles(d.files);
+    });
+  }
+  // „Зареди дефолт“ от празния попъп: файловете се разчитат пак и стават работната колекция.
+  function openDefaultRoute() {
+    if (!ui.defColl) return;
+    loadDefaultColl().then(function (n) {
+      if (!n) return;
+      analyzeNow();
+      fitRoute();
+      saveNow();
+      toast(T('def.loaded', { name: (ui.defColl || {}).name || T('def.name') }));
+    });
+  }
   function adopt(data, merge) {
     if (!data || !Array.isArray(data.tracks)) throw new Error(T('err.notColl'));
     var tracks = data.tracks.filter(function (t) { return t && t.id && Array.isArray(t.pts) && t.pts.length > 1; });
@@ -135,6 +218,8 @@
     if (full) {
       // 1.7: върховете на трака сменят разстоянията и в другите маршрути - пазят се частите на всички.
       ui.undo.push(JSON.stringify({ full: true, rid: S.curId, tracks: S.tracks.map(plainTrack), route: cur(), dropJ: S.dropJ, keptJ: S.keptJ,
+        // 1.9.5: „Изтрий“ в „Записани маршрути“ маха целия списък - отпечатъкът носи и всички маршрути.
+        routesAll: JSON.parse(JSON.stringify(S.routes)),
         allItems: S.routes.map(function (r) { return [r.id, r.items]; }) }));
       if (ui.undo.length > 100) ui.undo.shift();
       $('#undoBtn').disabled = false;
@@ -157,7 +242,13 @@
     if (!s) return;
     s = JSON.parse(s);
     var r = S.routes.filter(function (x) { return x.id === s.rid; })[0];
-    if (s.full) {
+    if (s.routesAll) {
+      // 1.9.5: отпечатъкът носи всички маршрути - връщат се цели, с редицата и номерата си.
+      S.routes = JSON.parse(JSON.stringify(s.routesAll));
+      S.tracks = s.tracks;
+      S.curId = s.rid;
+      r = null;
+    } else if (s.full) {
       S.tracks = s.tracks;
       if (r) S.routes[S.routes.indexOf(r)] = s.route; else S.routes.unshift(s.route);
       S.curId = s.rid;
@@ -212,6 +303,7 @@
     saveSoon();
     map.redraw();
     $('#empty').hidden = !(S.tracks.length === 0 && r.items.length === 0);
+    updateDefBtn();
   }
 
   // Височините се питат с пауза, за да не се пита услугата при всяко движение.
@@ -2459,6 +2551,7 @@
     var list = S.routes.slice().sort(function (a, b) { return (b.modified || 0) - (a.modified || 0); })
       .filter(function (r) { return !f || r.name.toLowerCase().indexOf(f) >= 0; });
     $('#routesCount').textContent = '(' + S.routes.length + ')';
+    $('#clearRoutesBtn').disabled = !S.routes.length;
     $('#routesBody').innerHTML = list.map(function (r) {
       return '<tr data-route="' + r.id + '" class="' + (r.id === S.curId ? 'cur' : '') + '">' +
         '<td>' + U.esc(r.name) + '</td><td class="r num">' + U.km(r.len || 0) + '</td>' +
@@ -2617,7 +2710,7 @@
       out.push('<div class="err">' + TE('imp.tooMany', { n: files.length, max: MAX_FILES }) + '</div>');
       files = files.slice(0, MAX_FILES);
     }
-    var added = [], anyErr = false, loadedCollection = false;
+    var added = [], anyErr = false, loadedCollection = false, defFiles = [];
     var chain = Promise.resolve();
     files.forEach(function (f, i) {
       chain = chain.then(function () {
@@ -2633,6 +2726,7 @@
             });
           }
           var res = GPX.parse(trimmed, f.name);
+          defFiles.push(f);
           res.tracks.forEach(function (t) {
             var tr = { id: U.uid(), name: t.name, title: t.title, color: nextColor(), pts: t.pts, breaks: t.breaks, wpts: t.wpts, visible: true, created: Date.now() };
             Core.prep(tr);
@@ -2653,6 +2747,15 @@
         // След зареждане картата показва целия трак (или всички нови).
         if (added.length) fitTo(added.map(function (t) { return t.pts; })); else fitRoute();
         saveNow();
+        // 1.9.5: отметката „Запомни го като дефолт“ - помнят се самите .gpx файлове (байтовете им),
+        // за да се разчетат пак при празна колекция. Колекция .json не се помни - тя не е .gpx.
+        if ($('#impDefault').checked) {
+          var dname = defNameFrom(defFiles.map(function (x) { return x.name; }));
+          $('#impDefault').checked = false;
+          if ($('#impDefName')) { $('#impDefName').value = ''; $('#impDefName').disabled = true; }
+          if (defFiles.length) saveDefaultGpx(defFiles.map(function (x) { return { name: x.name, blob: x }; }), dname);
+          else toast(T('imp.defNoGpx'), true);
+        }
       }
       if (!anyErr && (added.length || loadedCollection)) {
         var dlg = $('#dlgImport');
@@ -3526,6 +3629,22 @@
     if (S.curId === id) { S.curId = null; openRoute(cur().id); }
     else { renderRoutes(); saveSoon(); }
   }
+  // 1.9.5: „Изтрий“ в „Записани маршрути“ маха всички наведнъж. Траковете остават,
+  // на тяхно място остава един празен маршрут, а „Отмени“ връща целия списък.
+  function clearRoutes() {
+    if (!S.routes.length) return;
+    if (!confirm(T('confirm.delAllRoutes', { n: S.routes.length }))) return;
+    pushUndo(true);
+    S.routes.forEach(function (x) { U.DB.del('snap:' + x.id); });
+    S.routes = [];
+    S.curId = null;
+    ui.cut = null; ui.sel = null; ui.drawTarget = null; ui.hl = null;
+    hidePointMenu();
+    cur();                       // нов празен маршрут
+    analyzeNow();                // вътре се преизчертават панелът, списъкът и картата
+    saveNow();
+    toast(T('msg.routesCleared'));
+  }
 
   // ---- Изчистване ----
   // "Нов": маха всички тракове и с тях частите на текущия маршрут (част без трак не може).
@@ -3725,6 +3844,8 @@
       case 'to-top': if ($('#toTopBtn').dataset.dir === 'down') $('#panel').scrollIntoView({ behavior: 'smooth' }); else window.scrollTo({ top: 0, behavior: 'smooth' }); break;
       case 'undo': undo(); break;
       case 'clear-tracks': clearTracks(); break;
+      case 'clear-routes': clearRoutes(); break;
+      case 'load-default': openDefaultRoute(); break;
       case 'clear-names': clearNames(); break;
       case 'clear-parts': clearParts(); break;
       case 'clean-route': cleanRoute(); break;
@@ -3765,6 +3886,12 @@
     });
     $('#labelsToggle').addEventListener('change', function (e) { ui.labels = e.target.checked; U.LS.set('labels', ui.labels); applyLayers(); });
     $('#vtxToggle').checked = ui.vtxShow;
+    // 1.9.5: полето за име на дефолта работи само при сложена отметка „Запомни го като дефолт“.
+    $('#impDefault').addEventListener('change', function (e) {
+      var n = $('#impDefName');
+      n.disabled = !e.target.checked;
+      if (!e.target.checked) n.value = '';
+    });
     $('#vtxToggle').addEventListener('change', function (e) { ui.vtxShow = e.target.checked; U.LS.set('vtxShow', ui.vtxShow); map.redraw(); });
     $('#gradeToggle').checked = ui.grade;
     $('#gradeToggle').addEventListener('change', function (e) { ui.grade = e.target.checked; U.LS.set('grade', ui.grade); drawProfile(); });
@@ -4097,12 +4224,26 @@
       if (data && data.tracks) {
         try { adopt(data, false); } catch (e) { console.error(e); }
       }
-    }).catch(function () { /* празна колекция */ }).then(function () {
+      // 1.9.5: дефолтът - помни се името му, а внесените .gpx файлове се разчитат пак,
+      // но само когато колекцията е празна (първи старт или след „Нов“).
+      return readDef().then(function (d) {
+        if (!d) return 0;
+        ui.defColl = { name: d.name || T('def.name'), at: d.at || null };
+        var nothing = S.tracks.length === 0 && S.routes.every(function (r) { return !r.items.length; });
+        if (!nothing) return 0;
+        return addDefFiles(d.files);
+      });
+    }).catch(function () { /* празна колекция */ }).then(function (defN) {
       S.tracks.forEach(function (t) { if (t.color == null) t.color = nextColor(); });
       $$('.tolInput').forEach(function (r) { r.value = S.tol; });
       $$('.tolVal').forEach(function (b) { b.textContent = S.tol + ' ' + T('unit.m'); });
       cur();
       analyzeNow();
+      // Зареденият дефолт става работната колекция и се вижда като съобщение.
+      if (defN) {
+        saveNow();
+        toast(T('def.loaded', { name: (ui.defColl || {}).name || T('def.name') }));
+      }
       askRings();
       loadPic();
       if (!view && S.tracks.length) fitRoute();
@@ -4116,6 +4257,7 @@
         liveAsk(lw);
       }).catch(function () { /* без незавършено следене */ });
     }).then(function () {
+      updateDefBtn();
       window.__gpxk = { S: S, get A() { return A; }, get G() { return G; }, get prof() { return prof; }, map: map, ui: ui, handleFiles: handleFiles, refresh: function () { routeChanged(); }, reanalyze: function () { analyzeNow(); }, flattenAutoGaps: flattenAutoGaps, get SET() { return SET; }, LW: LW, ready: true };
     });
 

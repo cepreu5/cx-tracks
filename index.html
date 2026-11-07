@@ -126,6 +126,7 @@
     <p data-i18n="empty.p">Няма заредени тракове. Зареди колекция от файл или добави отделни .gpx.</p>
     <div class="row">
       <button class="btn pri" data-act="add-tracks" data-i18n="act.addAny">Добави .gpx или колекция</button>
+      <button class="btn" data-act="load-default" id="defBtn" data-i18n="def.load" hidden>Зареди дефолт</button>
     </div>
   </div>
   <div id="tip" class="tip" hidden></div>
@@ -286,6 +287,9 @@
   <section class="card fold" id="routesCard" data-fold="routes">
     <div class="card-head">
       <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="routesFoldBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="routes.h">Записани маршрути</span> <span class="num muted" id="routesCount">(0)</span></button></h2>
+      <span class="head-acts">
+        <button class="btn sm" data-act="clear-routes" id="clearRoutesBtn" data-i18n="routes.clear" data-i18n-title="routes.clear.title" title="Маха всички записани маршрути наведнъж. Траковете остават, „Отмени“ ги връща." disabled>Изтрий</button>
+      </span>
     </div>
     <div class="fold-b" id="routesFoldBody" hidden>
     <div class="row lib-filter">
@@ -324,6 +328,10 @@
     </label>
     <div id="importMsg" class="import-msg"></div>
     <p class="muted small" data-i18n="imp.note">От файла влизат: името, точките, сегментите, имената на спирките и височината, ако я има.</p>
+    <div class="imp-def">
+      <label class="chk" for="impDefault"><input type="checkbox" id="impDefault" data-i18n-aria="imp.asDefault" aria-label="Запомни го като дефолт"> <span data-i18n="imp.asDefault">Запомни го като дефолт</span></label>
+      <input type="text" id="impDefName" data-i18n-placeholder="imp.defName" data-i18n-aria="imp.defName" placeholder="Име на дефолта; празно - името на файла" aria-label="Име на дефолта" disabled>
+    </div>
     <div class="row end"><button class="btn" value="cancel" data-i18n="act.close">Затвори</button></div>
   </form>
 </dialog>
