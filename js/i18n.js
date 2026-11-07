@@ -513,7 +513,7 @@ I18N.add({
   'imp.collLoaded': ['Колекцията е заредена', 'Collection loaded'],
   'imp.asDefault': ['Запомни го като дефолт', 'Remember it as the default'],
   'imp.defSaved': ['Дефолтът е записан: {name}', 'Default saved: {name}'],
-  'imp.defNoGpx': ['Дефолт се помни само от .gpx файл - колекция .json не се пази', 'Only a .gpx file can be remembered as the default - a .json collection is not saved'],
+  'imp.defNone': ['Дефолтът не е записан - внесените файлове не се прочетоха', 'The default was not saved - the files could not be read'],
   'msg.routeEmpty': ['Маршрутът е празен - клик върху трак го слага в маршрута.', 'The route is empty - clicking a track adds it to the route.'],
   'msg.exported': ['Изнесен {f} · {len}, една линия', 'Exported {f} · {len}, one line'],
   'msg.collExported': ['Колекцията е изнесена: {t}, {r}', 'Collection exported: {t}, {r}'],

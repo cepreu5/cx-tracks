@@ -99,11 +99,12 @@
     });
   }
 
-  // ---- Дефолтна колекция (1.9.5) ----
-  // Пази се САМИЯТ внесен .gpx файл - байтовете му (Blob) и името - под ключ 'defaultGpx'.
-  // При празна колекция файловете се разчитат пак през същия GPX.parse, така че няма втори формат
-  // и няма таван на размера. Път до файла няма (браузърът не отваря файл по път), затова байтовете
-  // стоят в IndexedDB, а в интерфейса се показва само името.
+  // ---- Дефолтна колекция (1.9.5, разширена в 1.9.8) ----
+  // Пази се САМИЯТ внесен файл - байтовете му (Blob) и името - под ключ 'defaultGpx'. От 1.9.8 това
+  // може да е .gpx трак (един или няколко) или цяла .json колекция: при празна колекция файловете се
+  // разчитат пак - .gpx през GPX.parse, .json през същия importCollection, който внася колекция, така
+  // че няма втори формат и няма таван на размера. Път до файла няма (браузърът не отваря файл по път),
+  // затова байтовете стоят в IndexedDB, а в интерфейса се показва само името.
   function saveDefaultGpx(files, name) {
     if (!files || !files.length) return Promise.resolve(false);
     name = name || files.map(function (f) { return f.name; }).join(', ') || T('def.name');
@@ -137,12 +138,33 @@
       return d && Array.isArray(d.files) && d.files.length ? d : null;
     }).catch(function () { return null; });
   }
-  // Разчита отново внесените .gpx файлове и ги слага в колекцията - както при внасяне.
+  // 1.9.8: записаният дефолт може да е и цяла .json колекция. Разчита се през същия importCollection,
+  // който внася колекция от файл, тоест траковете, маршрутите и картините влизат както при внасяне.
+  // Връща броя влезли тракове (0 при лош файл).
+  function addDefColl(text) {
+    var before = S.tracks.length, data;
+    try {
+      data = JSON.parse(String(text || '').replace(/^\uFEFF/, '').trim());
+    } catch (e) {
+      console.error(e);
+      toast(T('err.badJson'), true);
+      return Promise.resolve(0);
+    }
+    return importCollection(data).then(function () {
+      return S.tracks.length - before;
+    }).catch(function (e) {
+      console.error(e);
+      toast(T('err.read'), true);
+      return 0;
+    });
+  }
+  // Разчита отново записаните файлове и ги слага в колекцията - както при внасяне.
   function addDefFiles(files) {
     var chain = Promise.resolve(), n = 0;
     (files || []).forEach(function (f) {
       chain = chain.then(function () {
         return readFile(f.blob).then(function (text) {
+          if (/\.json$/i.test(f.name || '')) return addDefColl(text).then(function (k) { n += k; });
           var res = GPX.parse(text.replace(/^﻿/, '').trim(), f.name);
           res.tracks.forEach(function (t) {
             var tr = { id: U.uid(), name: t.name, title: t.title, color: nextColor(), pts: t.pts, breaks: t.breaks, wpts: t.wpts, visible: true, created: Date.now() };
@@ -2745,6 +2767,7 @@
             try { data = JSON.parse(trimmed); } catch (e) { throw new Error(T('err.badJson')); }
             return importCollection(data).then(function (n) {
               loadedCollection = true;
+              defFiles.push(f);   // 1.9.8: и колекцията може да стане дефолт
               out.push('<div class="ok">' + U.esc(f.name) + ' - ' + TE('imp.coll', { t: T.n('n.tracks', n.tracks), r: T.n('n.routes', n.routes) }) + '</div>');
             });
           }
@@ -2770,13 +2793,13 @@
         // След зареждане картата показва целия трак (или всички нови).
         if (added.length) fitTo(added.map(function (t) { return t.pts; })); else fitRoute();
         saveNow();
-        // 1.9.5: отметката „Запомни го като дефолт“ - помнят се самите .gpx файлове (байтовете им),
-        // за да се разчетат пак при празна колекция. Колекция .json не се помни - тя не е .gpx.
+        // 1.9.8: отметката „Запомни го като дефолт“ помни самите внесени файлове (байтовете им) -
+        // .gpx траковете и/или цялата .json колекция, - за да се разчетат пак при празна колекция.
         if ($('#impDefault').checked) {
           var dname = defNameFrom(defFiles.map(function (x) { return x.name; }));
           $('#impDefault').checked = false;
           if (defFiles.length) saveDefaultGpx(defFiles.map(function (x) { return { name: x.name, blob: x }; }), dname);
-          else toast(T('imp.defNoGpx'), true);
+          else toast(T('imp.defNone'), true);
         }
       }
       if (!anyErr && (added.length || loadedCollection)) {
