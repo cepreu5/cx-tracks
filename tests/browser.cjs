@@ -3224,7 +3224,11 @@ function barFits() {
     await p15.evaluate(() => document.querySelector('#dupCheckRes [data-dc]').click());
     check(await p15.evaluate(() => !!__gpxk.ui.dcHl && __gpxk.ui.dcHl.trackId === __gpxk.S.tracks[2].id), tag + 'клик на реда показва мястото на картата');
     // Износ с неминала проверка - минава, с предупреждение.
-    const [dl1] = await Promise.all([p15.waitForEvent('download'), p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click())]);
+    await p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click());
+    const nm1 = await p15.evaluate(() => ({ ext: (document.querySelector('#nameExt') || {}).textContent, val: document.querySelector('#fileName').value, open: document.querySelector('#dlgName').open }));
+    check(nm1.open && nm1.ext === '.json' && nm1.val === '', tag + '1.9.11: износът на колекцията пита за име - празно поле, до него „.json“: ' + JSON.stringify(nm1));
+    const [dl1] = await Promise.all([p15.waitForEvent('download'), p15.click('#nameOk')]);
+    check(/\.json$/.test(dl1.suggestedFilename()), tag + '1.9.11: празно поле дава gpx-kolekciya-<дата>.json: ' + dl1.suggestedFilename());
     await p15.waitForFunction(() => /Изнесени|изнесена|колекция/i.test(document.querySelector('#toast').textContent));
     const w1 = await p15.textContent('#toast');
     check(!!dl1 && /Внимание: проверката за дубликати намери 1 застъпване без маркер/.test(w1), tag + 'износът минава с предупреждение: ' + w1);
@@ -3236,7 +3240,10 @@ function barFits() {
     await p15.evaluate(() => document.querySelector('#dupCheckBtn').click());
     const dc3 = await dcOf();
     check(/Няма останали дубликати\./.test(dc3.res || '') && /колекцията е консистентна/.test(dc3.res) && !dc3.rows.length && dc3.cnt === '0 застъпвания', tag + 'без късото застъпване: ' + dc3.res);
-    const [dl2] = await Promise.all([p15.waitForEvent('download'), p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click())]);
+    await p15.evaluate(() => document.querySelector('#tracksCard [data-act="export-collection"]').click());
+    await p15.fill('#fileName', 'moya-kolekciya');
+    const [dl2] = await Promise.all([p15.waitForEvent('download'), p15.click('#nameOk')]);
+    check(dl2.suggestedFilename() === 'moya-kolekciya.json', tag + '1.9.11: въведеното име излиза с добавено .json: ' + dl2.suggestedFilename());
     await frame();
     const w2 = await p15.textContent('#toast');
     check(!!dl2 && !/Внимание/.test(w2), tag + 'след минала проверка износът е без предупреждение: ' + w2);

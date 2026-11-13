@@ -2879,7 +2879,8 @@
     var xml = GPX.build({ name: t.title || nm, pts: Core.trackLine(t, S.tracks), wpts: (t.wpts || []).filter(function (w) { return w.name; }) });
     U.download(new Blob([xml], { type: 'application/gpx+xml' }), U.slug(nm.replace(/\.gpx.*$/i, '')) + '.gpx');
   }
-  function exportCollection() {
+  // 1.9.11: името идва от прозореца „Име на файла“ - без име се пази старото gpx-kolekciya-<дата>.json.
+  function exportCollection(name) {
     var data = snapshotState();
     data.exported = new Date().toISOString();
     data.snaps = {};
@@ -2895,7 +2896,7 @@
       });
     });
     Promise.all(jobs).then(function () {
-      U.download(new Blob([JSON.stringify(data)], { type: 'application/json' }), 'gpx-kolekciya-' + U.dateDots(Date.now()) + '.json');
+      U.download(new Blob([JSON.stringify(data)], { type: 'application/json' }), name || ('gpx-kolekciya-' + U.dateDots(Date.now()) + '.json'));
       // 1.5: износът не се спира, но казва, ако „Проверка за дубликати“ не е минала.
       var warn = S.tracks.length ? dupWarn() : '';
       toast(T('msg.collExported', { t: T.n('n.tracks', S.tracks.length), r: T.n('n.routes', S.routes.length) }) + (warn ? ' ' + warn : ''), !!warn, warn ? 8000 : undefined);
@@ -3553,7 +3554,8 @@
   function askName(job) {
     var d = $('#dlgName'), inp = $('#fileName');
     ui.nameJob = job;
-    inp.value = job.def;
+    inp.value = job.def || '';
+    $('#nameExt').textContent = job.kind === 'collection' ? '.json' : '.gpx';
     $('#nameOk').textContent = job.kind === 'save' ? T('act.save') : T('act.download');
     $('#nameTitle').textContent = job.kind === 'save' ? T('name.saveTitle') : T('name.file');
     $('#saveSmooth').hidden = job.kind !== 'save';
@@ -3566,11 +3568,14 @@
     inp.focus(); inp.select();
   }
   // Празно поле или само ".gpx" - предложеното име; липсващото разширение се добавя.
+  /* 1.9.11: износът на колекцията пита за име с празно поле - разширението .json се добавя само.
+     Празно поле (или само разширението) връща предложеното име: job.def, а при колекцията - job.fallback. */
   function fileNameOf(job) {
-    var name = $('#fileName').value.trim().replace(/[\\/:*?"<>|]+/g, '-');
-    if (!name || /^\.gpx$/i.test(name)) name = job.def;
-    if (!/\.gpx$/i.test(name)) name += '.gpx';
-    return name;
+    var ext = job.kind === 'collection' ? '.json' : '.gpx';
+    var name = $('#fileName').value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\.(gpx|json)$/i, '').trim();
+    if (!name) name = String(job.def || job.fallback || '').replace(/\.(gpx|json)$/i, '').trim();
+    if (!name) name = 'gpx-kolekciya-' + U.dateDots(Date.now());
+    return name + ext;
   }
   function plainName(n) { return String(n || '').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'marshrut'; }
   // Изминатото като .gpx: пита за име на файла, после сваля. Следенето не спира.
@@ -3617,6 +3622,8 @@
       if (r) exportGpx(r, name);
     } else if (job.kind === 'save') {
       if (job.routeId === cur().id) saveRoute(name, saveChosen());
+    } else if (job.kind === 'collection') {
+      exportCollection(name);
     } else {
       var xml = GPX.build({ name: job.title, pts: job.pts, wpts: job.wpts || [] });
       U.download(new Blob([xml], { type: 'application/gpx+xml' }), name);
@@ -3898,7 +3905,7 @@
       case 'add-tracks': openImport(); break;
       case 'picture': openPicture(); break;
       case 'export-gpx': askRouteGpx(); break;
-      case 'export-collection': exportCollection(); break;
+      case 'export-collection': askName({ kind: 'collection', def: '', fallback: 'gpx-kolekciya-' + U.dateDots(Date.now()) + '.json' }); break;
       case 'save': askSave(); break;
       case 'follow': if (ui.follower) stopFollow(); else startFollow(); break;
       case 'follow-stop': stopFollow(); break;
