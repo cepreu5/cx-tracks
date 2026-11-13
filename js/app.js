@@ -32,6 +32,9 @@
   var ui = {
     mode: 'select', hover: null, hl: null, cut: null, drawTarget: null, sel: null,
     undo: [], base: U.LS.get('base', 'sat'), labels: U.LS.get('labels', true), vtxShow: U.LS.get('vtxShow', true),
+    // 1.10.1: „Стрелки“ - малките стрелки по посоката на всеки трак; изключено = картата както преди.
+    // trackArrows / startDots / flip се пълнят при всяко чертане - за проверките на картата.
+    arrShow: U.LS.get('arrShow', true) !== false, trackArrows: [], startDots: [], flip: null,
     grade: U.LS.get('grade', true), fold: U.LS.get('fold', {}), follower: null, pos: null, prog: null, followView: 'map',
     autoCenter: true, pin: null, profHover: null, picUrl: null, picMeta: null, picLabels: [], picAt: null,
     orient: U.LS.get('orient', 'heading') === 'north' ? 'north' : 'heading', heading: null, lastWalk: null, lastPos: null, rot: 0, nameJob: null,
@@ -736,6 +739,8 @@
     ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     var tb = byId();
     var following = !!ui.follower;
+    // 1.10.1: посоката по траковете и кръгчето за обръщане на първата част се смятат наново при всяко чертане.
+    ui.trackArrows = []; ui.startDots = []; ui.flip = null;
 
     // 1. Тракове-източници - тънко, в собствен цвят.
     ui.drawn = {}; ui.joins = [];
@@ -744,11 +749,17 @@
       var secs = A.byTrack[t.id] || [];
       var hlT = ui.hl && ui.hl.track === t.id;
       // Махнатият дубликат не се чертае: линията на трака се прекъсва там.
-      shownRanges(t, secs).forEach(function (pts) {
+      shownRanges(t, secs).forEach(function (pts, ri) {
         path(ctx, pr, pts);
         if (hlT) stroke(ctx, C.accent, LW.trackHl);
         stroke(ctx, C.casing, LW.trackCase);
         stroke(ctx, col, LW.track);
+        // 1.10.1: посоката на всеки запис - дребни стрелки по линията (при посочен ред - по-гъсти)
+        // и точка на началото на записа, за да се чете посоката и на къс трак.
+        if (ui.arrShow && !following) {
+          trackArrows(ctx, pr, pts, t, hlT);
+          if (!ri) startDot(ctx, pr, pts, t);
+        }
       });
       secs.forEach(function (s) {
         if (s.kind === 'part' || s.kind === 'dup' || s.kind === 'del') return;
@@ -877,6 +888,8 @@
           var mp = g.pts[Math.floor(g.pts.length / 2)], q = pr(mp[0], mp[1]);
           badge(ctx, q[0], q[1], g.bad ? '!' : String(g.no), g.bad ? C.dup : itemColor(g.no));
         });
+        // 1.10.1: кръгчето с две стрелки до първата част - стартът и краят ѝ се разменят с едно натискане.
+        if (!ui.om) flipButton(ctx, pr);
       }
     }
 
@@ -1093,6 +1106,89 @@
     }
   }
 
+  /* 1.10.1: посоката на всеки запис - дребни чавки по цялата дължина на трака, за да се вижда накъде
+     върви записът, преди да влезе в маршрута. Същата геометрия като drawArrows, но по-малка и с две
+     черти (широк кант в цвета на основата, после бяло), за да се чете върху всеки цвят на трак.
+     При посочен ред от „Тракове-източници“ стъпката е два пъти по-къса. ui.trackArrows - за проверките. */
+  var ARR_H = 3.2, ARR_STEP = 70, ARR_STEP_HL = 35;
+  function trackArrows(ctx, pr, pts, t, dense) {
+    var q = pts.map(function (p) { return pr(p[0], p[1]); }), seg = [0], L = 0, i;
+    for (i = 1; i < q.length; i++) { L += Math.hypot(q[i][0] - q[i - 1][0], q[i][1] - q[i - 1][1]); seg.push(L); }
+    var h = ARR_H;
+    // Много къса линия не носи стрелка - само началото ѝ се вижда по точката.
+    if (L < 6 * h) return;
+    var n = Math.max(1, Math.round(L / (dense ? ARR_STEP_HL : ARR_STEP))), W = map.w, H = map.h;
+    function at(s) {
+      for (var k = 1; k < q.length; k++) if (seg[k] >= s && seg[k] > seg[k - 1]) {
+        var f = (s - seg[k - 1]) / (seg[k] - seg[k - 1]);
+        return [q[k - 1][0] + f * (q[k][0] - q[k - 1][0]), q[k - 1][1] + f * (q[k][1] - q[k - 1][1]), Math.atan2(q[k][1] - q[k - 1][1], q[k][0] - q[k - 1][0])];
+      }
+      return null;
+    }
+    for (i = 0; i < n; i++) {
+      var a = at((i + 0.5) * L / n);
+      if (!a) continue;
+      if (a[0] < -6 || a[1] < -6 || a[0] > W + 6 || a[1] > H + 6) continue;
+      ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(a[2]);
+      ctx.beginPath(); ctx.moveTo(-h * 0.55, -h); ctx.lineTo(h * 0.65, 0); ctx.lineTo(-h * 0.55, h);
+      stroke(ctx, C['map-bg'], LW.arrow + 1.6);
+      stroke(ctx, C.casing, LW.arrow);
+      ctx.restore();
+      ui.trackArrows.push({ trackId: t.id, x: a[0], y: a[1], ang: a[2] * 180 / Math.PI });
+    }
+  }
+  /* 1.10.1: началото на записа - малка точка върху първата видима точка на трака. Посоката се вижда
+     и когато записът е къс и не стига за стрелка. */
+  function startDot(ctx, pr, pts, t) {
+    var q = pr(pts[0][0], pts[0][1]);
+    if (q[0] < -6 || q[1] < -6 || q[0] > map.w + 6 || q[1] > map.h + 6) return;
+    ctx.beginPath(); ctx.arc(q[0], q[1], 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = C.casing; ctx.fill();
+    ctx.lineWidth = 1.8; ctx.strokeStyle = trackColor(t); ctx.stroke();
+    ui.startDots.push({ trackId: t.id, x: q[0], y: q[1] });
+  }
+
+  /* 1.10.1: „обърни старт и край“ - кръгче с две стрелки стои на 20 px встрани от първата част на
+     маршрута (перпендикулярно на линията, за да не закрива пътя и номера на частта). Стрелките вътре
+     са начертани с черти, не са знак от шрифт. ui.flip пази къде е за попадението от мишката. */
+  var FLIP_R = 11, FLIP_OFF = 20;
+  function flipButton(ctx, pr) {
+    if (ui.follower || ui.om || !G) return;
+    var gi = -1, i;
+    for (i = 0; i < G.items.length; i++) {
+      var g0 = G.items[i];
+      if (g0.auto || g0.item.type !== 'part' || !g0.pts.length) continue;
+      gi = i; break;
+    }
+    if (gi < 0) return;
+    var g = G.items[gi], full = routeSpan(g, gi);
+    if (full.length < 2) return;
+    var q = full.map(function (p) { return pr(p[0], p[1]); });
+    // По-къса от 40 px част не носи кръгче - то ще закрие повече, отколкото показва.
+    var tot = 0;
+    for (i = 1; i < q.length; i++) tot += Math.hypot(q[i][0] - q[i - 1][0], q[i][1] - q[i - 1][1]);
+    if (tot < 40) return;
+    var mi = Math.floor(q.length / 2);
+    var a = q[Math.max(0, mi - 1)], b = q[Math.min(q.length - 1, mi + 1)];
+    var dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy);
+    if (len < 1) { a = q[0]; b = q[q.length - 1]; dx = b[0] - a[0]; dy = b[1] - a[1]; len = Math.hypot(dx, dy); }
+    if (len < 1) return;
+    var ux = dx / len, uy = dy / len;
+    var x = q[mi][0] + uy * FLIP_OFF, y = q[mi][1] - ux * FLIP_OFF;
+    ctx.beginPath(); ctx.arc(x, y, FLIP_R, 0, Math.PI * 2);
+    ctx.fillStyle = C.casing; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = C['route-a']; ctx.stroke();
+    // Вътре: горната стрелка сочи надясно, долната - наляво; начертани са с черти, не със знак от шрифт.
+    var s = 3.6;
+    ctx.beginPath();
+    ctx.moveTo(x - s, y - 3.2); ctx.lineTo(x + s, y - 3.2);
+    ctx.moveTo(x + s - 2.4, y - 5.2); ctx.lineTo(x + s, y - 3.2); ctx.lineTo(x + s - 2.4, y - 1.2);
+    ctx.moveTo(x + s, y + 3.2); ctx.lineTo(x - s, y + 3.2);
+    ctx.moveTo(x - s + 2.4, y + 1.2); ctx.lineTo(x - s, y + 3.2); ctx.lineTo(x - s + 2.4, y + 5.2);
+    stroke(ctx, C['map-bg'], 1.7);
+    ui.flip = { x: x, y: y, r: FLIP_R, idx: g.idx };
+  }
+
   // Знакът на отворена дупка: пръстен, прекъснат отдолу.
   var GAP_R = 9;
   function gapRing(ctx, x, y, r) {
@@ -1196,6 +1292,8 @@
   function hitTest(p) {
     var pr = map.projector();
     if (ui.follower) return null;
+    // 1.10.1: кръгчето за обръщане на първата част се хваща пръв - то стои над всичко останало.
+    if (ui.flip && Math.hypot(ui.flip.x - p.x, ui.flip.y - p.y) <= ui.flip.r + 6) return { kind: 'flip', idx: ui.flip.idx, d: 0 };
     var v = hitVertex(p);
     if (v) return v;
     var mk = hitMarker(p) || hitGapRing(p);
@@ -1231,6 +1329,7 @@
 
   function tipText(h) {
     var tb = byId();
+    if (h.kind === 'flip') return U.esc(T('tip.flip'));
     if (h.kind === 'part') {
       var t = tb[h.sec.trackId];
       var inR = findItemFor(h.sec) >= 0;
@@ -1331,6 +1430,17 @@
     cur().items.splice(i, 1);
     if (ui.drawTarget != null && ui.drawTarget >= i) ui.drawTarget = ui.drawTarget === i ? null : ui.drawTarget - 1;
     toast(T('msg.partRemoved', { n: gx ? gx.no : i + 1 }));
+    routeChanged();
+  }
+  /* 1.10.1: кръгчето с двете стрелки върху първата част разменя старта и края ѝ. Обръщането живее
+     в данните на маршрута (rev), не в изгледа - така се пази при презареждане и излиза в .gpx. */
+  function flipPart(idx) {
+    var it = cur().items[idx];
+    if (!it || it.type !== 'part') return;
+    pushUndo();
+    it.rev = !it.rev;
+    ui.drawTarget = null;
+    toast(T('msg.partFlipped'));
     routeChanged();
   }
   /* 1.10.0: двете посоки за добавяне в края на маршрута. Първа е посоката, чийто вход е
@@ -2011,6 +2121,7 @@
     var h = hitTest(p);
     if (!h) { toggleBar(); return; }
     if (h.kind === 'none') return;
+    if (h.kind === 'flip') { flipPart(h.idx); return; }
     if (h.kind === 'marker') { showDupMenu(h.sec); return; }
     if (h.kind === 'fork') { showJuncMenu(h.j); return; }
     if (h.kind === 'part') { showSegMenu(h.sec, null, p); return; }
@@ -2521,6 +2632,8 @@
     var vs = allVertices(), ws = walkPoints();
     // "Точки" горе вдясно се вижда само докато има чертани точки; отметката си пази състоянието и скрита.
     $('#vtxChk').hidden = !vs.length;
+    // 1.10.1: "Стрелки" се вижда само докато има видим трак - иначе няма какво да сочи.
+    $('#arrChk').hidden = !visibleTracks().length;
     $('#ptsCount').textContent = '(' + (vs.length + ws.length) + ')';
     $('#pointsList').innerHTML = vs.map(function (v, n) {
       var e = Elev.cache.get(Elev.cacheKey(v.p.lat, v.p.lon));
@@ -4030,6 +4143,9 @@
     $('#labelsToggle').addEventListener('change', function (e) { ui.labels = e.target.checked; U.LS.set('labels', ui.labels); applyLayers(); });
     $('#vtxToggle').checked = ui.vtxShow;
     $('#vtxToggle').addEventListener('change', function (e) { ui.vtxShow = e.target.checked; U.LS.set('vtxShow', ui.vtxShow); map.redraw(); });
+    // 1.10.1: „Стрелки“ - посоката по траковете се показва/скрива; изборът се помни.
+    $('#arrToggle').checked = ui.arrShow;
+    $('#arrToggle').addEventListener('change', function (e) { ui.arrShow = e.target.checked; U.LS.set('arrShow', ui.arrShow); map.redraw(); });
     $('#gradeToggle').checked = ui.grade;
     $('#gradeToggle').addEventListener('change', function (e) { ui.grade = e.target.checked; U.LS.set('grade', ui.grade); drawProfile(); });
     // Отклонение: до 3 цифри (0-999 м); прилага се с Enter или при излизане от полето.

@@ -816,4 +816,12 @@ I18N.add({
   'msg.partAddedAgain': ['Част {n} пак в маршрута · {len}', 'Part {n} in the route again · {len}']
 });
 
+/* ---- 1.10.1: стрелки по посоката на всеки трак и обръщане на старт и край ---- */
+I18N.add({
+  'arr.title': ['Стрелки - посоката на всеки запис', 'Arrows - the direction of each track'],
+  'arr.aria': ['Стрелки', 'Arrows'],
+  'tip.flip': ['Обърни старт и край', 'Swap start and end'],
+  'msg.partFlipped': ['Обърнат старт и край на първата част', 'Start and end of the first part swapped']
+});
+
 I18N.start();
