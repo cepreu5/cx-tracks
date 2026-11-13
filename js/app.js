@@ -3363,12 +3363,15 @@
     // копчето "x" на реда (walkbar-close), затова флагът се пази в браузъра.
     walkDlDone();
   }
-  /* Затваря прозореца "Запис на изминатото" и маха реда "Следенето спря" от картата (1.9.9). */
+  /* Затваря прозореца "Запис на изминатото" и маха реда "Следенето спря" от картата (1.9.9).
+     Отбелязва и че изминалото вече е свалено (w.dl, 1.9.10): тогава панелът "Следене" вече не
+     предлага "Свали изминалото като .gpx". Флагът се пази в браузъра, така че копчето не се
+     връща след презареждане. Ново следене прави нов lastWalk - без флага, с копче. */
   function walkDlDone() {
     var d = $('#dlgWalk');
     if (d.open) d.close();
     var w = ui.lastWalk;
-    if (w && w.bar) { w.bar = false; U.DB.set('lastWalk', w); }
+    if (w) { w.bar = false; w.dl = true; U.DB.set('lastWalk', w); }
     showWalk();
   }
 
@@ -3533,6 +3536,9 @@
     $('#followTitle').textContent = T('follow.title', { name: w.name });
     if (w.stats) { $('#fDone').textContent = w.stats.done; $('#fTime').textContent = w.stats.time; $('#fLeft').textContent = w.stats.left; $('#fOff').textContent = w.stats.off; }
     $('#fMsg').textContent = w.msgK ? T(w.msgK.head) + ' ' + T('walk.savedAs', { name: w.msgK.name }) : w.msg || ''; $('#fMsg').className = 'follow-msg';
+    // 1.9.10: свалено ли е вече изминалото - копчето "Свали ... .gpx" не се предлага повече.
+    // Подсказката до него ("записът се отваря от Записани маршрути") остава.
+    $('#walkDone button').hidden = !!w.dl;
     $('#walkDone').hidden = false;
   }
   function forgetWalk() {
@@ -3568,9 +3574,11 @@
   }
   function plainName(n) { return String(n || '').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'marshrut'; }
   // Изминатото като .gpx: пита за име на файла, после сваля. Следенето не спира.
-  function walkGpx(pts, routeName, title, wpts) {
+  // done = true само от копчето в панела "Следене": след свалянето панелът вече не го предлага.
+  // "Изнеси .gpx" при следене не го подава - там следенето продължава и копчето остава.
+  function walkGpx(pts, routeName, title, wpts, done) {
     if (!pts || pts.length < 2) return;
-    askName({ kind: 'walk', pts: pts.slice(), wpts: (wpts || []).slice(), title: title || T('walk.trackName', { d: U.date(Date.now()) }), def: 'izminat-' + U.slug(routeName) + '-' + U.dateDots(Date.now()) });
+    askName({ kind: 'walk', done: !!done, pts: pts.slice(), wpts: (wpts || []).slice(), title: title || T('walk.trackName', { d: U.date(Date.now()) }), def: 'izminat-' + U.slug(routeName) + '-' + U.dateDots(Date.now()) });
   }
   // Маршрутът като .gpx: пита за име (предложено - името на маршрута); празен маршрут не пита.
   function askRouteGpx(r) {
@@ -3613,6 +3621,8 @@
       var xml = GPX.build({ name: job.title, pts: job.pts, wpts: job.wpts || [] });
       U.download(new Blob([xml], { type: 'application/gpx+xml' }), name);
       toast(T('msg.exportedPts', { f: name, len: U.km(U.lengthOf(job.pts)), pts: T.n('n.points', job.pts.length, { n: U.num(job.pts.length) }) }), false, 4500);
+      // Свалено от панела "Следене" (1.9.10): панелът вече не предлага копчето за .gpx.
+      if (job.done) walkDlDone();
     }
   }
   /* Сваля <име>.gpx и записва текущия маршрут в "Записани маршрути" под същото име. Текущият
@@ -3894,7 +3904,7 @@
       case 'follow-stop': stopFollow(); break;
       case 'awake': setAwake(!ui.awake); break;
       case 'walk-gpx': if (ui.follower) walkGpx(ui.follower.rec, ui.followName, T('walk.trackName', { d: U.date(Date.now()) }), ui.follower.wpts); break;
-      case 'walk-gpx-done': if (ui.lastWalk) { var lt = track(ui.lastWalk.trackId); walkGpx(ui.lastWalk.pts, ui.lastWalk.name, ui.lastWalk.title, lt ? lt.wpts : ui.lastWalk.wpts); } break;
+      case 'walk-gpx-done': if (ui.lastWalk) { var lt = track(ui.lastWalk.trackId); walkGpx(ui.lastWalk.pts, ui.lastWalk.name, ui.lastWalk.title, lt ? lt.wpts : ui.lastWalk.wpts, true); } break;
       case 'walk-point': askPoint(); break;
       case 'center': centerMe(); break;
       case 'north': northUp(el); break;
