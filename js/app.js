@@ -3357,6 +3357,19 @@
     var xml = GPX.build({ name: name, pts: pts, wpts: t ? (t.wpts || []).filter(function (w) { return w.name; }) : [] });
     U.download(new Blob([xml], { type: 'application/gpx+xml' }), fname);
     toast(T('msg.exportedPts', { f: fname, len: U.km(U.lengthOf(pts)), pts: T.n('n.points', pts.length, { n: U.num(pts.length) }) }), false, 4500);
+    // 1.9.9: след като файлът е свален, прозорецът се затваря и редът "Следенето спря" се скрива -
+    // сваленото вече е при потребителя и редът няма какво да предложи. Записът остава (суров, както
+    // и след "Отказ"), панелът "Следене" пази "Свали изминалото като .gpx". Същото скриване прави и
+    // копчето "x" на реда (walkbar-close), затова флагът се пази в браузъра.
+    walkDlDone();
+  }
+  /* Затваря прозореца "Запис на изминатото" и маха реда "Следенето спря" от картата (1.9.9). */
+  function walkDlDone() {
+    var d = $('#dlgWalk');
+    if (d.open) d.close();
+    var w = ui.lastWalk;
+    if (w && w.bar) { w.bar = false; U.DB.set('lastWalk', w); }
+    showWalk();
   }
 
   /* Начален екран: само при първото пускане на устройството (помни се в браузъра). Изчезва
