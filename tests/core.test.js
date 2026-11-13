@@ -1262,3 +1262,63 @@ console.log('общ участък OK');
   });
   console.log('1.9.3 „Картина“: завъртане на целия кадър по посоката, увеличение за ъглите, надписите изправени: OK');
 })();
+
+// ---- 1.10.0: „посока и повторно добавяне на участък“ - маршрутът излиза и се връща по същия път:
+// a -> b по P, ляв b -> c по L, десен c -> b по R (срещу записа), b -> a по P (срещу записа).
+// Една и съща част влиза в маршрута два пъти; геометрията няма дупки и нито един скок. ----
+(function () {
+  var lat0 = 42.6, lon0 = 24.8, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(lat0 * Math.PI / 180) * ky;
+  function xy(x, y) { return [lat0 + y / ky, lon0 + x / kx]; }
+  // Плътна линия (стъпка ~10 м) през дадените върхове, в метри около базовата точка.
+  function poly(v) {
+    var o = [xy(v[0][0], v[0][1]).concat([500])];
+    for (var i = 1; i < v.length; i++) {
+      var a = v[i - 1], b = v[i], k = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1]) / 10));
+      for (var j = 1; j <= k; j++) o.push(xy(a[0] + (b[0] - a[0]) * j / k, a[1] + (b[1] - a[1]) * j / k).concat([500]));
+    }
+    return o;
+  }
+  var A0 = xy(0, 0), B0 = xy(1000, 0), C0 = xy(1000, 1000);
+  var P = { id: 'P', pts: poly([[0, 0], [1000, 0]]) };                              // a -> b
+  var L = { id: 'L', pts: poly([[1000, 0], [992, 500], [1000, 1000]]) };            // b -> c, ляв (мъничко на запад)
+  var R = { id: 'R', pts: poly([[1000, 0], [1008, 500], [1000, 1000]]) };           // b -> c, десен (мъничко на изток)
+  var by = { P: P, L: L, R: R }, an = Core.analyze([P, L, R], 20);
+  Core.prep(P); Core.prep(L); Core.prep(R);
+  var route = { items: [
+    { type: 'part', trackId: 'P', a: 0, b: P.len, rev: false },
+    { type: 'part', trackId: 'L', a: 0, b: L.len, rev: false },
+    { type: 'part', trackId: 'R', a: 0, b: R.len, rev: true },
+    { type: 'part', trackId: 'P', a: 0, b: P.len, rev: true }
+  ] };
+  var geo = Core.routeGeometry(route, by, an);
+  assert.strictEqual(route.items.length, 4, '1.10.0: маршрутът е от четири части - същата част P влиза в края втори път');
+  assert.strictEqual(geo.items.filter(function (g) { return g.item.type === 'part'; }).length, 4,
+    '1.10.0: геометрията вижда четирите части, а не е сляла повторената: ' + geo.items.map(function (g) { return g.item.type; }).join(','));
+  assert.strictEqual(geo.gaps.length, 0, '1.10.0: в отиване-връщане няма дупки: ' + JSON.stringify(geo.gaps.map(function (g) { return Math.round(g.d); })));
+  // Шевовете между частите: краят на едната и началото на следващата са на едно място (под 1 м).
+  var parts = geo.items.filter(function (g) { return g.item.type === 'part'; }), seams = [], step = 0;
+  parts.forEach(function (g) {
+    for (var k = 1; k < g.pts.length; k++) step = Math.max(step, U.hav(g.pts[k - 1][0], g.pts[k - 1][1], g.pts[k][0], g.pts[k][1]));
+  });
+  for (var si = 1; si < parts.length; si++) {
+    var pe = parts[si - 1].pts[parts[si - 1].pts.length - 1], ps = parts[si].pts[0];
+    seams.push(U.hav(pe[0], pe[1], ps[0], ps[1]));
+  }
+  assert.ok(seams.length === 3 && seams.every(function (d) { return d < 1; }),
+    '1.10.0: частите се залепват една за друга (3 шева под 1 м): ' + seams.map(function (d) { return d.toFixed(2); }).join(', '));
+  // Никъде по целия маршрут няма скок - съседните му точки са на обичайната стъпка на трака.
+  var worst = 0;
+  for (var i = 1; i < geo.pts.length; i++) worst = Math.max(worst, U.hav(geo.pts[i - 1][0], geo.pts[i - 1][1], geo.pts[i][0], geo.pts[i][1]));
+  assert.ok(worst <= step + 0.5, '1.10.0: между съседните точки на маршрута няма скок (най-голям ' + worst.toFixed(2) + ' м при стъпка ' + step.toFixed(2) + ' м)');
+  var d0 = U.hav(geo.pts[0][0], geo.pts[0][1], A0[0], A0[1]), d1 = U.hav(geo.pts[geo.pts.length - 1][0], geo.pts[geo.pts.length - 1][1], A0[0], A0[1]);
+  assert.ok(d0 < 1, '1.10.0: маршрутът тръгва от a (на ' + d0.toFixed(2) + ' м)');
+  assert.ok(d1 < 1, '1.10.0: и се връща пак в a (на ' + d1.toFixed(2) + ' м)');
+  var want = 2 * P.len + L.len + R.len;
+  assert.ok(Math.abs(geo.len - want) < 5, '1.10.0: дължината е 2·P + L + R (' + Math.round(want) + ' м), а е ' + Math.round(geo.len) + ' м');
+  // Краят на втората част е в c, а не в b: посоката идва от полето rev на частта.
+  var it3 = geo.items.filter(function (g) { return g.item.type === 'part'; });
+  var e2 = it3[1].pts[it3[1].pts.length - 1], s3 = it3[2].pts[0];
+  assert.ok(U.hav(e2[0], e2[1], C0[0], C0[1]) < 1 && U.hav(s3[0], s3[1], C0[0], C0[1]) < 1,
+    '1.10.0: левият свършва в c и десният тръгва от c срещу записа');
+  console.log('1.10.0 посока и повторно добавяне на участък: отиване и връщане с една част два пъти, без дупки и без скок: OK');
+})();
