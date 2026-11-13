@@ -805,4 +805,15 @@ I18N.add({
   'om.near.sub': ['свободен край · {name} · {d}', 'free end · {name} · {d}']
 });
 
+/* ---- 1.10.0: посока и повторно добавяне на участък ---- */
+I18N.add({
+  'om.addFwd': ['Добави в края · по посоката на записа', 'Add at end · as recorded'],
+  'om.addRev': ['Добави в края · срещу посоката на записа', 'Add at end · against the recording'],
+  'om.addAgainFwd': ['Добави пак в края · по посоката на записа', 'Add again at end · as recorded'],
+  'om.addAgainRev': ['Добави пак в края · срещу посоката на записа', 'Add again at end · against the recording'],
+  'om.endDist': ['краят на маршрута е на {d}', 'the route end is {d} away'],
+  'om.juncTwice': ['Маршрутът минава оттук {n} пъти - смяна на клон не се предлага', 'The route passes here {n} times - switching branch is not offered'],
+  'msg.partAddedAgain': ['Част {n} пак в маршрута · {len}', 'Part {n} in the route again · {len}']
+});
+
 I18N.start();

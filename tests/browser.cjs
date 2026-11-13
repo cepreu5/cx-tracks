@@ -2618,7 +2618,10 @@ function barFits() {
     rg = await crossRing();
     await pr.mouse.click(rg.x + 60, rg.y);
     const ms = await menuState();
-    check(ms.kind === 'seg' && JSON.stringify(ms.btns) === '["Махни от маршрута","Изтрий участъка","Отказ"]', '1.3.0: клик върху част от маршрута - меню „Махни от маршрута“ / „Изтрий участъка“: ' + JSON.stringify(ms.btns));
+    // 1.10.0: клик върху част от маршрута дава и двете посоки за „Добави пак в края“ - пътят обратно,
+    // а „Махни от маршрута“ пада след тях. Частта е последната в маршрута, затова до края му е 0 м.
+    check(ms.kind === 'seg' && JSON.stringify(ms.btns) === '["Добави пак в края · срещу посоката на записа краят на маршрута е на 0 м","Добави пак в края · по посоката на записа краят на маршрута е на 2,42 км","Махни от маршрута","Изтрий участъка","Отказ"]',
+      '1.10.0: клик върху част от маршрута - „Добави пак в края“ в двете посоки, после „Махни от маршрута“ / „Изтрий участъка“: ' + JSON.stringify(ms.btns));
     await pr.click('#objMenu [data-omk="del"]');
     await pr.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
     const R3 = await routeSt(), trX3 = await trRow(0);

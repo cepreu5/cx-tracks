@@ -1294,25 +1294,65 @@
     for (var i = G.items.length - 1; i >= 0; i--) if (G.items[i].pts.length) return G.items[i].pts[G.items[i].pts.length - 1];
     return null;
   }
-  function addPart(sec) {
-    var existing = findItemFor(sec);
+  // 1.10.0: посоката на частта при добавяне - 'fwd' по посоката на записа, 'rev' срещу нея;
+  // без избор (undefined) остава старата догадка: по-близкият до края на маршрута край влиза пръв.
+  function partRev(t, sec, dir) {
+    if (dir === 'fwd') return false;
+    if (dir === 'rev') return true;
+    var e = lastEnd();
+    if (!t || !e) return false;
+    var s0 = Core.pointAt(t, sec.a), s1 = Core.pointAt(t, sec.b);
+    return U.hav(e[0], e[1], s1[0], s1[1]) < U.hav(e[0], e[1], s0[0], s0[1]);
+  }
+  /* 1.10.0: „Добави в края“ слага частта в края на маршрута и не маха нищо - вече добавена
+     част може да влезе пак, за да се върне маршрутът по същия път обратно. */
+  function addPart(sec, dir, again) {
+    var t = track(sec.trackId), rev = partRev(t, sec, dir);
     pushUndo();
-    if (existing >= 0) {
-      var gx = G.items.filter(function (x) { return x.idx === existing; })[0];
-      var no = gx ? gx.no : existing + 1;
-      cur().items.splice(existing, 1);
-      toast(T('msg.partRemoved', { n: no }));
-    } else {
-      var t = track(sec.trackId), rev = false, e = lastEnd();
-      if (t && e) {
-        var s0 = Core.pointAt(t, sec.a), s1 = Core.pointAt(t, sec.b);
-        rev = U.hav(e[0], e[1], s1[0], s1[1]) < U.hav(e[0], e[1], s0[0], s0[1]);
-      }
-      cur().items.push({ type: 'part', trackId: sec.trackId, a: sec.a, b: sec.b, rev: rev });
-      ui.drawTarget = null;
-      toast(T('msg.partAdded', { n: (G ? G.count : 0) + 1, len: U.km(sec.len) }));
-    }
+    cur().items.push({ type: 'part', trackId: sec.trackId, a: sec.a, b: sec.b, rev: rev });
+    ui.drawTarget = null;
+    var p = { n: (G ? G.count : 0) + 1, len: U.km(sec.len) };
+    toast(again ? T('msg.partAddedAgain', p) : T('msg.partAdded', p));
     routeChanged();
+  }
+  /* 1.10.0: махане на вече добавена част от менюто на участъка. Пада последното копие на
+     участъка - то е това, което току-що е добавено. */
+  function removePart(sec) {
+    var items = cur().items, i = -1;
+    for (var k = items.length - 1; k >= 0; k--) {
+      var it = items[k];
+      if (it.type !== 'part' || it.trackId !== sec.trackId) continue;
+      var a = Math.min(it.a, it.b), b = Math.max(it.a, it.b);
+      if (Core.overlap(a, b, sec.a, sec.b) > 0.5 * Math.min(b - a, sec.len)) { i = k; break; }
+    }
+    if (i < 0) return;
+    pushUndo();
+    var gx = G.items.filter(function (x) { return x.idx === i; })[0];
+    cur().items.splice(i, 1);
+    if (ui.drawTarget != null && ui.drawTarget >= i) ui.drawTarget = ui.drawTarget === i ? null : ui.drawTarget - 1;
+    toast(T('msg.partRemoved', { n: gx ? gx.no : i + 1 }));
+    routeChanged();
+  }
+  /* 1.10.0: двете посоки за добавяне в края на маршрута. Първа е посоката, чийто вход е
+     по-близо до края на маршрута, и до нея пише на колко е краят. При празен маршрут
+     остава едното „Добави в маршрута“, както досега. */
+  function addDirBtns(btns, sec, again) {
+    var t = track(sec.trackId), e = lastEnd();
+    if (!t || !e) {
+      btns.push({ key: 'add', label: T('om.add'), run: function () { addPart(sec); } });
+      return;
+    }
+    var sA = Core.pointAt(t, sec.a), sB = Core.pointAt(t, sec.b);
+    var dF = U.hav(e[0], e[1], sA[0], sA[1]), dR = U.hav(e[0], e[1], sB[0], sB[1]);
+    var list = [
+      { dir: 'fwd', d: dF, lab: again ? 'om.addAgainFwd' : 'om.addFwd' },
+      { dir: 'rev', d: dR, lab: again ? 'om.addAgainRev' : 'om.addRev' }
+    ];
+    if (dR < dF) list.reverse();
+    list.forEach(function (o, oi) {
+      btns.push({ key: oi === 0 ? 'add' : 'addOther', label: T(o.lab), sub: T('om.endDist', { d: U.dist(o.d) }),
+        run: function () { addPart(sec, o.dir, again); } });
+    });
   }
   function removeItem(idx) {
     var g = G.items.filter(function (x) { return x.idx === idx; })[0];
@@ -1335,6 +1375,18 @@
       });
     });
     return res;
+  }
+  /* 1.10.0: колко пъти маршрутът минава през точката j - всеки непрекъснат опън от точки на
+     маршрута до нея (в рамките на отклонението) е едно минаване. През точка, през която
+     маршрутът минава повече от веднъж, смяна на клон не се предлага. */
+  function passCount(j) {
+    if (!G || !G.pts || !G.pts.length) return 0;
+    var jt = Math.max(Core.ROUTE_GAP, 1.5 * (S.tol || 20)), n = 0, inRun = false;
+    G.pts.forEach(function (p) {
+      if (U.hav(p[0], p[1], j.lat, j.lon) <= jt) { if (!inRun) n++; inRun = true; }
+      else inRun = false;
+    });
+    return n;
   }
   function switchFork(fk) {
     pushUndo();
@@ -2128,17 +2180,27 @@
     var sec = (A.byTrack[it.trackId] || []).filter(function (s) { return s.kind === 'part' && d >= s.a && d <= s.b; })[0];
     return sec || { trackId: it.trackId, kind: 'part', a: lo, b: hi, len: hi - lo, key: it.trackId + ':' + Math.round(lo) };
   }
-  // Меню на участък: първото копче е днешният клик (добави / продължи по клона / махни от маршрута).
+  // Меню на участък: първите копчета слагат участъка в края на маршрута (1.10.0 - с избор на посока).
   function showSegMenu(sec, idx, p) {
     var t = track(sec.trackId), btns = [];
-    if (idx != null) btns.push({ key: 'out', label: T('om.out'), run: function () { removeItem(idx); } });
-    else if (findItemFor(sec) >= 0) btns.push({ key: 'out', label: T('om.out'), run: function () { addPart(sec); } });
-    else {
-      var fk = forkFor(sec);
-      btns.push(fk ? { key: 'fork', label: T('om.fork'), run: function () { switchFork(fk); } }
-        : { key: 'add', label: T('om.add'), run: function () { addPart(sec); } });
+    // 1.10.0: и кликът върху част от маршрута (idx) дава „Добави пак в края“ - без него последната
+    // отсечка на отиване-връщане (b -> a) не може да влезе, защото кликът върху добавеното
+    // стига до тук, а не до клона по-долу. „Махни от маршрута“ маха точно тази част.
+    if (idx != null) {
+      addDirBtns(btns, sec, true);
+      btns.push({ key: 'out', cls: 'danger', label: T('om.out'), run: function () { removeItem(idx); } });
     }
-    btns[0].cls = 'pri';
+    // 1.10.0: вече добавен участък влиза пак в края (за обратния път), а „Махни от маршрута“ е отделно копче.
+    else if (findItemFor(sec) >= 0) {
+      addDirBtns(btns, sec, true);
+      btns.push({ key: 'out', cls: 'danger', label: T('om.out'), run: function () { removePart(sec); } });
+    } else {
+      // 1.10.0: посоката се избира; смяната на клона остава след нея, вече не е първото копче.
+      addDirBtns(btns, sec, false);
+      var fk = forkFor(sec);
+      if (fk) btns.push({ key: 'fork', label: T('om.fork'), run: function () { switchFork(fk); } });
+    }
+    if (btns.length && !btns[0].cls) btns[0].cls = 'pri';
     // 1.8: „Удължи/Скъси“ - точно под първото копче, по един ред за всеки свободен край на трака.
     // 1.9: над него „Свържи с най-близката линия“ - един клик, ако най-близката линия е до тавана (Core.LINK_MAX).
     var xr = t ? extRows(t) : [], nears = xr.map(nearTarget), nn = nears.filter(Boolean).length;
@@ -2157,11 +2219,12 @@
     showObjMenu({ sec: sec, under: under }, 'seg', T('om.seg') + ' · ' + kmRange(sec.a, sec.b), trackLabel(t) + ' · ' + (sec.len < 1000 ? U.meters(sec.len) : U.km(sec.len)), btns, [p.lat, p.lon], note);
   }
   function showJuncMenu(j) {
-    var tb = byId(), names = [], f = forkOf(j), btns = [];
+    var tb = byId(), names = [], f = forkOf(j), btns = [], twice = passCount(j);
     j.branches.forEach(function (br) { var n = trackLabel(tb[br.trackId]); if (names.indexOf(n) < 0) names.push(n); });
     btns.push({ key: 'delj', cls: 'danger', label: T('om.delJ'), run: function () { deleteJunction(j); } });
     // Продължи по клон: при маршрут, който минава оттук (или свършва тук).
-    if (f && !f.atStart) j.branches.forEach(function (br, bi) {
+    // 1.10.0: през точка, през която маршрутът минава повече от веднъж, смяна на клон не се предлага.
+    if (f && !f.atStart && twice < 2) j.branches.forEach(function (br, bi) {
       if (bi === f.chosen || bi === f.incoming) return;
       var sec = { trackId: br.trackId, kind: 'part', a: br.a, b: br.b, len: br.len, key: br.key };
       if (f.atEnd && findItemFor(sec) >= 0) return;
@@ -2178,7 +2241,7 @@
       if (nt) btns.push({ key: 'near', label: T('om.delNear', { name: nt.name, d: U.dist(lk.d) }), run: function () { deleteTrack(nt); } });
     }
     var at = ringAt(j);
-    showObjMenu({ j: j }, 'junc', T('om.junc'), names.join(' × '), btns, at);
+    showObjMenu({ j: j }, 'junc', T('om.junc'), names.join(' × '), btns, at, twice >= 2 ? T('om.juncTwice', { n: twice }) : '');
   }
   // Изтриване на разклонения: маршрутът се слива в точките, после анализът ги пропуска (S.dropJ).
   function dropJunctions(js) {
