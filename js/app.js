@@ -3085,12 +3085,19 @@
     if (!quiet) toast(T('msg.exported', { f: fname, len: U.km(geo.len) }));
     return true;
   }
-  function exportTrack(t) {
+  /* 1.10.3: тракът също пита за име на файла (предложено - името на трака), както маршрутът,
+     изминатото и колекцията. Без fname (от прозореца за име) само отваря питането. */
+  function exportTrack(t, fname) {
+    if (!t) return;
     // 1.6: след „Изтрий имената“ .gpx излиза с първоначалното име (t.orig), не със служебното.
     var nm = t.orig || t.name;
+    if (!fname) {
+      askName({ kind: 'track', trackId: t.id, def: plainName(nm.replace(/\.gpx.*$/i, '')) });
+      return;
+    }
     // 1.7: една непрекъсната линия - без изтритото, а връзките от колекцията са върхове в трака.
     var xml = GPX.build({ name: t.title || nm, pts: Core.trackLine(t, S.tracks), wpts: (t.wpts || []).filter(function (w) { return w.name; }) });
-    U.download(new Blob([xml], { type: 'application/gpx+xml' }), U.slug(nm.replace(/\.gpx.*$/i, '')) + '.gpx');
+    U.download(new Blob([xml], { type: 'application/gpx+xml' }), fname);
   }
   // 1.9.11: името идва от прозореца „Име на файла“ - без име се пази старото gpx-kolekciya-<дата>.json.
   function exportCollection(name) {
@@ -3165,7 +3172,14 @@
     if (s.area === 'view' || !s.info) return null;
     return { legend: parts.filter(function (x) { return !x.drawn && x.pts.length > 1; }).length };
   }
-  function makePicture(withGpx) {
+  /* 1.10.3: картината също пита за име на файла (предложено - marshrut-<маршрут>-<дата>). При
+     „картина + .gpx“ едно питане дава името на двата файла: <име>.png и <име>.gpx. */
+  function makePicture(withGpx, fname) {
+    if (!fname) {
+      askName({ kind: 'pic', withGpx: !!withGpx, def: 'marshrut-' + U.slug(cur().name) + '-' + U.dateDots(Date.now()) });
+      return;
+    }
+    var picBase = String(fname).replace(/\.(png|gpx)$/i, '');
     var s = picSource(), r = cur(), msg = $('#picMsg');
     if (!s.bounds) { msg.innerHTML = '<div class="err">' + TE('picd.nothing2') + '</div>'; return; }
     var parts = picParts();
@@ -3187,9 +3201,9 @@
     }, function (done, total) {
       msg.innerHTML = '<div class="muted">' + TE('picd.tilesN', { done: Math.min(done, total), total: total }) + '</div>';
     }).then(function (res) {
-      var name = 'marshrut-' + U.slug(r.name) + '-' + U.dateDots(Date.now()) + '.png';
+      var name = picBase + '.png';
       U.download(res.blob, name);
-      if (withGpx) exportGpx(r);
+      if (withGpx) exportGpx(r, picBase + '.gpx');
       r.snap = { meta: res.meta, date: Date.now(), base: s.base };
       return U.DB.set('snap:' + r.id, res.blob).then(function () {
         saveNow(); loadPic(); renderPicCard();
@@ -3513,7 +3527,7 @@
   /* Прозорецът "Запис на изминатото" след "Стоп". Записът вече е направен суров (нищо не се губи);
      тук се дава име и по желание се изглажда (Core.smoothWalk, праг 5 м, две отметки - изключени).
      Суровата следа се пази, докато прозорецът е отворен: "Запази" записва избраното (и пак, и пак),
-     "Свали .gpx" сваля избраното, "Отказ" оставя записа суров. */
+     "Запиши .gpx" записва избраното, "Отказ" оставя записа суров. */
   function askWalk() {
     var lw = ui.lastWalk, t = lw && track(lw.trackId);
     if (!t) return;
@@ -3578,8 +3592,8 @@
     walkDlDone();
   }
   /* Затваря прозореца "Запис на изминатото" и маха реда "Следенето спря" от картата (1.9.9).
-     Отбелязва и че изминалото вече е свалено (w.dl, 1.9.10): тогава панелът "Следене" вече не
-     предлага "Свали изминалото като .gpx". Флагът се пази в браузъра, така че копчето не се
+     Отбелязва и че изминалото вече е записано (w.dl, 1.9.10): тогава панелът "Следене" вече не
+     предлага "Запиши изминалото като .gpx". Флагът се пази в браузъра, така че копчето не се
      връща след презареждане. Ново следене прави нов lastWalk - без флага, с копче. */
   function walkDlDone() {
     var d = $('#dlgWalk');
@@ -3614,7 +3628,7 @@
 
   /* Незавършено следене: докато следиш, изминатото се пише в браузъра на всеки 10 с и при
      скриване или затваряне на страницата. Пази се само едно - ново следене го заменя; чисти се
-     при "Стоп" и щом бъде запазено, свалено или изхвърлено от прозореца при отваряне. */
+     при "Стоп" и щом бъде запазено, записано или изхвърлено от прозореца при отваряне. */
   var LIVE_MS = 10000;
   function liveStart() {
     var f = ui.follower;
@@ -3736,7 +3750,7 @@
     }, function () { toast(T('msg.noGps'), true); }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
   }
 
-  /* Последното изминато: панелът "Следене" и редът върху картата с копчето за сваляне.
+  /* Последното изминато: панелът "Следене" и редът върху картата с копчето за запис.
      Пази се в браузъра - остава след презареждане и при отваряне на друг маршрут. */
   function showWalk() {
     var w = ui.lastWalk;
@@ -3750,7 +3764,7 @@
     $('#followTitle').textContent = T('follow.title', { name: w.name });
     if (w.stats) { $('#fDone').textContent = w.stats.done; $('#fTime').textContent = w.stats.time; $('#fLeft').textContent = w.stats.left; $('#fOff').textContent = w.stats.off; }
     $('#fMsg').textContent = w.msgK ? T(w.msgK.head) + ' ' + T('walk.savedAs', { name: w.msgK.name }) : w.msg || ''; $('#fMsg').className = 'follow-msg';
-    // 1.9.10: свалено ли е вече изминалото - копчето "Свали ... .gpx" не се предлага повече.
+    // 1.9.10: свалено ли е вече изминалото - копчето "Запиши ... .gpx" не се предлага повече.
     // Подсказката до него ("записът се отваря от Записани маршрути") остава.
     $('#walkDone button').hidden = !!w.dl;
     $('#walkDone').hidden = false;
@@ -3768,7 +3782,7 @@
     var d = $('#dlgName'), inp = $('#fileName');
     ui.nameJob = job;
     inp.value = job.def || '';
-    $('#nameExt').textContent = job.kind === 'collection' ? '.json' : '.gpx';
+    $('#nameExt').textContent = job.kind === 'collection' ? '.json' : (job.kind === 'pic' ? '.png' : '.gpx');
     $('#nameOk').textContent = job.kind === 'save' ? T('act.save') : T('act.download');
     $('#nameTitle').textContent = job.kind === 'save' ? T('name.saveTitle') : T('name.file');
     $('#saveSmooth').hidden = job.kind !== 'save';
@@ -3784,7 +3798,7 @@
   /* 1.9.11: износът на колекцията пита за име с празно поле - разширението .json се добавя само.
      Празно поле (или само разширението) връща предложеното име: job.def, а при колекцията - job.fallback. */
   function fileNameOf(job) {
-    var ext = job.kind === 'collection' ? '.json' : '.gpx';
+    var ext = job.kind === 'collection' ? '.json' : (job.kind === 'pic' ? '.png' : '.gpx');
     var name = $('#fileName').value.trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\.(gpx|json)$/i, '').trim();
     if (!name) name = String(job.def || job.fallback || '').replace(/\.(gpx|json)$/i, '').trim();
     if (!name) name = 'gpx-kolekciya-' + U.dateDots(Date.now());
@@ -3837,6 +3851,11 @@
       if (job.routeId === cur().id) saveRoute(name, saveChosen());
     } else if (job.kind === 'collection') {
       exportCollection(name);
+    } else if (job.kind === 'track') {
+      var tt = track(job.trackId);
+      if (tt) exportTrack(tt, name);
+    } else if (job.kind === 'pic') {
+      makePicture(job.withGpx, name);
     } else {
       var xml = GPX.build({ name: job.title, pts: job.pts, wpts: job.wpts || [] });
       U.download(new Blob([xml], { type: 'application/gpx+xml' }), name);
@@ -3845,7 +3864,7 @@
       if (job.done) walkDlDone();
     }
   }
-  /* Сваля <име>.gpx и записва текущия маршрут в "Записани маршрути" под същото име. Текущият
+  /* Записва <име>.gpx и записва текущия маршрут в "Записани маршрути" под същото име. Текущият
      маршрут винаги е в списъка - преименува се той, втори запис не се прави. */
   function saveRoute(fname, smooth) {
     var r = cur(), name = fname.replace(/\.gpx$/i, '').trim() || r.name;
