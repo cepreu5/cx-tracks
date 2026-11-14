@@ -1,5 +1,5 @@
 /* CX Tracks (по-рано GPX конструктор) - приложението: състояние, карта, решения с клик, списъци под картата,
-   износ, картина за офлайн и следене. */
+   износ, снимка за офлайн и следене. */
 (function () {
   'use strict';
 
@@ -150,7 +150,7 @@
     }).catch(function () { return null; });
   }
   // 1.9.8: записаният дефолт може да е и цяла .json колекция. Разчита се през същия importCollection,
-  // който внася колекция от файл, тоест траковете, маршрутите и картините влизат както при внасяне.
+  // който внася колекция от файл, тоест траковете, маршрутите и снимките влизат както при внасяне.
   // Връща броя влезли тракове (0 при лош файл).
   function addDefColl(text, name) {
     var before = S.tracks.length, data;
@@ -705,7 +705,7 @@
   }
 
   /* Попълненото при дупка в GPS в изминат трак (Core.walkGaps): отрязъци [от, до] в метри по трака.
-     Чертае се кехлибарено на пунктир - на картата, в "Картина" и върху запазената картина. */
+     Чертае се кехлибарено на пунктир - на картата, в "Снимка" и върху запазената снимка. */
   function walkGapIv(t) {
     if (!t || !t.walk) return [];
     Core.prep(t);
@@ -737,7 +737,7 @@
     return out;
   }
   /* "Свързано направо": празна връзка (draw без точки) между две части - маршрутът минава направо
-     от края на едната до началото на другата. [{from, to, item}] за чертане - на картата и в "Картина". */
+     от края на едната до началото на другата. [{from, to, item}] за чертане - на картата и в "Снимка". */
   function bridgeLines() {
     var out = [];
     if (!G) return out;
@@ -3030,7 +3030,7 @@
     adopt(data, true);
     var snaps = data.snaps || {};
     var jobs = Object.keys(snaps).map(function (rid) {
-      return fetch(snaps[rid]).then(function (r) { return r.blob(); }).then(function (b) { return U.DB.set('snap:' + rid, b); }).catch(function () { /* без картина */ });
+      return fetch(snaps[rid]).then(function (r) { return r.blob(); }).then(function (b) { return U.DB.set('snap:' + rid, b); }).catch(function () { /* без снимка */ });
     });
     return Promise.all(jobs).then(function () {
       ui.undo = []; $('#undoBtn').disabled = true;
@@ -3123,7 +3123,7 @@
     });
   }
 
-  // ---- Картина за офлайн ----
+  // ---- Снимка за офлайн ----
   function picSource() {
     var f = $('#picForm');
     var base = f.pbase.value, area = f.parea.value;
@@ -3150,7 +3150,7 @@
     var p = Snapshot.plan(s.bounds, s.area === 'view' ? 0 : 0.1, s.base === 'topo' ? 17 : 18, null, picBox(s, picParts()));
     $('#picEst').textContent = T('picd.est', { w: U.num(p.w), h: U.num(p.h), mb: U.num(p.w * p.h * 0.45 / 1048576, 1) });
   }
-  // Частите за картината (линия и легенда).
+  // Частите за снимката (линия и легенда).
   function picParts() {
     var parts = [];
     if (G && G.pts.length > 1) {
@@ -3172,8 +3172,8 @@
     if (s.area === 'view' || !s.info) return null;
     return { legend: parts.filter(function (x) { return !x.drawn && x.pts.length > 1; }).length };
   }
-  /* 1.10.3: картината също пита за име на файла (предложено - marshrut-<маршрут>-<дата>). При
-     „картина + .gpx“ едно питане дава името на двата файла: <име>.png и <име>.gpx. */
+  /* 1.10.3: снимката също пита за име на файла (предложено - marshrut-<маршрут>-<дата>). При
+     „снимка + .gpx“ едно питане дава името на двата файла: <име>.png и <име>.gpx. */
   function makePicture(withGpx, fname) {
     if (!fname) {
       askName({ kind: 'pic', withGpx: !!withGpx, def: 'marshrut-' + U.slug(cur().name) + '-' + U.dateDots(Date.now()) });
@@ -3215,7 +3215,7 @@
     }).then(function () { btns.forEach(function (b) { b.disabled = false; }); });
   }
 
-  // Запазената картина на текущия маршрут - в паметта като адрес за <img>.
+  // Запазената снимка на текущия маршрут - в паметта като адрес за <img>.
   function loadPic() {
     var r = cur();
     if (ui.picUrl) { URL.revokeObjectURL(ui.picUrl); ui.picUrl = null; }
@@ -3252,7 +3252,7 @@
     if (one && ui.pos) {
       var q = Snapshot.toPic(m, ui.pos.lat, ui.pos.lon);
       sc.scrollLeft = q[0] - avW / 2; sc.scrollTop = q[1] - avH / 2;
-      // Това скролване е програмно - не се брои за дръпване с пръст (виж bind, „Картина“).
+      // Това скролване е програмно - не се брои за дръпване с пръст (виж bind, „Снимка“).
       ui.picAt = { l: sc.scrollLeft, t: sc.scrollTop };
     }
   }
@@ -3300,7 +3300,7 @@
     turnPic();
   }
 
-  /* Завъртането на изгледа „Картина“: същото състояние като на картата (ui.rot), затова „Север / Посока“
+  /* Завъртането на изгледа „Снимка“: същото състояние като на картата (ui.rot), затова „Север / Посока“
      е един избор за двата изгледа. Целият кадър - снимка, линии, точки и кръгчето за положението - е в
      един слой (#picTurn) и се върти наведнъж около центъра на екрана; нищо не се върти само.
      Надписите в SVG-а се противовъртат около собствената си котва, за да останат изправени, а слоят се
@@ -3317,7 +3317,7 @@
     });
   }
 
-  /* Дръпването с пръст (или мишка) в „Картина“ спира автоматичното въртене по движението - точно както
+  /* Дръпването с пръст (или мишка) в „Снимка“ спира автоматичното въртене по движението - точно както
      дръпването на картата. „Посока“ го включва пак. */
   function picDragged() {
     if (ui.follower && ui.followView === 'pic') ui.autoCenter = false;
@@ -3690,7 +3690,7 @@
     if (j < 0) return null;
     return U.bearing(rec[j][0], rec[j][1], rec[i][0], rec[i][1]);
   }
-  // При следене посоката на движение сочи нагоре - и на картата, и в „Картина“ (един и същ ъгъл за
+  // При следене посоката на движение сочи нагоре - и на картата, и в „Снимка“ (един и същ ъгъл за
   // двата изгледа), докато изгледът не е дръпнат встрани.
   function followBearing() {
     if (ui.follower && ui.autoCenter && ui.orient === 'heading' && ui.heading != null) map.setBearing(ui.heading);
@@ -3702,13 +3702,13 @@
     // И извън следене: "Север" изправя картата, "Посока" я връща към последната известна посока.
     if (ui.orient === 'north') map.setBearing(0);
     else if (ui.heading != null) {
-      // „Посока“ включва пак автоматичното въртене по движението - и в „Карта“, и в „Картина“.
+      // „Посока“ включва пак автоматичното въртене по движението - и в „Карта“, и в „Снимка“.
       if (ui.follower) ui.autoCenter = true;
       map.setBearing(ui.heading);
     }
     showCompass();
   }
-  /* Стрелката "С" и двурежимното копче - върху картата и в изглед „Картина“ (един и същ вид и един и същ
+  /* Стрелката "С" и двурежимното копче - върху картата и в изглед „Снимка“ (един и същ вид и един и същ
      избор): "Север", докато кадърът е завъртян; "Посока", докато е север-нагоре, а посоката на движение е
      известна (и след "Стоп"). Без известна посока - само "Север", и то само при завъртян кадър. */
   function showCompass(rot) {
@@ -4243,7 +4243,7 @@
     $('#dlgWalk').addEventListener('close', function () { ui.walkJob = null; });
     $$('#followBar [data-view]').forEach(function (b) { b.addEventListener('click', function () { showPic(b.dataset.view === 'pic'); followBearing(); }); });
     $$('#followBar [data-orient]').forEach(function (b) { b.addEventListener('click', function () { setOrient(b.dataset.orient); }); });
-    /* Дръпването в „Картина“ спира автоматичното въртене по движението (както на картата): всичко,
+    /* Дръпването в „Снимка“ спира автоматичното въртене по движението (както на картата): всичко,
        което мести изгледа - скрол, влачене с пръст или мишка, отнет жест при скрол - се брои за дръпване.
        Програмното скролване на „1:1“ не се брои: то оставя ui.picAt на мястото, което е сложило. */
     (function () {

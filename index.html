@@ -6,7 +6,7 @@
 <title>CX Tracks</title>
 <meta name="application-name" content="CX Tracks">
 <meta name="apple-mobile-web-app-title" content="CX Tracks">
-<meta name="description" data-i18n-content="meta.desc" content="CX Tracks: сглобяване на нов маршрут от записани GPX тракове: дубликати, части, изрязване, износ като .gpx и картина за офлайн.">
+<meta name="description" data-i18n-content="meta.desc" content="CX Tracks: сглобяване на нов маршрут от записани GPX тракове: дубликати, части, изрязване, износ като .gpx и снимка за офлайн.">
 <meta name="theme-color" content="#171614">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='none' stroke='%232b5fd9' stroke-width='2.5'/%3E%3C/svg%3E">
 <script>
@@ -45,7 +45,7 @@
     <label class="tol"><span class="tol-label" data-i18n="bar.tol">Отклонение</span> <input type="text" class="tolInput num" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="20" autocomplete="off" data-i18n-aria="tol.aria" data-i18n-title="tol.title" aria-label="Максимално допустимо отклонение в метри" title="Отклонение в метри, от 0 до 999. Enter прилага."> <span class="tol-unit" data-i18n="unit.m">м</span></label>
     <span class="sp"></span>
     <button class="btn pri" data-act="add-tracks" data-i18n-title="bar.add.title" title="Добави .gpx тракове"><span data-i18n="bar.add">Добави</span><span class="wide" data-i18n="bar.addWide"> тракове</span></button>
-    <button class="btn wide-only" data-act="picture" data-i18n="act.picture">Картина</button>
+    <button class="btn wide-only" data-act="picture" data-i18n="act.picture">Снимка</button>
     <button class="btn wide-only" data-act="export-gpx" data-i18n="act.exportGpx">Изнеси .gpx</button>
     <button class="btn" data-act="save" data-i18n="act.save" data-i18n-title="bar.save.title" title="Записва .gpx и маршрута в „Записани маршрути“">Запази</button>
     <label class="chk bar-chk" id="labelsChk" data-i18n-title="bar.labels.title" title="Имената и номерата на пътищата върху сателитните снимки"><input type="checkbox" id="labelsToggle" checked> <span data-i18n="bar.labels">Имена</span></label>
@@ -70,7 +70,7 @@
     <span class="sp"></span>
     <div class="seg" role="group" data-i18n-aria="follow.view.aria" aria-label="Изглед при следене">
       <button data-view="map" class="on" data-i18n="follow.view.map">Карта</button>
-      <button data-view="pic" data-i18n="act.picture">Картина</button>
+      <button data-view="pic" data-i18n="act.picture">Снимка</button>
     </div>
     <button class="btn" data-act="walk-point" id="walkPtBtn" aria-disabled="true" data-i18n-title="wpt.btn.no" title="Няма сигнал от GPS - точката чака положение" data-i18n="wpt.h">Точка</button>
     <div class="seg" role="group" data-i18n-aria="follow.orient.aria" aria-label="Ориентация на картата при следене">
@@ -148,16 +148,16 @@
     <!-- Целият кадър се върти на едно място („Север / Посока“): снимката, линиите, точките и кръгчето
          за положението са в един слой и се въртят заедно около центъра на екрана, а надписите се
          противовъртат, за да се четат изправени. Виж turnPic() в js/app.js. -->
-    <div id="picTurn" class="pic-turn"><div id="picScroll" class="pic-scroll"><div id="picInner" class="pic-inner"><img id="picImg" data-i18n-alt="pic.alt" alt="Запазена картина на маршрута"><svg id="picSvg"></svg></div></div></div>
-    <!-- Колона като "+ / − / Центрирай / ▣" на картата: "Към картата", "1:1" и "▣" (цялата картина) - не стига до стрелката нагоре -->
+    <div id="picTurn" class="pic-turn"><div id="picScroll" class="pic-scroll"><div id="picInner" class="pic-inner"><img id="picImg" data-i18n-alt="pic.alt" alt="Запазена снимка на маршрута"><svg id="picSvg"></svg></div></div></div>
+    <!-- Колона като "+ / − / Центрирай / ▣" на картата: "Към картата", "1:1" и "▣" (цялата снимка) - не стига до стрелката нагоре -->
     <div class="pic-ctl">
-      <!-- „Север / Посока“ и в този изглед, като на картата: същият избор върти и картата, и картината.
+      <!-- „Север / Посока“ и в този изглед, като на картата: същият избор върти и картата, и снимката.
            Слотът е с display:contents, за да е в колоната до „Към картата“, „1:1“ и „▣“, без да е
            сред трите квадратни копчета на колоната. -->
-      <div class="pic-compass-slot"><button id="picNorthBtn" class="compass pic-compass" type="button" data-act="north" data-i18n-title="compass.pic.north.title" data-i18n-aria="compass.pic.north.aria" title="Върни север нагоре в картината" aria-label="Север - върни север нагоре в картината" hidden><span class="rose" aria-hidden="true"><i class="needle"></i><b class="n" data-i18n="compass.n">С</b></span><span id="picNorthLbl" data-i18n="orient.north">Север</span></button></div>
+      <div class="pic-compass-slot"><button id="picNorthBtn" class="compass pic-compass" type="button" data-act="north" data-i18n-title="compass.pic.north.title" data-i18n-aria="compass.pic.north.aria" title="Върни север нагоре в снимката" aria-label="Север - върни север нагоре в снимката" hidden><span class="rose" aria-hidden="true"><i class="needle"></i><b class="n" data-i18n="compass.n">С</b></span><span id="picNorthLbl" data-i18n="orient.north">Север</span></button></div>
       <button class="btn ico" data-act="pic-close" id="picCloseBtn" data-i18n-title="pic.close" data-i18n-aria="pic.close" title="Към картата" aria-label="Към картата"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 4.5 3.5 6.8v12.7L9 17.2l6 2.3 5.5-2.3V4.5L15 6.8z"/><path d="M9 4.5v12.7M15 6.8v12.7"/></svg></button>
       <button class="btn ico pic-one" data-act="pic-1" data-i18n-title="pic.one" data-i18n-aria="pic.one" title="1:1 - точка за точка" aria-label="1:1 - точка за точка">1:1</button>
-      <button class="btn ico" data-act="pic-fit" id="picFitBtn" data-i18n-title="pic.fit" data-i18n-aria="pic.fit" title="Цялата картина" aria-label="Цялата картина">&#9635;</button>
+      <button class="btn ico" data-act="pic-fit" id="picFitBtn" data-i18n-title="pic.fit" data-i18n-aria="pic.fit" title="Цялата снимка" aria-label="Цялата снимка">&#9635;</button>
     </div>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
@@ -206,7 +206,7 @@
     </div>
     <div class="actions">
       <button class="btn" data-act="export-gpx" data-i18n="act.exportGpx">Изнеси .gpx</button>
-      <button class="btn" data-act="picture" data-i18n="act.picture">Картина</button>
+      <button class="btn" data-act="picture" data-i18n="act.picture">Снимка</button>
       <button class="btn" data-act="save" data-i18n="act.save">Запази</button>
       <button class="btn follow-btn" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
       <label class="tol"><span data-i18n="bar.tol">Отклонение</span> <input type="text" class="tolInput num" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="20" autocomplete="off" data-i18n-aria="tol.aria" data-i18n-title="tol.title" aria-label="Максимално допустимо отклонение в метри" title="Отклонение в метри, от 0 до 999. Enter прилага."> <span class="tol-unit" data-i18n="unit.m">м</span></label>
@@ -275,12 +275,12 @@
   </div>
 
   <section class="card fold" id="picCard" data-fold="pic">
-    <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="picBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="piccard.h">Запазена картина</span></button></h2>
+    <h2><button type="button" class="fold-t" aria-expanded="false" aria-controls="picBody"><span class="chev" aria-hidden="true">&#9656;</span><span data-i18n="piccard.h">Запазена снимка</span></button></h2>
     <div class="fold-b" id="picBody" hidden>
-    <div id="picInfo" class="muted small" data-i18n="pic.none">Още няма картина за този маршрут. Копчето "Картина" я прави и я пази заедно с обхвата ѝ.</div>
+    <div id="picInfo" class="muted small" data-i18n="pic.none">Още няма снимка за този маршрут. Копчето "Снимка" я прави и я пази заедно с обхвата ѝ.</div>
     <div class="row">
-      <button class="btn sm" data-act="picture" data-i18n="piccard.make">Направи картина</button>
-      <button class="btn sm" data-act="pic-open" id="picOpenBtn" disabled data-i18n="piccard.open">Покажи върху картината</button>
+      <button class="btn sm" data-act="picture" data-i18n="piccard.make">Направи снимка</button>
+      <button class="btn sm" data-act="pic-open" id="picOpenBtn" disabled data-i18n="piccard.open">Покажи върху снимката</button>
     </div>
     </div>
   </section>
@@ -338,7 +338,7 @@
 
 <dialog id="dlgPic" class="dlg">
   <form method="dialog" id="picForm">
-    <h3 data-i18n="picd.h">Картина за офлайн</h3>
+    <h3 data-i18n="picd.h">Снимка за офлайн</h3>
     <div class="opts">
       <fieldset><legend data-i18n="picd.base">Основа</legend>
         <label><input type="radio" name="pbase" value="sat" checked> <span data-i18n="picd.sat">Сателит с надписи</span></label>
@@ -358,8 +358,8 @@
     <div id="picMsg" class="import-msg"></div>
     <div class="row end">
       <button class="btn" value="cancel" data-i18n="act.cancel">Отказ</button>
-      <button class="btn" type="button" data-act="pic-make-both" data-i18n="picd.both">Запиши картина + .gpx</button>
-      <button class="btn pri" type="button" data-act="pic-make" data-i18n="picd.make">Запиши картината (.png)</button>
+      <button class="btn" type="button" data-act="pic-make-both" data-i18n="picd.both">Запиши снимка + .gpx</button>
+      <button class="btn pri" type="button" data-act="pic-make" data-i18n="picd.make">Запиши снимката (.png)</button>
     </div>
   </form>
 </dialog>
