@@ -21,7 +21,7 @@ const server = http.createServer((req, res) => {
 
 let failures = 0;
 function check(ok, msg) { console.log((ok ? 'OK   ' : 'FAIL ') + msg); if (!ok) failures++; }
-// 1.9.4: „Записани маршрути“, „Запазена картина“ и картата „Маршрут“ са акордеони, свити по подразбиране.
+// 1.9.4: „Записани маршрути“, „Запазена снимка“ и картата „Маршрут“ са акордеони, свити по подразбиране.
 // Проверките, които цъкат нещо в тялото им, първо отварят панела - както би направил човек.
 async function openFold(pg, ...keys) {
   await pg.evaluate(ks => ks.forEach(k => {
@@ -61,7 +61,7 @@ function rotState() {
     northAng: ang([north.x - c.x, north.y - c.y]), roundTrip: Math.hypot(again.x - c.x - 37, again.y - c.y + 51)
   };
 }
-// Изглед „Картина“ (1.9.3): завъртането на целия кадър, надписите и копчето „Север / Посока“.
+// Изглед „Снимка“ (1.9.3): завъртането на целия кадър, надписите и копчето „Север / Посока“.
 function picState() {
   const v = document.querySelector('#picView'), tr = document.querySelector('#picTurn'), b = document.querySelector('#picNorthBtn');
   const cs = getComputedStyle(tr), tf = cs.transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : cs.transform, m = new DOMMatrixReadOnly(tf);
@@ -414,11 +414,11 @@ function barFits() {
   await page.waitForFunction(() => __gpxk.prof, null, { timeout: 25000 }).then(() => check(true, 'височините дойдоха; изкачване: ' + 0), () => check(false, 'височините дойдоха'));
   console.log('     бележка за височините: ' + await page.textContent('#elevNote') + ' · изкачване ' + await page.textContent('#sUp'));
 
-  // Картина за офлайн.
+  // Снимка за офлайн.
   await page.click('#bar [data-act="picture"]');
-  // 1.10.3: картината първо пита за име на файла (.png).
+  // 1.10.3: снимката първо пита за име на файла (.png).
   await page.click('[data-act="pic-make"]');
-  check(await page.evaluate(() => document.querySelector('#dlgName').open && document.querySelector('#nameExt').textContent === '.png'), '1.10.3: „Запиши картината (.png)“ отваря прозореца за име на файла');
+  check(await page.evaluate(() => document.querySelector('#dlgName').open && document.querySelector('#nameExt').textContent === '.png'), '1.10.3: „Запиши снимката (.png)“ отваря прозореца за име на файла');
   const [pic] = await Promise.all([
     page.waitForEvent('download', { timeout: 60000 }).catch(() => null),
     page.evaluate(() => document.querySelector('#nameOk').click())
@@ -427,11 +427,11 @@ function barFits() {
     const pf = path.join(OUT, pic.suggestedFilename());
     await pic.saveAs(pf);
     const buf = fs.readFileSync(pf);
-    check(buf.slice(1, 4).toString() === 'PNG' && buf.length > 50000, 'картина .png: ' + pic.suggestedFilename() + ', ' + Math.round(buf.length / 1024) + ' КБ, ' + buf.readUInt32BE(16) + 'x' + buf.readUInt32BE(20));
-  } else check(false, 'картина: ' + await page.textContent('#picMsg'));
+    check(buf.slice(1, 4).toString() === 'PNG' && buf.length > 50000, 'снимка .png: ' + pic.suggestedFilename() + ', ' + Math.round(buf.length / 1024) + ' КБ, ' + buf.readUInt32BE(16) + 'x' + buf.readUInt32BE(20));
+  } else check(false, 'снимка: ' + await page.textContent('#picMsg'));
   await page.waitForFunction(() => /Свалена/.test(document.querySelector('#picMsg').textContent), null, { timeout: 10000 }).catch(() => {});
   await page.keyboard.press('Escape');
-  check(await page.evaluate(() => !!__gpxk.S.routes.find(r => r.id === __gpxk.S.curId).snap), 'картината се пази с обхвата си');
+  check(await page.evaluate(() => !!__gpxk.S.routes.find(r => r.id === __gpxk.S.curId).snap), 'снимката се пази с обхвата си');
 
   // Следене по GPS.
   await page.click('#followMapBtn');
@@ -488,20 +488,20 @@ function barFits() {
   const posPx = await page.evaluate(() => { const m = __gpxk.map, q = m.project(__gpxk.ui.pos.lat, __gpxk.ui.pos.lon); return Math.hypot(q.x - m.w / 2, q.y - m.h / 2); });
   check(rs.auto && angDiff(rs.rot, rs.heading) < 0.5 && posPx < 1, '"Центрирай" връща и центъра, и посоката (' + rs.rot.toFixed(1) + '°, ' + posPx.toFixed(2) + ' px от центъра)');
   await page.click('#followBar [data-view="pic"]');
-  check(await page.isVisible('#picView') && await page.evaluate(() => document.querySelectorAll('#picSvg circle').length > 0), 'следене върху запазената картина: положението е върху нея');
-  // ---- 1.9.3: „Картина“ се върти цяла - снимка, линии, точки и кръгчето заедно, около центъра на екрана ----
+  check(await page.isVisible('#picView') && await page.evaluate(() => document.querySelectorAll('#picSvg circle').length > 0), 'следене върху запазената снимка: положението е върху нея');
+  // ---- 1.9.3: „Снимка“ се върти цяла - снимка, линии, точки и кръгчето заедно, около центъра на екрана ----
   await settled(page);
   const turnG = d => ((d % 360) + 360) % 360;
   const pv = await page.evaluate(picState);
   check(pv.shown && pv.rot > 1 && angDiff(turnG(pv.deg), turnG(360 - pv.rot)) < 0.6 && pv.scale > 1.05,
-    '1.9.3: в „Картина“ целият кадър е завъртян по посоката на движение - ' + pv.rot.toFixed(1) + '° нагоре, слоят на ' + pv.deg.toFixed(1) + '°, увеличен x' + pv.scale.toFixed(2));
+    '1.9.3: в „Снимка“ целият кадър е завъртян по посоката на движение - ' + pv.rot.toFixed(1) + '° нагоре, слоят на ' + pv.deg.toFixed(1) + '°, увеличен x' + pv.scale.toFixed(2));
   check(pv.layer && pv.clip && pv.origin < 1.5,
     '1.9.3: снимката, линиите, точките и кръгчето са в един слой, който се върти около центъра на екрана и не пуска нищо извън екрана (отстояние на центъра ' + pv.origin.toFixed(2) + ' px)');
   const upN = pv.texts.filter(t => t.ratio > 3).length;
   check(pv.texts.length > 0 && upN === pv.texts.length && pv.texts.every(t => Math.abs(t.back - pv.rot) < 0.6),
     '1.9.3: надписите са изправени при завъртян кадър - надписи: ' + pv.texts.length + ', противовъртени на ' + (pv.texts[0] || {}).back + '° при ' + pv.rot.toFixed(1) + '° завъртане на кадъра');
-  check(pv.btn.shown && pv.btn.offer === 'north' && /Север/.test(pv.btn.text) && /картината/.test(pv.btn.aria) && pv.btn.onScreen && pv.btn.label === 'С',
-    '1.9.3: „Север / Посока“ има и в „Картина“ - вижда се, предлага „Север“ и сочи север: ' + JSON.stringify(pv.btn));
+  check(pv.btn.shown && pv.btn.offer === 'north' && /Север/.test(pv.btn.text) && /снимката/.test(pv.btn.aria) && pv.btn.onScreen && pv.btn.label === 'С',
+    '1.9.3: „Север / Посока“ има и в „Снимка“ - вижда се, предлага „Север“ и сочи север: ' + JSON.stringify(pv.btn));
   // На 390 px същото копче се побира в колоната и не застъпва трите квадратни копчета.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector('#picTurn').getBoundingClientRect().width > 300, null, { timeout: 3000 }).catch(() => {});
@@ -511,7 +511,7 @@ function barFits() {
     const hit = (p, q) => !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top);
     return { shown: b.width > 0 && b.left >= 0 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5, clear: bs.every(q => !hit(b, q)), square: bs.every(q => Math.round(q.width) === 38), w: Math.round(b.width) };
   });
-  check(pvS.shown && pvS.clear && pvS.square, '1.9.3, 390 px: „Север“ се побира в колоната на картината и не застъпва „Към картата“, „1:1“ и „▣“: ' + JSON.stringify(pvS));
+  check(pvS.shown && pvS.clear && pvS.square, '1.9.3, 390 px: „Север“ се побира в колоната на снимката и не застъпва „Към картата“, „1:1“ и „▣“: ' + JSON.stringify(pvS));
   await page.screenshot({ path: path.join(OUT, 'pic-turn-390.png') });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForTimeout(200);
@@ -520,24 +520,24 @@ function barFits() {
   await settled(page);
   const pvN = await page.evaluate(picState);
   check(pvN.rot === 0 && Math.abs(pvN.deg) < 0.01 && pvN.orient === 'north' && pvN.btn.offer === 'heading' && /Посока/.test(pvN.btn.text) && pvN.texts.every(t => Math.abs(t.back) < 0.01),
-    '1.9.3: „Север“ в „Картина“ изправя кадъра на 0° - слоят без завъртане, надписите без противовъртане, копчето предлага „Посока“');
+    '1.9.3: „Север“ в „Снимка“ изправя кадъра на 0° - слоят без завъртане, надписите без противовъртане, копчето предлага „Посока“');
   await page.click('#picNorthBtn');
   await settled(page);
   const pvH = await page.evaluate(picState);
   check(pvH.auto && pvH.orient === 'heading' && pvH.rot > 1 && angDiff(pvH.rot, pvH.heading) < 0.5,
-    '1.9.3: „Посока“ в „Картина“ пак завърта кадъра по движението (' + pvH.rot.toFixed(1) + '°, посока ' + (pvH.heading || 0).toFixed(1) + '°)');
+    '1.9.3: „Посока“ в „Снимка“ пак завърта кадъра по движението (' + pvH.rot.toFixed(1) + '°, посока ' + (pvH.heading || 0).toFixed(1) + '°)');
   // Дръпването с пръст (тук с мишката) спира автоматичното въртене; „Посока“ го включва пак.
   const rotPic = pvH.rot;
   const pc = await page.evaluate(() => { const r = document.querySelector('#picView').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; });
   await page.mouse.move(pc.x, pc.y); await page.mouse.down(); await page.mouse.move(pc.x - 80, pc.y - 50, { steps: 5 }); await page.mouse.up();
-  check(await page.evaluate(() => !__gpxk.ui.autoCenter), '1.9.3: дръпването в „Картина“ спира автоматичното въртене');
+  check(await page.evaluate(() => !__gpxk.ui.autoCenter), '1.9.3: дръпването в „Снимка“ спира автоматичното въртене');
   const recPic = await page.evaluate(() => __gpxk.ui.follower.rec.length);
   await ctx.setGeolocation({ latitude: 42.5040, longitude: 24.7020 });
   await page.waitForFunction(n => __gpxk.ui.follower.rec.length > n, recPic, { timeout: 10000 });
   await settled(page);
   const pvD = await page.evaluate(picState);
   check(!pvD.auto && Math.abs(pvD.rotTo - rotPic) < 0.01 && angDiff(pvD.heading, rotPic) > 30,
-    '1.9.3: дръпнатата картина не се върти по новата посока (' + pvD.heading.toFixed(1) + '°), остава ' + pvD.rotTo.toFixed(1) + '°');
+    '1.9.3: дръпнатата снимка не се върти по новата посока (' + pvD.heading.toFixed(1) + '°), остава ' + pvD.rotTo.toFixed(1) + '°');
   await page.click('#picNorthBtn');
   await settled(page);
   await page.click('#picNorthBtn');
@@ -1338,7 +1338,7 @@ function barFits() {
   await p5.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
   r1 = await rs5();
   check(r1.tracks === r0.tracks && r1.items === r0.items, 'върнатото е записано и след презареждане');
-  // 1.9.4: още четири панела на началния екран се сгъват по същия начин - „Запазена картина“,
+  // 1.9.4: още четири панела на началния екран се сгъват по същия начин - „Запазена снимка“,
   // „Записани маршрути“, картата „Маршрут“ с числата и профила и дългите указания в нея.
   const NEWF = [['#picCard', 'picBody'], ['#routesCard', 'routesFoldBody'], ['#sumCard', 'sumBody'], ['.hint-fold', 'hintBody']];
   const newFoldSt = () => p5.evaluate(F => F.map(([c, id]) => {
@@ -1349,14 +1349,14 @@ function barFits() {
       free: !document.querySelector('.fold-b').contains(t) };
   }), NEWF);
   let nf = await newFoldSt();
-  check(nf.every(f => !f.open && f.aria === 'false' && f.ac === f.id && f.fits && f.free), '1.9.4: „Запазена картина“, „Записани маршрути“, „Маршрут“ и „Как се работи“ са свити при отваряне, със свои бутони и тела ' + JSON.stringify(nf.map(f => [f.id, f.open, f.aria, f.ac])));
+  check(nf.every(f => !f.open && f.aria === 'false' && f.ac === f.id && f.fits && f.free), '1.9.4: „Запазена снимка“, „Записани маршрути“, „Маршрут“ и „Как се работи“ са свити при отваряне, със свои бутони и тела ' + JSON.stringify(nf.map(f => [f.id, f.open, f.aria, f.ac])));
   // Редът с копчетата не влиза в свиваното тяло: вижда се и при свита карта „Маршрут“.
   const acts5 = await p5.evaluate(() => {
     const a = document.querySelector('#sumCard .actions'), ar = a.getBoundingClientRect();
     const btns = ['export-gpx', 'picture', 'save', 'follow'].map(x => { const b = a.querySelector('[data-act="' + x + '"]'), r = b.getBoundingClientRect(); return !!b && !b.disabled && r.height > 0 && r.width > 0; });
     return { sumClosed: document.getElementById('sumBody').hidden, vis: !a.hidden && ar.height > 0 && ar.width > 0 && ar.top >= 0, btns, tol: !!a.querySelector('.tolInput') && a.querySelector('.tolInput').getBoundingClientRect().width > 0 };
   });
-  check(acts5.sumClosed && acts5.vis && acts5.btns.every(Boolean) && acts5.tol, '1.9.4: при свита карта „Маршрут“ редът „Изнеси .gpx“, „Картина“, „Запази“, „Следене“ и полето „Отклонение“ остават на екрана ' + JSON.stringify(acts5));
+  check(acts5.sumClosed && acts5.vis && acts5.btns.every(Boolean) && acts5.tol, '1.9.4: при свита карта „Маршрут“ редът „Изнеси .gpx“, „Снимка“, „Запази“, „Следене“ и полето „Отклонение“ остават на екрана ' + JSON.stringify(acts5));
   // Профилът е платно: отварянето на картата трябва да го нарисува с истинската ширина, не с нулева.
   const profSt = () => p5.evaluate(() => {
     const cv = document.getElementById('profile'), box = cv.parentNode.getBoundingClientRect();
@@ -1375,7 +1375,7 @@ function barFits() {
   check(await p5.evaluate(() => { const h = document.querySelector('.hint-fold'), w = document.querySelector('#sumCard').getBoundingClientRect(); const r = h.getBoundingClientRect(); return r.left >= w.left - 0.5 && r.right <= w.right + 0.5; }), '1.9.4: „Как се работи“ стои в рамките на картата, без втора рамка извън нея');
   await p5.click('#picCard .fold-t'); await p5.click('#routesCard .fold-t');
   nf = await newFoldSt();
-  check(nf[0].open && nf[1].open && nf[0].aria === 'true' && nf[1].aria === 'true' && await p5.isVisible('#routeFilter') && await p5.isVisible('#routesCount'), '1.9.4: „Запазена картина“ и „Записани маршрути“ се отварят, търсенето е в тялото, броят остава в заглавието');
+  check(nf[0].open && nf[1].open && nf[0].aria === 'true' && nf[1].aria === 'true' && await p5.isVisible('#routeFilter') && await p5.isVisible('#routesCount'), '1.9.4: „Запазена снимка“ и „Записани маршрути“ се отварят, търсенето е в тялото, броят остава в заглавието');
   await p5.click('#picCard .fold-t'); await p5.click('#routesCard .fold-t'); await p5.click('#sumCard > .card-head .fold-t');
   nf = await newFoldSt();
   check(nf.slice(0, 3).every(f => !f.open && f.aria === 'false') && nf.some(f => f.open), '1.9.4: втори клик свива всеки от новите панели');
@@ -1721,7 +1721,7 @@ function barFits() {
   const ctx10 = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['geolocation'], geolocation: { latitude: 42.5, longitude: 24.7 } });
   await ctx10.addInitScript({ content: GEO_INIT });
   await ctx10.addInitScript({ content: 'window.lineColors = ' + lineColors.toString() });
-  // Плочките - една празна точка с CORS, за да се четат пикселите и картината се сглобява без мрежа.
+  // Плочките - една празна точка с CORS, за да се четат пикселите и снимката се сглобява без мрежа.
   const PNG1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
   await ctx10.route(/arcgisonline\.com|opentopomap\.org/, r => r.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'image/png' }, body: PNG1 }));
   const p10 = await ctx10.newPage();
@@ -1829,7 +1829,7 @@ function barFits() {
   check(await p10.evaluate(() => !/дупка/.test(document.querySelector('#partsList').textContent + document.querySelector('.stats').textContent)), 'дупката е само цвят: без ред в числата и без значка в списъка с части');
   await p10.click('#followMapBtn');
   await shutWalk(p10);
-  // След "Стоп": записът на изминатото, отворен като маршрут - дупката е кехлибарена и на картата, и в "Картина" (.png).
+  // След "Стоп": записът на изминатото, отворен като маршрут - дупката е кехлибарена и на картата, и в "Снимка" (.png).
   const cur10 = await p10.evaluate(() => __gpxk.S.curId);
   const wr10 = await p10.evaluate(() => { const S = __gpxk.S, t = S.tracks[S.tracks.length - 1]; return S.routes.find(r => r.items.length === 1 && r.items[0].trackId === t.id).id; });
   await openFold(p10, 'routes');
@@ -1857,7 +1857,7 @@ function barFits() {
     }
     return { n, n1, w: bmp.width, h: bmp.height };
   }, [gapLine, cols.gap, cols.walked]);
-  check(!!pngPix && pngPix.n > 20 && pngPix.n1 > pngPix.n * 0.25, '"Картина" (.png): дупката е кехлибарена на пунктир - ' + JSON.stringify(pngPix) + (pngPix ? '' : ' ' + await p10.textContent('#picMsg')));
+  check(!!pngPix && pngPix.n > 20 && pngPix.n1 > pngPix.n * 0.25, '"Снимка" (.png): дупката е кехлибарена на пунктир - ' + JSON.stringify(pngPix) + (pngPix ? '' : ' ' + await p10.textContent('#picMsg')));
   await p10.keyboard.press('Escape');
   await openFold(p10, 'routes');
   await p10.click('#routesBody tr[data-route="' + cur10 + '"] [data-rt="open"]');
@@ -2097,7 +2097,7 @@ function barFits() {
   await cxCase(1280, 800);
   await cxCase(390, 844);
 
-  // ---- 1.1.6: "Следене" само на картата, видима връзка "свързано направо", изглаждане при "Запази", кадър и копчета на картината ----
+  // ---- 1.1.6: "Следене" само на картата, видима връзка "свързано направо", изглаждане при "Запази", кадър и копчета на снимката ----
   {
     const c11 = await browser.newContext({ viewport: { width: 760, height: 800 } });
     await c11.route(/arcgisonline\.com|opentopomap\.org/, r => r.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'image/png' }, body: PNG1 }));
@@ -2193,7 +2193,7 @@ function barFits() {
     const fr = path.join(OUT, 'surov-116.gpx'); await dr.saveAs(fr);
     const nr = (fs.readFileSync(fr, 'utf8').match(/<trkpt /g) || []).length;
     check(nr === raw6.n && await p11.evaluate(([n, u]) => __gpxk.G.pts.length === n && __gpxk.ui.undo.length === u, [raw6.n, undo1]), '1.1.6: "Запази" без отметки не пипа чертежа: ' + nr + ' точки в .gpx, ' + raw6.n + ' на картата');
-    // (4) Картината: маршрутът е под панела и центриран там; връзката е кехлибарена и в .png; копчетата са колона.
+    // (4) Снимката: маршрутът е под панела и центриран там; връзката е кехлибарена и в .png; копчетата са колона.
     await p11.evaluate(() => { window.__blobs = []; const d = U.download; U.download = (b, n) => { window.__blobs.push({ b, n }); return d(b, n); }; });
     for (const w of [360, 560, 760]) {
       await p11.setViewportSize({ width: w, height: 800 });
@@ -2215,7 +2215,7 @@ function barFits() {
           below: bb.t > pb.y + pb.h, inside: bb.l >= 0 && bb.r <= m.w && bb.b <= fa.y + fa.h, dx: Math.round((bb.l + bb.r) / 2 - m.w / 2), dy: Math.round((bb.t + bb.b) / 2 - (fa.y + fa.h / 2)), bridge: { n, n1 } };
       }, [gap6, walkGap]);
       check(!!pic && pic.pw === pic.w && pic.ph === pic.h && pic.below && pic.inside && Math.abs(pic.dx) <= 2 && Math.abs(pic.dy) <= 2,
-        '1.1.6, ' + w + ' px: в "Картина" маршрутът е под панела (панелът до ' + (pic && pic.panelBottom) + ' px) и центриран в свободното място: ' + JSON.stringify(pic) + (pic ? '' : ' ' + await p11.textContent('#picMsg')));
+        '1.1.6, ' + w + ' px: в "Снимка" маршрутът е под панела (панелът до ' + (pic && pic.panelBottom) + ' px) и центриран в свободното място: ' + JSON.stringify(pic) + (pic ? '' : ' ' + await p11.textContent('#picMsg')));
       check(!!pic && pic.bridge.n > 3 && pic.bridge.n1 > pic.bridge.n * 0.25, '1.1.6, ' + w + ' px: "свързано направо" е кехлибарено и в .png: ' + JSON.stringify(pic && pic.bridge));
       await p11.keyboard.press('Escape');
       // Дълга и тясна следа (33 км на север, 80 м широка): събира се под панела, смалява се, не отива вдясно от панела.
@@ -2225,8 +2225,8 @@ function barFits() {
         return { w: m.w, h: m.h, z: m.z, zFlat: flat.z, top: Math.round(a[1]), bottom: Math.round(b[1]), l: Math.round(a[0]), r: Math.round(b[0]), panelBottom: Math.round(pb.y + pb.h), freeBottom: Math.round(fa.y + fa.h),
           below: a[1] > pb.y + pb.h, inside: b[1] <= fa.y + fa.h, centered: Math.abs((a[0] + b[0]) / 2 - m.w / 2) <= 2, max: Math.max(m.w, m.h) <= 4096 };
       });
-      check(tall.below && tall.inside && tall.centered && tall.max && tall.z <= tall.zFlat, '1.1.6, ' + w + ' px: дълга тясна следа в "Картина" е под панела, центрирана по ширина (не вдясно от панела), до 4096 px: ' + JSON.stringify(tall));
-      // Копчетата на картината: колона като на картата, не стигат до стрелката нагоре; "Към картата" връща на картата.
+      check(tall.below && tall.inside && tall.centered && tall.max && tall.z <= tall.zFlat, '1.1.6, ' + w + ' px: дълга тясна следа в "Снимка" е под панела, центрирана по ширина (не вдясно от панела), до 4096 px: ' + JSON.stringify(tall));
+      // Копчетата на снимката: колона като на картата, не стигат до стрелката нагоре; "Към картата" връща на картата.
       await p11.evaluate(() => document.querySelector('#picOpenBtn').click());
       await p11.waitForFunction(() => !document.querySelector('#picView').hidden);
       const ctl = await p11.evaluate(() => {
@@ -2237,7 +2237,7 @@ function barFits() {
           fitSame: bs[2].textContent.trim() === fit.textContent.trim() && bs[2].classList.contains('ico'), close: { svg: !!bs[0].querySelector('svg'), text: bs[0].textContent.trim(), label: bs[0].getAttribute('aria-label') } };
       });
       check(JSON.stringify(ctl.acts) === '["pic-close","pic-1","pic-fit"]' && ctl.col && ctl.widths.every(x => x === 38) && !ctl.overTop && ctl.fitSame && ctl.close.svg && ctl.close.text === '' && ctl.close.label === 'Към картата',
-        '1.1.6, ' + w + ' px: копчетата на картината са колона като на картата ("Към картата" с иконка, "1:1", "▣"), без застъпване със стрелката нагоре: ' + JSON.stringify(ctl));
+        '1.1.6, ' + w + ' px: копчетата на снимката са колона като на картата ("Към картата" с иконка, "1:1", "▣"), без застъпване със стрелката нагоре: ' + JSON.stringify(ctl));
       await p11.click('#picCloseBtn');
       check(await p11.evaluate(() => document.querySelector('#picView').hidden), '1.1.6, ' + w + ' px: "Към картата" връща на картата');
     }
@@ -2334,7 +2334,7 @@ function barFits() {
     const scan1 = await pe.evaluate(cyrScan);
     check(!scan1.length, '1.2.0, en: с отворен прозорец „Import GPX“ няма кирилица' + (scan1.length ? ': ' + scan1.slice(0, 10).join(' | ') : ''));
     await pe.keyboard.press('Escape');
-    // Част в маршрута с клик върху трака, после панелите, подсказката и прозорецът за картината.
+    // Част в маршрута с клик върху трака, после панелите, подсказката и прозорецът за снимката.
     const tp = await pe.evaluate(() => { const g = __gpxk, t = g.S.tracks[0], p = t.pts[Math.floor(t.pts.length / 3)]; g.map.setView(p[0], p[1], 15); const q = g.map.project(p[0], p[1]), r = document.querySelector('#map').getBoundingClientRect(); return { x: r.left + q.x, y: r.top + q.y }; });
     await pe.mouse.click(tp.x, tp.y);
     await pe.waitForFunction(() => __gpxk.G && __gpxk.G.count >= 1, null, { timeout: 3000 }).catch(() => {});
