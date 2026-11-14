@@ -128,6 +128,14 @@
     var s = (names || []).filter(function (n) { return n; }).join(', ');
     return s.length > 60 ? s.slice(0, 59).replace(/[\s,]+$/, '') + '…' : s;
   }
+  // 1.10.2: защо дефолтът не даде нито един трак - по един запис на файл (име + причина),
+  // за да може попъпът да каже името на файла и причината, вместо да мълчи.
+  var defWhy = [];
+  function defNote(name, reason, text) { defWhy.push({ name: name || T('def.name'), reason: reason, text: text || '' }); }
+  function defWhyText() {
+    var parts = defWhy.slice(0, 3).map(function (w) { return w.name + ': ' + (w.text || T('def.why.' + w.reason)); });
+    return parts.length ? parts.join('; ') : T('def.why.unknown');
+  }
   // Копчето „Зареди дефолт“ в празния попъп: вижда се само когато има записан дефолт.
   function updateDefBtn() {
     var b = $('#defBtn');
@@ -144,20 +152,30 @@
   // 1.9.8: записаният дефолт може да е и цяла .json колекция. Разчита се през същия importCollection,
   // който внася колекция от файл, тоест траковете, маршрутите и картините влизат както при внасяне.
   // Връща броя влезли тракове (0 при лош файл).
-  function addDefColl(text) {
+  function addDefColl(text, name) {
     var before = S.tracks.length, data;
     try {
       data = JSON.parse(String(text || '').replace(/^\uFEFF/, '').trim());
     } catch (e) {
       console.error(e);
       toast(T('err.badJson'), true);
+      defNote(name, 'bad-json');
+      return Promise.resolve(0);
+    }
+    // 1.10.2: файл, който не е колекция, се казва направо - по-точно от общото „не се чете“.
+    if (!data || !Array.isArray(data.tracks)) {
+      toast(T('err.notColl'), true, 6000);
+      defNote(name, 'not-coll');
       return Promise.resolve(0);
     }
     return importCollection(data).then(function () {
-      return S.tracks.length - before;
+      var k = S.tracks.length - before;
+      if (k === 0) defNote(name, data.tracks.length ? 'no-usable' : 'no-tracks');
+      return k;
     }).catch(function (e) {
       console.error(e);
       toast(T('err.read'), true);
+      defNote(name, 'read');
       return 0;
     });
   }
@@ -167,8 +185,19 @@
     (files || []).forEach(function (f) {
       chain = chain.then(function () {
         return readFile(f.blob).then(function (text) {
-          if (/\.json$/i.test(f.name || '')) return addDefColl(text).then(function (k) { n += k; });
-          var res = GPX.parse(text.replace(/^﻿/, '').trim(), f.name);
+          if (/\.json$/i.test(f.name || '')) return addDefColl(text, f.name).then(function (k) { n += k; });
+          var res;
+          try {
+            res = GPX.parse(text.replace(/^﻿/, '').trim(), f.name);
+          } catch (ge) {
+            // 1.10.2: GPX.parse сам казва защо няма трак (само точки или не е GPX) - това е точната
+            // причина, затова нейното съобщение върви в попъпа, а причината се помни по файл.
+            console.error(ge);
+            toast(ge.message || T('err.read'), true);
+            defNote(f.name, 'not-gpx', ge.message);
+            return;
+          }
+          if (!res.tracks.length) defNote(f.name, 'no-tracks');
           res.tracks.forEach(function (t) {
             var tr = { id: U.uid(), name: t.name, title: t.title, color: nextColor(), pts: t.pts, breaks: t.breaks, wpts: t.wpts, visible: true, created: Date.now() };
             Core.prep(tr);
@@ -178,6 +207,7 @@
         }).catch(function (e) {
           console.error(e);
           toast(T('err.read'), true);
+          defNote(f.name, 'read');
         });
       });
     });
@@ -195,8 +225,15 @@
   // „Зареди дефолт“ от празния попъп: файловете се разчитат пак и стават работната колекция.
   function openDefaultRoute() {
     if (!ui.defColl) return;
+    var name = (ui.defColl || {}).name || T('def.name');
+    defWhy = [];
     loadDefaultColl().then(function (n) {
-      if (!n) return;
+      if (!n) {
+        // 1.10.2: нула тракове вече не е тишина - казва се кой файл и защо.
+        if (!ui.defColl) defNote(name, 'no-record');
+        toast(T('def.empty', { name: name, why: defWhyText() }), true, 9000);
+        return;
+      }
       analyzeNow();
       fitRoute();
       saveNow();
