@@ -190,7 +190,7 @@ I18N.add({
   'bar.add': ['Добави', 'Add'],
   'bar.addWide': [' тракове', ' tracks'],
   'act.picture': ['Снимка', 'Picture'],
-  'act.exportGpx': ['Изнеси .gpx', 'Export .gpx'],
+  'act.exportGpx': ['Запиши .gpx', 'Download .gpx'],
   'bar.save.title': ['Записва .gpx и маршрута в „Записани маршрути“', 'Download the .gpx and save the route in “Saved routes”'],
   'act.save': ['Запази', 'Save'],
   'bar.labels.title': ['Имената и номерата на пътищата върху сателитните снимки', 'Place names and road numbers on the satellite imagery'],
