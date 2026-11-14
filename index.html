@@ -47,7 +47,7 @@
     <button class="btn pri" data-act="add-tracks" data-i18n-title="bar.add.title" title="Добави .gpx тракове"><span data-i18n="bar.add">Добави</span><span class="wide" data-i18n="bar.addWide"> тракове</span></button>
     <button class="btn wide-only" data-act="picture" data-i18n="act.picture">Картина</button>
     <button class="btn wide-only" data-act="export-gpx" data-i18n="act.exportGpx">Изнеси .gpx</button>
-    <button class="btn" data-act="save" data-i18n="act.save" data-i18n-title="bar.save.title" title="Свали .gpx и запиши маршрута в „Записани маршрути“">Запази</button>
+    <button class="btn" data-act="save" data-i18n="act.save" data-i18n-title="bar.save.title" title="Записва .gpx и маршрута в „Записани маршрути“">Запази</button>
     <label class="chk bar-chk" id="labelsChk" data-i18n-title="bar.labels.title" title="Имената и номерата на пътищата върху сателитните снимки"><input type="checkbox" id="labelsToggle" checked> <span data-i18n="bar.labels">Имена</span></label>
     <button class="btn lang-btn" type="button" data-act="lang" id="langBtn" data-i18n-title="lang.btn.title" data-i18n-aria="lang.btn.aria" title="Език на интерфейса" aria-label="Език на интерфейса" aria-haspopup="dialog"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></svg><span id="langCode" data-i18n="lang.code">БГ</span></button>
     <button class="btn ico set-btn" type="button" data-act="settings" id="setBtn" data-i18n-title="set.h" data-i18n-aria="set.h" title="Настройки" aria-label="Настройки" aria-haspopup="dialog"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
@@ -78,7 +78,7 @@
       <button data-orient="north" data-i18n="orient.north" data-i18n-title="orient.north.title" title="Север сочи нагоре">Север</button>
     </div>
     <button class="btn awake-btn" data-act="awake" id="awakeBtn" aria-pressed="true" data-i18n-title="awake.title" title="Екранът да не заспива, докато следиш"><span class="walk-w" data-i18n="awake.w">Екранът </span><span data-i18n="awake.t">буден</span></button>
-    <button class="btn" data-act="walk-gpx" id="walkGpxBtn" aria-disabled="true" data-i18n-title="walkgpx.title" title="Свали изминатото дотук като .gpx - следенето продължава"><span class="walk-w" data-i18n="walkgpx.w">Изнеси </span>.gpx</button>
+    <button class="btn" data-act="walk-gpx" id="walkGpxBtn" aria-disabled="true" data-i18n-title="walkgpx.title" title="Записва изминатото дотук като .gpx - следенето продължава"><span class="walk-w" data-i18n="walkgpx.w">Изнеси </span>.gpx</button>
   </div>
 </header>
 
@@ -111,8 +111,8 @@
   <div id="attrib" class="attrib"></div>
   <div id="walkBar" class="walkbar" role="region" data-i18n-aria="walkbar.aria" aria-label="Изминатото" hidden>
     <span class="wb-t"><span data-i18n="walkbar.stopped">Следенето спря: </span><b id="walkBarName" data-i18n="walk.def">изминат</b></span>
-    <button class="btn sm pri" data-act="walk-gpx-done" id="walkBarBtn" data-i18n="walkbar.dl">Свали изминалото като .gpx</button>
-    <button class="btn sm ico" data-act="walkbar-close" data-i18n-aria="walkbar.close" data-i18n-title="act.close" aria-label="Затвори реда за сваляне" title="Затвори">&times;</button>
+    <button class="btn sm pri" data-act="walk-gpx-done" id="walkBarBtn" data-i18n="walkbar.dl">Запиши изминалото като .gpx</button>
+    <button class="btn sm ico" data-act="walkbar-close" data-i18n-aria="walkbar.close" data-i18n-title="act.close" aria-label="Затвори реда за записа" title="Затвори">&times;</button>
   </div>
   <div id="cutBox" class="cutbox" hidden>
     <b id="cutText" data-i18n="cut.start">Изрязване: цъкни началото по линията на трака</b>
@@ -167,7 +167,7 @@
   <!-- Ред под картата, докато има излишни пръстени: отваря списъка пак -->
   <p id="ringsRow" class="rings-row" hidden><span id="ringsRowT"></span> · <button type="button" class="linkbtn" id="ringsOpen" data-i18n="rings.review">Прегледай</button></p>
   <section id="followPanel" class="card follow-panel" hidden>
-    <button class="btn sm ico follow-x" data-act="walk-forget" id="walkForget" data-i18n-aria="walk.forget.aria" data-i18n-title="walk.forget.title" aria-label="Махни панела „Следене“" title="Махни панела и изминатото за сваляне" hidden>&times;</button>
+    <button class="btn sm ico follow-x" data-act="walk-forget" id="walkForget" data-i18n-aria="walk.forget.aria" data-i18n-title="walk.forget.title" aria-label="Махни панела „Следене“" title="Махни панела и изминатото за запис" hidden>&times;</button>
     <div class="follow-stats">
       <div><small data-i18n="fs.done">Изминати</small><b class="num" id="fDone">0</b></div>
       <div><small data-i18n="fs.time">Време</small><b class="num" id="fTime">0:00</b></div>
@@ -177,7 +177,7 @@
     <p id="fMsg" class="follow-msg" data-i18n="follow.waiting">Чакам сигнал от GPS...</p>
     <p id="fAwake" class="follow-msg muted" hidden></p>
     <div id="walkDone" class="row follow-done" hidden>
-      <button class="btn pri" data-act="walk-gpx-done" data-i18n="walk.dl">Свали изминатото като .gpx</button>
+      <button class="btn pri" data-act="walk-gpx-done" data-i18n="walk.dl">Запиши изминатото като .gpx</button>
       <span class="muted small" data-i18n="walk.done.note">записът се отваря от "Записани маршрути" и се редактира като всеки друг</span>
     </div>
   </section>
@@ -358,8 +358,8 @@
     <div id="picMsg" class="import-msg"></div>
     <div class="row end">
       <button class="btn" value="cancel" data-i18n="act.cancel">Отказ</button>
-      <button class="btn" type="button" data-act="pic-make-both" data-i18n="picd.both">Свали картина + .gpx</button>
-      <button class="btn pri" type="button" data-act="pic-make" data-i18n="picd.make">Свали картината (.png)</button>
+      <button class="btn" type="button" data-act="pic-make-both" data-i18n="picd.both">Запиши картина + .gpx</button>
+      <button class="btn pri" type="button" data-act="pic-make" data-i18n="picd.make">Запиши картината (.png)</button>
     </div>
   </form>
 </dialog>
@@ -374,7 +374,7 @@
     <div class="row end">
       <button class="btn danger" type="button" data-act="live-drop" data-i18n="live.drop">Изхвърли</button>
       <span class="sp"></span>
-      <button class="btn" type="button" data-act="live-gpx" data-i18n="act.dlGpx">Свали .gpx</button>
+      <button class="btn" type="button" data-act="live-gpx" data-i18n="act.dlGpx">Запиши .gpx</button>
       <button class="btn pri" type="button" data-act="live-save" data-i18n="act.save">Запази</button>
     </div>
   </form>
@@ -383,7 +383,7 @@
 <dialog id="dlgName" class="dlg dlg-sm">
   <form method="dialog" id="nameForm">
     <h3 id="nameTitle" data-i18n="name.file">Име на файла</h3>
-    <!-- Само при "Запази": изглаждането на записа и на сваления .gpx - над полето за име -->
+    <!-- Само при "Запази": изглаждането на записа и на .gpx - над полето за име -->
     <div id="saveSmooth" class="save-smooth" hidden>
       <label class="smooth-opt"><input type="checkbox" id="rsSide">
         <span><b data-i18n="sm.side">Изглаждане</b><br><span class="muted small" data-i18n="sm.side.note">маха точките до 5 м встрани от линията</span></span></label>
@@ -393,7 +393,7 @@
         <dt data-i18n="st.pts">Точки</dt><dd class="num" id="rsPts">-</dd>
         <dt data-i18n="st.len">Дължина</dt><dd class="num" id="rsLen">-</dd>
       </dl>
-      <p class="muted small" id="rsNote" data-i18n="rs.note">Изглажда се маршрутът: чертежът на картата, записът и сваленият .gpx остават еднакви. „Отмени“ връща неизгладения. Чертаните точки и височините не се пипат.</p>
+      <p class="muted small" id="rsNote" data-i18n="rs.note">Изглажда се маршрутът: чертежът на картата, записът и .gpx остават еднакви. „Отмени“ връща неизгладения. Чертаните точки и височините не се пипат.</p>
       <span class="small muted name-lbl" data-i18n="rs.nameLbl">Име на файла и на записа</span>
     </div>
     <div class="row name-row">
@@ -401,9 +401,9 @@
       <span class="muted small" id="nameExt">.gpx</span>
     </div>
     <div class="row end">
-      <span class="muted small sp" data-i18n="name.keys">Enter сваля, Escape затваря</span>
+      <span class="muted small sp" data-i18n="name.keys">Enter записва, Escape затваря</span>
       <button class="btn" type="button" id="nameCancel" data-i18n="act.cancel">Отказ</button>
-      <button class="btn pri" type="submit" value="save" id="nameOk" data-i18n="act.download">Свали</button>
+      <button class="btn pri" type="submit" value="save" id="nameOk" data-i18n="act.download">Запиши</button>
     </div>
   </form>
 </dialog>
@@ -441,7 +441,7 @@
     <div class="row end">
       <button class="btn" type="button" id="walkCancel" data-i18n="act.cancel">Отказ</button>
       <span class="sp"></span>
-      <button class="btn" type="button" id="walkDl" data-i18n="act.dlGpx">Свали .gpx</button>
+      <button class="btn" type="button" id="walkDl" data-i18n="act.dlGpx">Запиши .gpx</button>
       <button class="btn pri" type="submit" value="save" id="walkOk" data-i18n="act.save">Запази</button>
     </div>
   </form>

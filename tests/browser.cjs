@@ -128,7 +128,7 @@ function barFits() {
 (async () => {
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   const url = 'http://127.0.0.1:' + server.address().port + '/';
-  // UTF-8 среда, за да пази браузърът имената на файлове на кирилица (без нея ги сваля като "download").
+  // UTF-8 среда, за да пази браузърът имената на файлове на кирилица (без нея ги записва като "download").
   const browser = await chromium.launch({ args: ['--num-raster-threads=4'], env: Object.assign({}, process.env, { LANG: 'C.UTF-8', LC_ALL: 'C.UTF-8' }) });
   // Началният екран излиза само при първо пускане; проверките извън него тръгват като "вече видян".
   // newContext({ splash: true }) - чисто устройство, началният екран излиза.
@@ -395,7 +395,7 @@ function barFits() {
     '"Изнеси .gpx" в лентата отваря прозореца за име, предложено "' + await page.inputValue('#fileName') + '"');
   await page.click('#nameCancel');
   await page.waitForFunction(() => !__gpxk.ui.nameJob, null, { timeout: 2000 }).catch(() => {});
-  check(await page.evaluate(() => !document.querySelector('#dlgName').open && !__gpxk.ui.nameJob), '"Отказ" не сваля нищо');
+  check(await page.evaluate(() => !document.querySelector('#dlgName').open && !__gpxk.ui.nameJob), '"Отказ" не записва нищо');
   await page.click('#bar [data-act="export-gpx"]');
   await page.fill('#fileName', '.gpx');
   const [dl] = await Promise.all([page.waitForEvent('download'), page.press('#fileName', 'Enter')]);
@@ -416,9 +416,12 @@ function barFits() {
 
   // Картина за офлайн.
   await page.click('#bar [data-act="picture"]');
+  // 1.10.3: картината първо пита за име на файла (.png).
+  await page.click('[data-act="pic-make"]');
+  check(await page.evaluate(() => document.querySelector('#dlgName').open && document.querySelector('#nameExt').textContent === '.png'), '1.10.3: „Запиши картината (.png)“ отваря прозореца за име на файла');
   const [pic] = await Promise.all([
     page.waitForEvent('download', { timeout: 60000 }).catch(() => null),
-    page.click('[data-act="pic-make"]')
+    page.evaluate(() => document.querySelector('#nameOk').click())
   ]);
   if (pic) {
     const pf = path.join(OUT, pic.suggestedFilename());
@@ -573,9 +576,9 @@ function barFits() {
   await wdl.saveAs(wFile);
   const wxml = fs.readFileSync(wFile, 'utf8');
   const wn = await page.evaluate(() => __gpxk.ui.follower.rec.length);
-  check(wdl.suggestedFilename() === 'moya razhodka.gpx', 'сваляне при следене: сменено име, добавено .gpx - ' + wdl.suggestedFilename());
-  check((wxml.match(/<trk>/g) || []).length === 1 && (wxml.match(/<trkpt /g) || []).length === wn && /<time>/.test(wxml), 'сваляне при следене: един трак, ' + wn + ' точки с час');
-  check(await page.evaluate(() => !document.querySelector('#dlgName').open && !!__gpxk.ui.follower && /Изнесен moya razhodka\.gpx/.test(document.querySelector('#toast').textContent)), 'сваляне при следене: следенето продължава, съобщение ' + await page.textContent('#toast'));
+  check(wdl.suggestedFilename() === 'moya razhodka.gpx', 'записване при следене: сменено име, добавено .gpx - ' + wdl.suggestedFilename());
+  check((wxml.match(/<trk>/g) || []).length === 1 && (wxml.match(/<trkpt /g) || []).length === wn && /<time>/.test(wxml), 'записване при следене: един трак, ' + wn + ' точки с час');
+  check(await page.evaluate(() => !document.querySelector('#dlgName').open && !!__gpxk.ui.follower && /Изнесен moya razhodka\.gpx/.test(document.querySelector('#toast').textContent)), 'записване при следене: следенето продължава, съобщение ' + await page.textContent('#toast'));
   await page.click('#walkGpxBtn');
   await page.fill('#fileName', '  ');
   const [wdl2] = await Promise.all([page.waitForEvent('download'), page.click('#nameForm button[type="submit"]')]);
@@ -603,7 +606,7 @@ function barFits() {
   rs = await page.evaluate(rotState);
   check(rs.rot === rotStop && rs.rot > 1 && rs.btnShown, 'след "Стоп" картата остава в последната посока (' + rs.rot.toFixed(1) + '°), копчето "Север" се вижда');
   const wb = await page.evaluate(() => inView('#walkBarBtn'));
-  check(wb.ok && /Свали изминалото като \.gpx/.test(await page.textContent('#walkBarBtn')) && /Следенето спря: изминат/.test(await page.textContent('#walkBar')), 'след "Стоп" върху картата: ред "Следенето спря" с "Свали изминалото като .gpx" - ' + JSON.stringify(wb));
+  check(wb.ok && /Запиши изминалото като \.gpx/.test(await page.textContent('#walkBarBtn')) && /Следенето спря: изминат/.test(await page.textContent('#walkBar')), 'след "Стоп" върху картата: ред "Следенето спря" с "Запиши изминалото като .gpx" - ' + JSON.stringify(wb));
   check(/Север/.test(rs.btnText), 'след "Стоп" копчето предлага "Север"');
   await page.click('#northBtn');
   await settled(page);
@@ -630,18 +633,18 @@ function barFits() {
   check(!!walkRec && walkRec.item.type === 'part' && walkRec.item.a === 0 && Math.abs(walkRec.item.b - walkRec.len) < 0.01 && walkRec.item.rev === false, 'отделен запис: една част от целия изминат трак ' + JSON.stringify(walkRec && walkRec.item));
   check(!!walkRec && walkRec.cur === followId && walkRec.walks && await page.evaluate(n => __gpxk.S.routes.length === n + 1, nr), 'отделен запис: следеният маршрут остава текущ, тракът е в неговите изминати');
   check(!!walkRec && (await page.textContent('#toast')).includes('отделен маршрут "' + walkRec.name + '"'), 'след "Стоп" съобщението казва името на записа: ' + await page.textContent('#toast'));
-  check(await page.isVisible('#followPanel') && await page.isVisible('#walkDone [data-act="walk-gpx-done"]') && /отделен маршрут/.test(await page.textContent('#fMsg')), 'панелът след "Стоп": числата остават, копче "Свали изминатото като .gpx"');
+  check(await page.isVisible('#followPanel') && await page.isVisible('#walkDone [data-act="walk-gpx-done"]') && /отделен маршрут/.test(await page.textContent('#fMsg')), 'панелът след "Стоп": числата остават, копче "Запиши изминатото като .gpx"');
   await page.click('#walkDone [data-act="walk-gpx-done"]');
   check(await page.isVisible('#dlgName') && await page.inputValue('#fileName') === defName, 'панелът след "Стоп": същият прозорец за име');
   const [wdl3] = await Promise.all([page.waitForEvent('download'), page.press('#fileName', 'Enter')]);
-  check(wdl3.suggestedFilename() === defName + '.gpx', 'панелът след "Стоп": сваля ' + wdl3.suggestedFilename());
-  // 1.9.10: след свалянето от панела копчето за .gpx го няма, подсказката и числата остават,
+  check(wdl3.suggestedFilename() === defName + '.gpx', 'панелът след "Стоп": записва ' + wdl3.suggestedFilename());
+  // 1.9.10: след записването от панела копчето за .gpx го няма, подсказката и числата остават,
   // редът "Следенето спря" се маха, а флагът се пази в браузъра.
   const dl1 = await page.evaluate(() => {
     const s = document.querySelector('#walkDone span');
     return { btn: document.querySelector('#walkDone button').hidden, note: s.getBoundingClientRect().height > 0, panel: !document.querySelector('#followPanel').hidden && document.querySelector('#followPanel').getBoundingClientRect().height > 0, bar: !document.querySelector('#walkBar').hidden, dl: !!(__gpxk.ui.lastWalk || {}).dl };
   });
-  check(dl1.btn && dl1.note && dl1.panel && !dl1.bar && dl1.dl, '1.9.10: след свалянето от панела копчето „Свали изминалото като .gpx“ го няма, подсказката остава - ' + JSON.stringify(dl1));
+  check(dl1.btn && dl1.note && dl1.panel && !dl1.bar && dl1.dl, '1.9.10: след записването от панела копчето „Запиши изминалото като .gpx“ го няма, подсказката остава - ' + JSON.stringify(dl1));
   await openFold(page, 'routes');
   const rowSel = '#routesBody tr[data-route="' + (walkRec && walkRec.id) + '"]';
   check(!!walkRec && (await page.textContent(rowSel)).includes(walkRec.name), 'отделният запис се вижда в "Записани маршрути": ' + (walkRec && (await page.textContent(rowSel)).replace(/\s+/g, ' ')));
@@ -650,7 +653,7 @@ function barFits() {
   await page.click('#routesBody tr[data-route="' + followId + '"] [data-rt="open"]');
   check(await page.evaluate(id => __gpxk.S.curId === id, followId), 'следеният маршрут се отваря отново');
 
-  // "Запази": прозорецът за име с името на маршрута; сваля <име>.gpx и преименува текущия запис - без втори.
+  // "Запази": прозорецът за име с името на маршрута; записва <име>.gpx и преименува текущия запис - без втори.
   const sv0 = await page.evaluate(() => ({ n: __gpxk.S.routes.length, name: __gpxk.S.routes.find(r => r.id === __gpxk.S.curId).name, id: __gpxk.S.curId }));
   await page.click('#bar [data-act="save"]');
   check(await page.evaluate(() => document.querySelector('#dlgName').open && __gpxk.ui.nameJob.kind === 'save') && await page.inputValue('#fileName') === sv0.name && await page.textContent('#nameOk') === 'Запази',
@@ -661,15 +664,15 @@ function barFits() {
   const sv1 = await page.evaluate(id => { const S = __gpxk.S, r = S.routes.find(x => x.id === id), row = document.querySelector('#routesBody tr[data-route="' + id + '"]');
     return { n: S.routes.length, name: r.name, input: document.querySelector('#routeName').value, row: row && row.textContent, first: document.querySelector('#routesBody tr').dataset.route === id, same: S.routes.filter(x => x.name === 'Моят маршрут').length, toast: document.querySelector('#toast').textContent }; }, sv0.id);
   const svx = fs.readFileSync(await dsv.path(), 'utf8');
-  check(dsv.suggestedFilename() === 'Моят маршрут.gpx' && (svx.match(/<trkpt /g) || []).length > 20, '"Запази" сваля ' + dsv.suggestedFilename() + ' (' + (svx.match(/<trkpt /g) || []).length + ' точки)');
+  check(dsv.suggestedFilename() === 'Моят маршрут.gpx' && (svx.match(/<trkpt /g) || []).length > 20, '"Запази" записва ' + dsv.suggestedFilename() + ' (' + (svx.match(/<trkpt /g) || []).length + ' точки)');
   check(sv1.n === sv0.n && sv1.same === 1 && sv1.name === 'Моят маршрут' && sv1.input === 'Моят маршрут' && /Моят маршрут/.test(sv1.row) && sv1.first, '"Запази": текущият маршрут е преименуван в "Записани маршрути", най-горе, без втори запис (' + sv0.n + ' → ' + sv1.n + ')');
   check(/Свален Моят маршрут\.gpx/.test(sv1.toast) && /Записани маршрути/.test(sv1.toast), '"Запази": съобщението казва и двете - ' + sv1.toast);
   // "GPX" в реда на записан маршрут - същият прозорец.
   await openFold(page, 'routes');
   await page.click('#routesBody tr[data-route="' + sv0.id + '"] [data-rt="gpx"]');
-  check(await page.evaluate(() => document.querySelector('#dlgName').open && __gpxk.ui.nameJob.kind === 'route') && await page.inputValue('#fileName') === 'Моят маршрут' && await page.textContent('#nameOk') === 'Свали', '"GPX" в реда на записан маршрут отваря прозореца за име');
+  check(await page.evaluate(() => document.querySelector('#dlgName').open && __gpxk.ui.nameJob.kind === 'route') && await page.inputValue('#fileName') === 'Моят маршрут' && await page.textContent('#nameOk') === 'Запиши', '"GPX" в реда на записан маршрут отваря прозореца за име');
   const [drw] = await Promise.all([page.waitForEvent('download'), page.press('#fileName', 'Enter')]);
-  check(drw.suggestedFilename() === 'Моят маршрут.gpx', '"GPX" в реда сваля ' + drw.suggestedFilename());
+  check(drw.suggestedFilename() === 'Моят маршрут.gpx', '"GPX" в реда записва ' + drw.suggestedFilename());
 
   // Устойчивост: запазва се и след презареждане.
   await page.waitForTimeout(700);
@@ -913,12 +916,12 @@ function barFits() {
     check(v4.n === 0 && !v4.shown && !v4.on, '"Изтрий" маха всички точки: „Точки“ е скрито, отметката остава махната ' + JSON.stringify(v4));
     await cv.close();
   }
-  // Редът за сваляне на изминатото (долу върху картата) не се застъпва със стрелката.
+  // Редът за записване на изминатото (долу върху картата) не се застъпва със стрелката.
   for (const w of [360, 1440]) {
     await page.setViewportSize({ width: w, height: 800 });
     const wb = await page.evaluate(() => { const b = document.querySelector('#walkBar'); b.hidden = false; const p = b.getBoundingClientRect(), q = document.querySelector('#toTopBtn').getBoundingClientRect(); b.hidden = true;
       return !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top); });
-    check(!wb, 'на ' + w + ' px стрелката не застъпва реда "Свали изминалото като .gpx"');
+    check(!wb, 'на ' + w + ' px стрелката не застъпва реда "Запиши изминалото като .gpx"');
   }
   await page.setViewportSize({ width: 390, height: 844 });
   await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
@@ -1393,7 +1396,7 @@ function barFits() {
   await ctx5.close();
 
 
-  // Телефон 390x844: след "Стоп" свалянето се вижда без превъртане, остава и след презареждане.
+  // Телефон 390x844: след "Стоп" записването се вижда без превъртане, остава и след презареждане.
   const ctx6 = await browser.newContext({ viewport: { width: 390, height: 844 }, acceptDownloads: true, permissions: ['geolocation'], geolocation: { latitude: 42.5, longitude: 24.7 } });
   await ctx6.addInitScript({ content: 'window.inView = ' + inView.toString() });
   const p6 = await ctx6.newPage();
@@ -1435,29 +1438,29 @@ function barFits() {
   await p6.click('#barHandle');
   await p6.waitForTimeout(300);
   const wb6 = await p6.evaluate(() => ({ bar: inView('#walkBarBtn'), panel: inView('#walkDone [data-act="walk-gpx-done"]'), rot: __gpxk.map.getBearing(), north: inView('#northBtn') }));
-  check(await p6.evaluate(() => { const a = document.querySelector('#walkBar').getBoundingClientRect(), b = document.querySelector('#centerBtn').getBoundingClientRect(); return b.width > 0 && (a.right <= b.left || a.bottom <= b.top || b.bottom <= a.top); }), '390x844 след "Стоп": редът за сваляне не покрива "Центрирай"');
-  check(wb6.bar.ok && wb6.bar.scrollY === 0, '390x844 след "Стоп": "Свали изминалото като .gpx" се вижда без превъртане - ' + JSON.stringify(wb6.bar) + ' (копчето в панела е на ' + wb6.panel.top + ' px)');
+  check(await p6.evaluate(() => { const a = document.querySelector('#walkBar').getBoundingClientRect(), b = document.querySelector('#centerBtn').getBoundingClientRect(); return b.width > 0 && (a.right <= b.left || a.bottom <= b.top || b.bottom <= a.top); }), '390x844 след "Стоп": редът за записване не покрива "Центрирай"');
+  check(wb6.bar.ok && wb6.bar.scrollY === 0, '390x844 след "Стоп": "Запиши изминалото като .gpx" се вижда без превъртане - ' + JSON.stringify(wb6.bar) + ' (копчето в панела е на ' + wb6.panel.top + ' px)');
   check(wb6.rot === rot6 && wb6.north.ok, '390x844 след "Стоп": картата остава завъртяна (' + rot6.toFixed(1) + '°), копчето "Север" се вижда');
   await p6.screenshot({ path: path.join(OUT, 'walk-done-390.png') });
   const def6 = 'izminat-' + await p6.evaluate(() => U.slug(__gpxk.ui.lastWalk.name) + '-' + U.dateDots(Date.now()));
-  // × на реда го затваря (и след презареждане), панелът остава да предлага свалянето.
+  // × на реда го затваря (и след презареждане), панелът остава да предлага записването.
   await p6.click('#walkBar [data-act="walkbar-close"]');
-  check(await p6.evaluate(() => document.querySelector('#walkBar').hidden && !document.querySelector('#followPanel').hidden && !document.querySelector('#walkDone button').hidden && !__gpxk.ui.lastWalk.dl), '× затваря реда върху картата, панелът пази копчето „Свали изминалото като .gpx“');
+  check(await p6.evaluate(() => document.querySelector('#walkBar').hidden && !document.querySelector('#followPanel').hidden && !document.querySelector('#walkDone button').hidden && !__gpxk.ui.lastWalk.dl), '× затваря реда върху картата, панелът пази копчето „Запиши изминалото като .gpx“');
   await p6.waitForTimeout(300);
   await p6.reload();
   await p6.waitForFunction(() => window.__gpxk && window.__gpxk.ready);
   check(await p6.evaluate(() => document.querySelector('#walkBar').hidden && !document.querySelector('#followPanel').hidden && !document.querySelector('#walkForget').hidden && !document.querySelector('#walkDone button').hidden), 'след презареждане затвореният ред не се връща, панелът с × и копчето за .gpx са на място');
-  // 1.9.10: свалянето от панела маха копчето за .gpx; подсказката, числата и панелът остават.
+  // 1.9.10: записването от панела маха копчето за .gpx; подсказката, числата и панелът остават.
   await p6.click('#walkDone [data-act="walk-gpx-done"]');
   check(await p6.evaluate(() => document.querySelector('#dlgName').open) && await p6.inputValue('#fileName') === def6, 'панелът отваря прозореца за име: ' + await p6.inputValue('#fileName'));
   const [d6] = await Promise.all([p6.waitForEvent('download'), p6.press('#fileName', 'Enter')]);
   const x6 = fs.readFileSync(await d6.path(), 'utf8');
-  check(d6.suggestedFilename() === def6 + '.gpx' && (x6.match(/<trkpt /g) || []).length === 4, 'панелът сваля ' + d6.suggestedFilename() + ' с ' + (x6.match(/<trkpt /g) || []).length + ' точки');
+  check(d6.suggestedFilename() === def6 + '.gpx' && (x6.match(/<trkpt /g) || []).length === 4, 'панелът записва ' + d6.suggestedFilename() + ' с ' + (x6.match(/<trkpt /g) || []).length + ' точки');
   const wd610 = await p6.evaluate(() => {
     const s = document.querySelector('#walkDone span');
     return { btn: document.querySelector('#walkDone button').hidden, note: s.getBoundingClientRect().height > 0, panel: !document.querySelector('#followPanel').hidden && document.querySelector('#followPanel').getBoundingClientRect().height > 0, bar: !document.querySelector('#walkBar').hidden, dl: !!__gpxk.ui.lastWalk.dl };
   });
-  check(wd610.btn && wd610.note && wd610.panel && !wd610.bar && wd610.dl, '1.9.10, 390 px: след свалянето копчето за .gpx го няма, подсказката „Записани маршрути“ и панелът остават - ' + JSON.stringify(wd610));
+  check(wd610.btn && wd610.note && wd610.panel && !wd610.bar && wd610.dl, '1.9.10, 390 px: след записването копчето за .gpx го няма, подсказката „Записани маршрути“ и панелът остават - ' + JSON.stringify(wd610));
   // Презареждане: копчето не се връща, панелът с числата е на място.
   await p6.waitForTimeout(700);
   await p6.reload();
@@ -1473,7 +1476,7 @@ function barFits() {
   await p6.click('#followMapBtn');
   await shutWalk(p6);
   const nw6 = await p6.evaluate(() => ({ dl: !!__gpxk.ui.lastWalk.dl, btn: document.querySelector('#walkDone button').hidden, bar: !document.querySelector('#walkBar').hidden }));
-  check(!nw6.dl && !nw6.btn && nw6.bar, '1.9.10: новото следене дава нов запис - копчето „Свали изминалото като .gpx“ пак го има - ' + JSON.stringify(nw6));
+  check(!nw6.dl && !nw6.btn && nw6.bar, '1.9.10: новото следене дава нов запис - копчето „Запиши изминалото като .gpx“ пак го има - ' + JSON.stringify(nw6));
   // × на панела маха всичко.
   await p6.click('#walkForget');
   await p6.waitForTimeout(300);
@@ -1552,7 +1555,7 @@ function barFits() {
   await p7.reload();
   await ready7();
   check(await p7.evaluate(() => !document.querySelector('#dlgLive').open), 'след "Изхвърли" и презареждане прозорецът не излиза');
-  // "Свали .gpx": същият прозорец за име, файлът и отделният запис.
+  // "Запиши .gpx": същият прозорец за име, файлът и отделният запис.
   await walk7(4, 42.52);
   await p7.evaluate(() => window.dispatchEvent(new Event('pagehide')));
   await until7(w => !!w && w.n === 4, 3000).catch(() => {});
@@ -1561,11 +1564,11 @@ function barFits() {
   await p7.waitForFunction(() => document.querySelector('#dlgLive').open, null, { timeout: 5000 }).catch(() => {});
   const nr7c = await routes7();
   await p7.click('#dlgLive [data-act="live-gpx"]');
-  check(await p7.evaluate(() => document.querySelector('#dlgName').open && !document.querySelector('#dlgLive').open), '"Свали .gpx" отваря прозореца за име на файла');
+  check(await p7.evaluate(() => document.querySelector('#dlgName').open && !document.querySelector('#dlgLive').open), '"Запиши .gpx" отваря прозореца за име на файла');
   const [d7g] = await Promise.all([p7.waitForEvent('download'), p7.press('#fileName', 'Enter')]);
   const x7 = fs.readFileSync(await d7g.path(), 'utf8');
-  check(/^izminat-.*\.gpx$/.test(d7g.suggestedFilename()) && (x7.match(/<trkpt /g) || []).length === 4 && (x7.match(/<time>/g) || []).length >= 4 && await routes7() === nr7c + 1 && !(await live7()), '"Свали .gpx" сваля ' + d7g.suggestedFilename() + ' (4 точки с час), вкарва отделен запис и чисти записа');
-  check(await p7.evaluate(() => !document.querySelector('#walkBar').hidden && /отделен маршрут/.test(document.querySelector('#fMsg').textContent)), 'след възстановяване редът "Свали изминалото като .gpx" и панелът "Следене" са както след "Стоп"');
+  check(/^izminat-.*\.gpx$/.test(d7g.suggestedFilename()) && (x7.match(/<trkpt /g) || []).length === 4 && (x7.match(/<time>/g) || []).length >= 4 && await routes7() === nr7c + 1 && !(await live7()), '"Запиши .gpx" записва ' + d7g.suggestedFilename() + ' (4 точки с час), вкарва отделен запис и чисти записа');
+  check(await p7.evaluate(() => !document.querySelector('#walkBar').hidden && /отделен маршрут/.test(document.querySelector('#fMsg').textContent)), 'след възстановяване редът "Запиши изминалото като .gpx" и панелът "Следене" са както след "Стоп"');
   // "Стоп" чисти записа.
   await walk7(2, 42.53);
   await p7.evaluate(() => window.dispatchEvent(new Event('pagehide')));
@@ -1839,6 +1842,7 @@ function barFits() {
   await p10.evaluate(() => { window.__blobs = []; const d = U.download; U.download = (b, n) => { window.__blobs.push({ b, n }); return d(b, n); }; });
   await p10.click('#bar [data-act="picture"]');
   await p10.click('#dlgPic [data-act="pic-make"]');
+  await p10.click('#nameOk');
   await p10.waitForFunction(() => window.__blobs.some(x => /\.png$/.test(x.n)), null, { timeout: 20000 }).catch(() => {});
   const pngPix = await p10.evaluate(async ([l, gap, walked]) => {
     const it = window.__blobs.find(x => /\.png$/.test(x.n)); if (!it) return null;
@@ -2050,7 +2054,7 @@ function barFits() {
     }
     await pg.screenshot({ path: path.join(OUT, 'walk-save-' + W + '.png') });
     await pg.fill('#walkName', 'Сутрешно ' + W);
-    // 1.9.9: „Свали .gpx“ вече затваря прозореца, затова „Запази“ се проверява пръв, а свалянето
+    // 1.9.9: „Запиши .gpx“ вече затваря прозореца, затова „Запази“ се проверява пръв, а записването
     // от прозореца - с ново кратко следене най-долу.
     await pg.click('#walkOk');
     const sv = await pg.evaluate(() => { const S = __gpxk.S, lw = __gpxk.ui.lastWalk, t = S.tracks.find(x => x.id === lw.trackId), r = S.routes.find(x => x.id === lw.routeId);
@@ -2070,7 +2074,7 @@ function barFits() {
       const xe = fs.readFileSync(fe, 'utf8');
       check((xe.match(/<wpt /g) || []).length === 2 && /creator="CX Tracks"/.test(xe), tag + ': износът на записа носи двете точки като спирки');
     }
-    // „Свали .gpx“ от прозореца „Запис на изминатото“: ново кратко следене. 1.9.9 затваря прозореца,
+    // „Запиши .gpx“ от прозореца „Запис на изминатото“: ново кратко следене. 1.9.9 затваря прозореца,
     // 1.9.10 маха и копчето за .gpx в панела, а подсказката остава.
     await pg.click('#followMapBtn');
     await pg.waitForFunction(() => __gpxk.ui.follower && __gpxk.ui.follower.rec.length > 0, null, { timeout: 10000 });
@@ -2085,9 +2089,9 @@ function barFits() {
     const [dls] = await Promise.all([pg.waitForEvent('download'), pg.click('#walkDl')]);
     const fs2 = path.join(OUT, 'cx-smooth-' + W + '.gpx'); await dls.saveAs(fs2);
     const xs = fs.readFileSync(fs2, 'utf8');
-    check(dls.suggestedFilename() === 'Изминато ' + W + '.gpx' && (xs.match(/<trkpt /g) || []).length === rawN2 && /<time>/.test(xs), tag + ': „Свали .gpx“ от прозореца сваля изминатото (' + (xs.match(/<trkpt /g) || []).length + ' точки, с часове): ' + dls.suggestedFilename());
+    check(dls.suggestedFilename() === 'Изминато ' + W + '.gpx' && (xs.match(/<trkpt /g) || []).length === rawN2 && /<time>/.test(xs), tag + ': „Запиши .gpx“ от прозореца записва изминатото (' + (xs.match(/<trkpt /g) || []).length + ' точки, с часове): ' + dls.suggestedFilename());
     const wd2 = await pg.evaluate(() => ({ open: document.querySelector('#dlgWalk').open, dl: !!__gpxk.ui.lastWalk.dl, btn: document.querySelector('#walkDone button').hidden, note: document.querySelector('#walkDone span').getBoundingClientRect().height > 0, panel: !document.querySelector('#followPanel').hidden, bar: !document.querySelector('#walkBar').hidden }));
-    check(!wd2.open && wd2.dl && wd2.btn && wd2.note && wd2.panel && !wd2.bar, tag + ': 1.9.9/1.9.10: след „Свали .gpx“ прозорецът се затваря, копчето за .gpx в панела го няма, подсказката остава - ' + JSON.stringify(wd2));
+    check(!wd2.open && wd2.dl && wd2.btn && wd2.note && wd2.panel && !wd2.bar, tag + ': 1.9.9/1.9.10: след „Запиши .gpx“ прозорецът се затваря, копчето за .gpx в панела го няма, подсказката остава - ' + JSON.stringify(wd2));
     await ctx.close();
   }
   await cxCase(1280, 800);
@@ -2195,6 +2199,7 @@ function barFits() {
       await p11.setViewportSize({ width: w, height: 800 });
       await p11.evaluate(() => { window.__blobs = []; document.querySelector('.actions [data-act="picture"]').click(); });
       await p11.click('#dlgPic [data-act="pic-make"]');
+      await p11.click('#nameOk');
       await p11.waitForFunction(() => window.__blobs.some(x => /\.png$/.test(x.n)) && /Свалена/.test(document.querySelector('#picMsg').textContent), null, { timeout: 20000 }).catch(() => {});
       const pic = await p11.evaluate(async ([gap, walkGap]) => {
         const it = window.__blobs.find(x => /\.png$/.test(x.n)); if (!it) return null;
@@ -3378,7 +3383,9 @@ function barFits() {
     await p16.click('#clearNamesBtn');
     const nm = await p16.evaluate(() => ({ names: [...document.querySelectorAll('#tracksList li .t')].map(e => e.firstChild.textContent.trim()), tips: [...document.querySelectorAll('#tracksList li .t')].map(e => e.title), toast: document.querySelector('#toast').textContent }));
     check(nm.names.join('|') === 'Трак 1|Трак 2' && nm.tips.join('|') === 'Синтетичен А|Синтетичен Б' && /Трак 1, 2/.test(nm.toast), tag + 'имената в панела: ' + nm.names.join(', ') + ' (подсказката пази първоначалните: ' + nm.tips.join(', ') + ')');
-    const [dlT] = await Promise.all([p16.waitForEvent('download'), p16.click('#tracksList li:first-child [data-tr="gpx"]')]);
+    await p16.click('#tracksList li:first-child [data-tr="gpx"]');
+    check(await p16.evaluate(() => document.querySelector('#dlgName').open && document.querySelector('#nameExt').textContent === '.gpx'), tag + '1.10.3: .gpx на трака пита за име на файла');
+    const [dlT] = await Promise.all([p16.waitForEvent('download'), p16.evaluate(() => document.querySelector('#nameOk').click())]);
     const gx = fs.readFileSync(await dlT.path(), 'utf8');
     check(/<name>Синтетичен А<\/name>/.test(gx) && !/Трак 1/.test(gx) && !/trak/i.test(dlT.suggestedFilename()), tag + '.gpx на трака е с първоначалното име: ' + dlT.suggestedFilename());
     await p16.click('#undoBtn');
@@ -3584,7 +3591,8 @@ function barFits() {
     await p17.click('[data-mode="select"]');
 
     // Износ: връзките са върхове в трака - една непрекъсната линия.
-    const [dl] = await Promise.all([p17.waitForEvent('download'), p17.click('#tracksList li:first-child [data-tr="gpx"]')]);
+    await p17.click('#tracksList li:first-child [data-tr="gpx"]');
+    const [dl] = await Promise.all([p17.waitForEvent('download'), p17.evaluate(() => document.querySelector('#nameOk').click())]);
     const gx = fs.readFileSync(await dl.path(), 'utf8');
     const tp = [...gx.matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"/g)].map(m => [+m[1], +m[2]]);
     const ex = await p17.evaluate(tp => { const r = Math.round, ky = 6371008.8 * Math.PI / 180, kx = Math.cos(42.6 * Math.PI / 180) * ky, xs = tp.map(p => r((p[1] - 24.8) * kx)); let jump = 0, at = null;
@@ -3744,7 +3752,8 @@ function barFits() {
       r.items = [{ type: 'part', trackId: 'P', a: 1100, b: P.len, rev: false }, { type: 'part', trackId: 'Z', a: 0, b: Z.len, rev: false }]; __gpxk.refresh(); return { gaps: __gpxk.G.gaps.length, len: Math.round(__gpxk.G.len) }; });
     check(rz.gaps === 0 && Math.abs(rz.len - (2855 - 1100 + 1145)) < 15, tag + 'маршрутът P + Z минава през свързаното без дупка: ' + JSON.stringify(rz));
     // .gpx на P: новите върхове са в трака - последният е началото на Z.
-    const [dl] = await Promise.all([p18.waitForEvent('download'), p18.click('#tracksList li:first-child [data-tr="gpx"]')]);
+    await p18.click('#tracksList li:first-child [data-tr="gpx"]');
+    const [dl] = await Promise.all([p18.waitForEvent('download'), p18.evaluate(() => document.querySelector('#nameOk').click())]);
     const tp = [...fs.readFileSync(await dl.path(), 'utf8').matchAll(/<trkpt lat="([\d.]+)" lon="([\d.]+)"/g)].map(m => [+m[1], +m[2]]);
     const gx = await p18.evaluate(tp => ({ n: tp.length, last: __X(tp[tp.length - 1]), has1003: tp.some(p => Math.abs(__X(p) - 1003) <= 2 && __Y(p) === 0) }), tp);
     check(gx.last === 2855 && gx.has1003 && gx.n === s4.n[0], tag + '.gpx на P носи новите върхове (вмъкнатия при 1003 м и края при 2855 м): ' + JSON.stringify(gx));
