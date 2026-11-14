@@ -3776,7 +3776,7 @@
   }
 
   /* Прозорецът "Име на файла". ui.nameJob.kind казва каква е работата: 'walk' - изминатото,
-     'route' - маршрутът ("Изнеси .gpx", "GPX" в реда на записан маршрут), 'save' - "Запази".
+     'route' - маршрутът ("Запиши .gpx", "GPX" в реда на записан маршрут), 'save' - "Запази".
      job.def е предложеното име без .gpx. */
   function askName(job) {
     var d = $('#dlgName'), inp = $('#fileName');
@@ -3807,7 +3807,7 @@
   function plainName(n) { return String(n || '').trim().replace(/[\\/:*?"<>|]+/g, '-') || 'marshrut'; }
   // Изминатото като .gpx: пита за име на файла, после сваля. Следенето не спира.
   // done = true само от копчето в панела "Следене": след свалянето панелът вече не го предлага.
-  // "Изнеси .gpx" при следене не го подава - там следенето продължава и копчето остава.
+  // "Запиши .gpx" при следене не го подава - там следенето продължава и копчето остава.
   function walkGpx(pts, routeName, title, wpts, done) {
     if (!pts || pts.length < 2) return;
     askName({ kind: 'walk', done: !!done, pts: pts.slice(), wpts: (wpts || []).slice(), title: title || T('walk.trackName', { d: U.date(Date.now()) }), def: 'izminat-' + U.slug(routeName) + '-' + U.dateDots(Date.now()) });
