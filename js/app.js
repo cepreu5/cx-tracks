@@ -2462,6 +2462,15 @@
       $('#yesOk').focus();
     });
   }
+  /* 1.10.7: „Следене“ без маршрут. Точно съобщение за 4,5 секунди се пропускаше, затова
+     прозорецът стои в средата, докато не се натисне „Разбрах“ - няма таймер и не се
+     затваря с клик встрани или с Escape. */
+  function showNoRoute() {
+    var d = $('#dlgNoRoute');
+    d.returnValue = '';
+    if (!d.open) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+    $('#noRouteOk').focus();
+  }
   function deleteTrack(t) {
     var usedIn = S.routes.filter(function (r) { return r.items.some(function (it) { return it.trackId === t.id; }); }).length;
     askYes(T('confirm.delTrack', { name: t.name }) + (usedIn ? ' ' + T('confirm.usedIn', { n: usedIn }) : '')).then(function (ok) {
@@ -3338,7 +3347,9 @@
   }
   function startFollow() {
     if (ui.follower) return;
-    if (!G || G.pts.length < 2) toast(T('msg.followEmpty'), false, 4500);
+    /* 1.10.7: при празен маршрут следенето не тръгва. Преди тук имаше съобщение за
+       4,5 секунди и то се пропускаше, а записът продължаваше само с измереното. */
+    if (!G || G.pts.length < 2) { showNoRoute(); return; }
     var f = new window.Follower({
       position: function (pos) {
         ui.pos = pos;
@@ -4442,6 +4453,7 @@
     $('#ringsDrop').addEventListener('click', function () { ringsDone(true); });
     $('#ringsKeep').addEventListener('click', function () { ringsDone(false); });
     $('#dlgRings').addEventListener('cancel', function (e) { e.preventDefault(); }); // затваря се само с копче
+    $('#dlgNoRoute').addEventListener('cancel', function (e) { e.preventDefault(); }); // и „Няма зареден маршрут“ - само с копчето
     $('#ringsOpen').addEventListener('click', openRings);
 
     document.addEventListener('keydown', function (e) {
