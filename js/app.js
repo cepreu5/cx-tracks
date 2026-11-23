@@ -2480,6 +2480,29 @@
       $('#noRouteGo').focus();
     });
   }
+  /* 1.10.10: „Само маршрута“ - от картата падат всички тракове, които не участват в текущия
+     маршрут. Остават само траковете с част в него; „Отмени“ връща целия списък. Ако някой от
+     падащите тракове се ползва и в друг записан маршрут, първо се пита - там частта ще липсва. */
+  function onlyRoute() {
+    var keep = {}, used = 0;
+    cur().items.forEach(function (it) { if (it.type === 'part' && it.trackId && track(it.trackId)) { keep[it.trackId] = 1; used++; } });
+    if (!used) { toast(T('msg.onlyNoParts'), true); return; }
+    var drop = S.tracks.filter(function (t) { return !keep[t.id]; });
+    if (!drop.length) { toast(T('msg.onlyAllUsed')); return; }
+    var dropIds = {};
+    drop.forEach(function (t) { dropIds[t.id] = 1; });
+    var id = cur().id;
+    var otherR = S.routes.filter(function (r) {
+      return r.id !== id && r.items.some(function (it) { return it.type === 'part' && dropIds[it.trackId]; });
+    }).length;
+    (otherR ? askYes(T('confirm.onlyRoute', { n: drop.length, r: otherR })) : Promise.resolve(true)).then(function (ok) {
+      if (!ok) return;
+      pushUndo(true);
+      S.tracks = S.tracks.filter(function (t) { return keep[t.id]; });
+      analyzeNow(); saveNow();
+      toast(T('msg.onlyRoute', { n: T.n('n.tracks', drop.length), m: T.n('n.tracks', S.tracks.length) }));
+    });
+  }
   function deleteTrack(t) {
     var usedIn = S.routes.filter(function (r) { return r.items.some(function (it) { return it.trackId === t.id; }); }).length;
     askYes(T('confirm.delTrack', { name: t.name }) + (usedIn ? ' ' + T('confirm.usedIn', { n: usedIn }) : '')).then(function (ok) {
@@ -4164,6 +4187,7 @@
       case 'export-gpx': askRouteGpx(); break;
       case 'export-collection': askName({ kind: 'collection', def: '', fallback: 'gpx-kolekciya-' + U.dateDots(Date.now()) + '.json' }); break;
       case 'save': askSave(); break;
+      case 'only-route': onlyRoute(); break;
       case 'follow': if (ui.follower) stopFollow(); else startFollow(); break;
       case 'follow-stop': stopFollow(); break;
       case 'awake': setAwake(!ui.awake); break;
