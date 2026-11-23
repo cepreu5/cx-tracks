@@ -137,6 +137,12 @@
     return parts.length ? parts.join('; ') : T('def.why.unknown');
   }
   // Копчето „Зареди дефолт“ в празния попъп: вижда се само когато има записан дефолт.
+  /* 1.10.12: празната карта се вижда само когато няма нито тракове, нито части в маршрута
+     и не тече следене - иначе закрива картата при „Следи без маршрут“. */
+  function updateEmpty() {
+    var r = cur();
+    $('#empty').hidden = !!ui.follower || !(S.tracks.length === 0 && r.items.length === 0);
+  }
   function updateDefBtn() {
     var b = $('#defBtn');
     if (!b) return;
@@ -363,7 +369,7 @@
     elevSoon();
     saveSoon();
     map.redraw();
-    $('#empty').hidden = !(S.tracks.length === 0 && r.items.length === 0);
+    updateEmpty();
     updateDefBtn();
   }
 
@@ -3513,6 +3519,7 @@
     // Картата остава в последната посока; копчето "Север" я изправя, а после "Посока" я връща (ui.heading се пази).
     ui.pos = null;
     map.redraw();
+    updateEmpty();
   }
 
   /* Режим "Екранът да не заспива" при следене: копчето в реда на следенето, изборът се помни.
@@ -4217,6 +4224,9 @@
       case 'save': askSave(); break;
       case 'only-route': onlyRoute(); break;
       case 'follow': if (ui.follower) stopFollow(); else startFollow(); break;
+      /* 1.10.12: от празната карта следенето тръгва направо, без обяснителния прозорец -
+         копчето самото казва, че е без маршрут. */
+      case 'follow-no-route': $('#empty').hidden = true; startFollow(true); break;
       case 'follow-stop': stopFollow(); break;
       case 'awake': setAwake(!ui.awake); break;
       case 'walk-gpx': if (ui.follower) walkGpx(ui.follower.rec, ui.followName, U.dateDots(Date.now()), ui.follower.wpts); break;
