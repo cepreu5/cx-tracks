@@ -459,18 +459,21 @@
   </form>
 </dialog>
 
-<!-- 1.10.7: „Следене“ без маршрут. Стои, докато не се прочете - съобщението за 4,5 секунди се пропускаше. -->
+<!-- 1.10.9: „Следене“ без маршрут - пита се, но не блокира: може да се записва само измереното. -->
 <dialog id="dlgNoRoute" class="dlg dlg-sm">
   <form method="dialog" id="noRouteForm">
     <h3 data-i18n="nr.h">Няма зареден маршрут</h3>
-    <p class="yes-text" data-i18n="nr.lead">Файлът, който зареди, влезе в списъка с тракове. „Следене“ върви по маршрута, а той е празен, затова следата ще е само измереното.</p>
+    <p class="yes-text" data-i18n="nr.lead">Маршрутът е празен, затова следата ще е само измереното: през дупка в GPS (загасен екран, тунел) ще е права линия.</p>
     <ol class="nr-steps">
-      <li data-i18n="nr.s1">Затвори този прозорец.</li>
+      <li data-i18n="nr.s1">Ако искаш следата да минава по маршрута, натисни „Отказ“.</li>
       <li data-i18n="nr.s2">На картата натисни върху линията на трака, който зареди.</li>
       <li data-i18n="nr.s3">От менюто избери „Добави в маршрута“.</li>
-      <li data-i18n="nr.s4">Натисни „Следене“ пак - в панела „Остават“ трябва да пише число, не „-“.</li>
+      <li data-i18n="nr.s4">Натисни „Следене“ пак.</li>
     </ol>
-    <div class="row end"><button class="btn pri" type="submit" value="ok" id="noRouteOk" data-i18n="nr.ok">Разбрах</button></div>
+    <div class="row end">
+      <button class="btn" type="submit" value="no" id="noRouteNo" data-i18n="nr.no">Отказ</button>
+      <button class="btn pri" type="submit" value="go" id="noRouteGo" data-i18n="nr.go">Продължи без маршрут</button>
+    </div>
   </form>
 </dialog>
 
