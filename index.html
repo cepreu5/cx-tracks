@@ -209,6 +209,8 @@
       <button class="btn" data-act="picture" data-i18n="act.picture">Снимка</button>
       <button class="btn" data-act="save" data-i18n="act.save">Запази</button>
       <button class="btn follow-btn" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
+      <!-- 1.10.10: маха от картата всички тракове без част в маршрута; „Отмени“ ги връща. -->
+      <button class="btn" data-act="only-route" data-i18n="act.onlyRoute" data-i18n-title="act.onlyRoute.title" title="Махни от картата всички тракове, които не участват в маршрута. „Отмени“ ги връща.">Само маршрута</button>
       <label class="tol"><span data-i18n="bar.tol">Отклонение</span> <input type="text" class="tolInput num" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="20" autocomplete="off" data-i18n-aria="tol.aria" data-i18n-title="tol.title" aria-label="Максимално допустимо отклонение в метри" title="Отклонение в метри, от 0 до 999. Enter прилага."> <span class="tol-unit" data-i18n="unit.m">м</span></label>
     </div>
     <div class="fold hint-fold" data-fold="hint">
