@@ -250,6 +250,7 @@ I18N.add({
   'empty.t': ['Тук ще се появи маршрутът', 'Your route will appear here'],
   'empty.p': ['Няма заредени тракове. Зареди колекция от файл или добави отделни .gpx.', 'No tracks loaded. Load a collection from a file or add individual .gpx files.'],
   'def.load': ['Зареди дефолт', 'Load the default'],
+  'empty.follow': ['Следи без маршрут', 'Follow without a route'],
   'def.load.title': ['Зареди дефолта „{name}“', 'Load the default “{name}”'],
   'def.loaded': ['Зареден е дефолтът: {name}', 'Default loaded: {name}'],
   'def.name': ['Дефолт', 'Default'],
