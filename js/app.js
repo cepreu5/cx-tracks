@@ -2482,15 +2482,32 @@
   }
   /* 1.10.10: „Само маршрута“ - от картата падат всички тракове, които не участват в текущия
      маршрут. Остават само траковете с част в него; „Отмени“ връща целия списък. Ако някой от
-     падащите тракове се ползва и в друг записан маршрут, първо се пита - там частта ще липсва. */
+     падащите тракове се ползва и в друг записан маршрут, първо се пита - там частта ще липсва.
+     1.10.11: от оставащите тракове падат и отсечките извън маршрута (t.dels) - в трака остава
+     само отсечката, която маршрутът ползва. */
+  function outsideOf(ranges, len) {
+    var out = [], pos = 0;
+    (ranges || []).slice().sort(function (x, y) { return x.a - y.a; }).forEach(function (r) {
+      var lo = Math.max(0, Math.min(r.a, len)), hi = Math.max(0, Math.min(r.b, len));
+      if (lo - pos > 0.5) out.push({ a: pos, b: lo });
+      if (hi > pos) pos = hi;
+    });
+    if (len - pos > 0.5) out.push({ a: pos, b: len });
+    return out;
+  }
   function onlyRoute() {
-    var keep = {}, used = 0;
-    cur().items.forEach(function (it) { if (it.type === 'part' && it.trackId && track(it.trackId)) { keep[it.trackId] = 1; used++; } });
+    var keep = {}, ranges = {}, used = 0;
+    cur().items.forEach(function (it) {
+      if (it.type !== 'part' || !it.trackId || !track(it.trackId)) return;
+      keep[it.trackId] = 1; used++;
+      (ranges[it.trackId] = ranges[it.trackId] || []).push({ a: Math.min(it.a, it.b), b: Math.max(it.a, it.b) });
+    });
     if (!used) { toast(T('msg.onlyNoParts'), true); return; }
     var drop = S.tracks.filter(function (t) { return !keep[t.id]; });
-    if (!drop.length) { toast(T('msg.onlyAllUsed')); return; }
+    var trim = S.tracks.filter(function (t) { return keep[t.id] && outsideOf(ranges[t.id], t.len).length; });
+    if (!drop.length && !trim.length) { toast(T('msg.onlyAllUsed')); return; }
     var dropIds = {};
-    drop.forEach(function (t) { dropIds[t.id] = 1; });
+    drop.concat(trim).forEach(function (t) { dropIds[t.id] = 1; });
     var id = cur().id;
     var otherR = S.routes.filter(function (r) {
       return r.id !== id && r.items.some(function (it) { return it.type === 'part' && dropIds[it.trackId]; });
@@ -2498,9 +2515,14 @@
     (otherR ? askYes(T('confirm.onlyRoute', { n: drop.length, r: otherR })) : Promise.resolve(true)).then(function (ok) {
       if (!ok) return;
       pushUndo(true);
+      S.tracks.forEach(function (t) {
+        if (!keep[t.id]) return;
+        var comp = outsideOf(ranges[t.id], t.len);
+        if (comp.length) t.dels = Core.mergeIv((t.dels || []).concat(comp));
+      });
       S.tracks = S.tracks.filter(function (t) { return keep[t.id]; });
       analyzeNow(); saveNow();
-      toast(T('msg.onlyRoute', { n: T.n('n.tracks', drop.length), m: T.n('n.tracks', S.tracks.length) }));
+      toast(T(trim.length ? 'msg.onlyRouteCut' : 'msg.onlyRoute', { n: T.n('n.tracks', drop.length), m: T.n('n.tracks', S.tracks.length), k: T.n('n.tracks', trim.length) }), false, 5000);
     });
   }
   function deleteTrack(t) {
@@ -3545,13 +3567,14 @@
     toast(T('msg.wptPlaced', { name: w.name, cnt: T.n('n.points', f.wpts.length) }));
   }
 
-  /* Изминатото като нормален трак: нов трак "изминат <дата>" в изминатите на следения
+  /* Изминатото като нормален трак: нов трак с дата за име в изминатите на следения
      маршрут и отделен запис в "Записани маршрути" (една част - целият трак). Текущ остава
-     отвореният маршрут. Същият път за "Стоп" и за възстановено незавършено следене. */
+     отвореният маршрут. Същият път за "Стоп" и за възстановено незавършено следене.
+     1.10.11: името е само датата (23.11.2026) - думата "изминат" отпадна по заявка. */
   function saveWalk(w) {
     var rec = w.pts, when = w.t || Date.now();
     var wpts = (w.wpts || []).map(function (x) { return { lat: x.lat, lon: x.lon, ele: x.ele, time: x.time, name: x.name }; });
-    var t = { id: U.uid(), name: T('walk.trackName', { d: U.dateShort(when) }), title: T('walk.trackName', { d: U.date(when) }), color: nextColor(), pts: rec, breaks: [], wpts: wpts, visible: true, created: Date.now(), walk: true };
+    var t = { id: U.uid(), name: U.dateDots(when), title: U.dateDots(when), color: nextColor(), pts: rec, breaks: [], wpts: wpts, visible: true, created: Date.now(), walk: true };
     Core.prep(t);
     S.tracks.push(t);
     S.routes.forEach(function (r) { if (r.id === w.routeId) r.walks = (r.walks || []).concat([t.id]); });
@@ -3618,7 +3641,12 @@
       if (r) lw.wname = r.name;
       if (lw.stats) lw.stats.done = U.km(t.len);
       lw.msgK = { head: 'walk.headStop', name: r ? r.name : t.name };
+      // 1.10.11: записът е направен - редът „Следенето спря“ с копчето за .gpx пада от картата,
+      // както при „Запиши .gpx“ (1.9.9). Копчето в панела „Следене“ остава: файлът още може да се поиска.
+      lw.bar = false;
       U.DB.set('lastWalk', lw);
+      var dw = $('#dlgWalk');
+      if (dw.open) dw.close();
       showWalk();
     }
     analyzeNow();
@@ -3858,7 +3886,7 @@
   // "Запиши .gpx" при следене не го подава - там следенето продължава и копчето остава.
   function walkGpx(pts, routeName, title, wpts, done) {
     if (!pts || pts.length < 2) return;
-    askName({ kind: 'walk', done: !!done, pts: pts.slice(), wpts: (wpts || []).slice(), title: title || T('walk.trackName', { d: U.date(Date.now()) }), def: 'izminat-' + U.slug(routeName) + '-' + U.dateDots(Date.now()) });
+    askName({ kind: 'walk', done: !!done, pts: pts.slice(), wpts: (wpts || []).slice(), title: title || U.dateDots(Date.now()), def: U.dateDots(Date.now()) });
   }
   // Маршрутът като .gpx: пита за име (предложено - името на маршрута); празен маршрут не пита.
   function askRouteGpx(r) {
@@ -4191,7 +4219,7 @@
       case 'follow': if (ui.follower) stopFollow(); else startFollow(); break;
       case 'follow-stop': stopFollow(); break;
       case 'awake': setAwake(!ui.awake); break;
-      case 'walk-gpx': if (ui.follower) walkGpx(ui.follower.rec, ui.followName, T('walk.trackName', { d: U.date(Date.now()) }), ui.follower.wpts); break;
+      case 'walk-gpx': if (ui.follower) walkGpx(ui.follower.rec, ui.followName, U.dateDots(Date.now()), ui.follower.wpts); break;
       case 'walk-gpx-done': if (ui.lastWalk) { var lt = track(ui.lastWalk.trackId); walkGpx(ui.lastWalk.pts, ui.lastWalk.name, ui.lastWalk.title, lt ? lt.wpts : ui.lastWalk.wpts, true); } break;
       case 'walk-point': askPoint(); break;
       case 'center': centerMe(); break;
