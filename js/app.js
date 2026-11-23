@@ -2462,14 +2462,23 @@
       $('#yesOk').focus();
     });
   }
-  /* 1.10.7: „Следене“ без маршрут. Точно съобщение за 4,5 секунди се пропускаше, затова
-     прозорецът стои в средата, докато не се натисне „Разбрах“ - няма таймер и не се
-     затваря с клик встрани или с Escape. */
+  /* 1.10.9: „Следене“ без маршрут вече не блокира. Прозорецът обяснява какво става със следата
+     (само измереното, права линия през дупките) и пита дали да се записва така. Връща Promise:
+     true - „Продължи без маршрут“, false - „Отказ“ или Escape. */
   function showNoRoute() {
-    var d = $('#dlgNoRoute');
-    d.returnValue = '';
-    if (!d.open) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
-    $('#noRouteOk').focus();
+    return new Promise(function (resolve) {
+      var d = $('#dlgNoRoute');
+      function done() {
+        d.removeEventListener('close', done);
+        var go = d.returnValue === 'go';
+        d.returnValue = '';
+        resolve(go);
+      }
+      d.addEventListener('close', done);
+      d.returnValue = '';
+      if (!d.open) { if (d.showModal) d.showModal(); else d.setAttribute('open', ''); }
+      $('#noRouteGo').focus();
+    });
   }
   function deleteTrack(t) {
     var usedIn = S.routes.filter(function (r) { return r.items.some(function (it) { return it.trackId === t.id; }); }).length;
@@ -3345,11 +3354,14 @@
       b.title = on ? T('follow.stop.title') : T('follow.start.title');
     });
   }
-  function startFollow() {
+  function startFollow(noRoute) {
     if (ui.follower) return;
-    /* 1.10.7: при празен маршрут следенето не тръгва. Преди тук имаше съобщение за
-       4,5 секунди и то се пропускаше, а записът продължаваше само с измереното. */
-    if (!G || G.pts.length < 2) { showNoRoute(); return; }
+    /* 1.10.9: без маршрут „Следене“ пак тръгва - пита се и се записва само измереното.
+       1.10.7 го спираше навсякъде, а човек може да иска да си запише ходенето и без маршрут. */
+    if (!noRoute && (!G || G.pts.length < 2)) {
+      showNoRoute().then(function (go) { if (go) startFollow(true); });
+      return;
+    }
     var f = new window.Follower({
       position: function (pos) {
         ui.pos = pos;
@@ -3405,6 +3417,8 @@
     if (!f.start()) { return; }
     ui.followTimer = setInterval(renderFollow, 15000);
     liveStart();
+    // 1.10.9: следа без маршрут - казва се веднъж, за да не се чака „Остават“ да покаже число.
+    if (noRoute) toast(T('nr.rec'), false, 6000);
   }
   function renderFollow() {
     if (!ui.follower) return;
@@ -4453,7 +4467,6 @@
     $('#ringsDrop').addEventListener('click', function () { ringsDone(true); });
     $('#ringsKeep').addEventListener('click', function () { ringsDone(false); });
     $('#dlgRings').addEventListener('cancel', function (e) { e.preventDefault(); }); // затваря се само с копче
-    $('#dlgNoRoute').addEventListener('cancel', function (e) { e.preventDefault(); }); // и „Няма зареден маршрут“ - само с копчето
     $('#ringsOpen').addEventListener('click', openRings);
 
     document.addEventListener('keydown', function (e) {
