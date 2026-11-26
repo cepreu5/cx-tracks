@@ -3,8 +3,8 @@
    Apps Script (сървърната част е в tools/who-sheet.gs). Пращането е fire-and-forget:
    отговор не се чака, страницата не блокира, а при липса на връзка или грешка нищо не
    се показва и нищо не се повтаря само. Отговореното се помни в gpxk.who, затова формата
-   не излиза пак на това устройство; „По-късно“ не помни нищо и формата излиза при
-   следващото стартиране. */
+   не излиза пак на това устройство. 1.10.27: и трите полета са задължителни и „По-късно“
+   го няма - прозорецът се затваря само със „Запази“. */
 (function () {
   'use strict';
 
@@ -63,7 +63,16 @@
       city: ((c && c.value) || '').trim(),
       country: ((k && k.value) || '').trim()
     };
-    if (!o.name) return false;
+    /* 1.10.27: и трите полета са задължителни - с празно поле нищо не се помни и не се праща. */
+    var miss = !o.name ? n : (!o.city ? c : (!o.country ? k : null));
+    if (miss) {
+      var er = $('#whoErr');
+      if (er) er.hidden = false;
+      try { miss.focus({ preventScroll: true }); } catch (e) { miss.focus(); }
+      return false;
+    }
+    var er2 = $('#whoErr');
+    if (er2) er2.hidden = true;
     o.at = new Date().toISOString();
     U.LS.set(KEY, o);
     send(o);
@@ -75,11 +84,26 @@
     if (!f || !d) return;
     f.addEventListener('submit', function (e) {
       e.preventDefault();
-      if (!save()) { var n = $('#whoName'); if (n) n.focus(); return; }
+      if (!save()) return;
       d.close('save');
     });
-    var later = $('#whoLater');
-    if (later) later.addEventListener('click', function () { d.close('later'); });
+    /* 1.10.27: „По-късно“ го няма, затова прозорецът не се затваря с Esc и с клик извън него,
+       а само със „Запази“ - иначе празна форма пак може да се подмине. */
+    d.addEventListener('cancel', function (e) { e.preventDefault(); });
+    /* Х в полето „Държава“ изтрива текста и връща курсора в полето. */
+    var x = $('#whoCountryX');
+    if (x) x.addEventListener('click', function (e) {
+      e.preventDefault();
+      var k = $('#whoCountry');
+      if (!k) return;
+      k.value = '';
+      try { k.focus({ preventScroll: true }); } catch (e2) { k.focus(); }
+    });
+    /* Щом полетата се попълват, редът за грешка се маха. */
+    f.addEventListener('input', function () {
+      var er = $('#whoErr');
+      if (er && !er.hidden) er.hidden = true;
+    });
   }
 
   window.Who = {

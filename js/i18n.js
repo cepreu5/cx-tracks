@@ -855,13 +855,15 @@ I18N.add({
 });
 
 /* ---- 1.10.26: кратката форма при първото стартиране (име, град, държава) ---- */
+/* 1.10.27: новият текст за статистиката, Х за изтриване на „Държава“, без „По-късно“ */
 I18N.add({
   'who.h': ['Кой използва приложението', 'Who is using the app'],
-  'who.lead': ['Пита се само веднъж на това устройство. Трите полета отиват в таблицата на създателя на приложението.', 'Asked only once on this device. The three fields go to the app creator\u2019s spreadsheet.'],
+  'who.lead': ['Пита се само веднъж на това устройство. Трите полета отиват в таблицата на създателя на приложението. - Данните се използват за статистика.', 'Asked only once on this device. The three fields go to the app creator\u2019s spreadsheet. - The data is used for statistics.'],
   'who.name': ['Име', 'Name'],
   'who.city': ['Град', 'City'],
   'who.country': ['Държава', 'Country'],
-  'who.later': ['По-късно', 'Later']
+  'who.clear': ['Изтрий текста', 'Clear the text'],
+  'who.err': ['Попълни и трите полета.', 'Fill in all three fields.']
 });
 
 I18N.start();

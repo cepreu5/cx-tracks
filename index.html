@@ -569,21 +569,23 @@
 <!-- 1.10.26: първото стартиране на устройството пита име, град и държава и ги праща към
      Google таблица (js/who.js, сървърът в tools/who-sheet.gs). Пита се веднъж. -->
 <dialog id="dlgWho" class="dlg dlg-sm">
-  <form method="dialog" id="whoForm">
+  <form method="dialog" id="whoForm" novalidate>
     <h3 data-i18n="who.h">Кой използва приложението</h3>
-    <p class="muted small" data-i18n="who.lead">Пита се само веднъж на това устройство. Трите полета отиват в таблицата на създателя на приложението.</p>
+    <p class="muted small" data-i18n="who.lead">Пита се само веднъж на това устройство. Трите полета отиват в таблицата на създателя на приложението. - Данните се използват за статистика.</p>
     <label class="walk-field"><span class="small muted" data-i18n="who.name">Име</span>
       <input id="whoName" name="whoName" type="text" autocomplete="name" spellcheck="false" required data-i18n-aria="who.name" aria-label="Име">
     </label>
     <label class="walk-field"><span class="small muted" data-i18n="who.city">Град</span>
-      <input id="whoCity" name="whoCity" type="text" autocomplete="address-level2" spellcheck="false" data-i18n-aria="who.city" aria-label="Град">
+      <input id="whoCity" name="whoCity" type="text" autocomplete="address-level2" spellcheck="false" required data-i18n-aria="who.city" aria-label="Град">
     </label>
     <label class="walk-field"><span class="small muted" data-i18n="who.country">Държава</span>
-      <input id="whoCountry" name="whoCountry" type="text" autocomplete="country-name" spellcheck="false" data-i18n-aria="who.country" aria-label="Държава">
+      <span class="walk-x-wrap">
+        <input id="whoCountry" name="whoCountry" type="text" autocomplete="country-name" spellcheck="false" value="Bulgaria" required data-i18n-aria="who.country" aria-label="Държава">
+        <button type="button" class="walk-x" id="whoCountryX" data-i18n-aria="who.clear" data-i18n-title="who.clear" aria-label="Изтрий текста" title="Изтрий текста">&#215;</button>
+      </span>
     </label>
+    <p class="who-err" id="whoErr" role="alert" hidden data-i18n="who.err">Попълни и трите полета.</p>
     <div class="row end">
-      <button class="btn" type="button" id="whoLater" data-i18n="who.later">По-късно</button>
-      <span class="sp"></span>
       <button class="btn pri" type="submit" value="save" id="whoOk" data-i18n="act.save">Запази</button>
     </div>
   </form>
