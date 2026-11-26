@@ -55,7 +55,7 @@ function rotState() {
     recHd: (() => { let i = rec.length - 1; while (i >= 0 && rec[i][4] == null) i--; if (i < 1) return null;
       let j = i - 1; while (j >= 0 && rec[j][4] == null) j--; if (j < 0) return null;
       return U.bearing(rec[j][0], rec[j][1], rec[i][0], rec[i][1]); })(),
-    btnShown: !b.hidden && b.getBoundingClientRect().width > 0, btnText: b.textContent.trim(), letter: b.querySelector('.n').textContent,
+    btnShown: !b.hidden && b.getBoundingClientRect().width > 0, btnText: document.querySelector("#northLbl").textContent.trim(), letter: b.querySelector('.n').textContent,
     letterAng: ang([let_.left + let_.width / 2 - (rose.left + rose.width / 2), let_.top + let_.height / 2 - (rose.top + rose.height / 2)]),
     letterUpright: Math.abs(let_.width - let_.height) < 6 && let_.width < 20,
     northAng: ang([north.x - c.x, north.y - c.y]), roundTrip: Math.hypot(again.x - c.x - 37, again.y - c.y + 51)
@@ -81,7 +81,7 @@ function picState() {
     layer: tr.contains(document.querySelector('#picImg')) && tr.contains(document.querySelector('#picSvg')) &&
       Math.abs(img.left - svg.left) < 1 && Math.abs(img.top - svg.top) < 1 && Math.abs(img.width - svg.width) < 1,
     texts,
-    btn: { shown: !b.hidden && br.width > 0, text: b.textContent.trim(), offer: b.dataset.offer, aria: b.getAttribute('aria-label'), label: b.querySelector('.n').textContent,
+    btn: { shown: !b.hidden && br.width > 0, text: document.querySelector('#picNorthLbl').textContent.trim(), offer: b.dataset.offer, aria: b.getAttribute('aria-label'), label: b.querySelector('.n').textContent,
       onScreen: br.right <= innerWidth + 0.5 && br.left >= 0 && br.bottom <= innerHeight + 0.5 && br.top >= 0 }
   };
 }
@@ -471,6 +471,23 @@ function barFits() {
   rs = await page.evaluate(rotState);
   const ogH = await page.evaluate(() => document.querySelector('#followBar [data-orient="heading"]').classList.contains('on'));
   check(angDiff(rs.rot, rs.recHd) < 0.5 && /Север/.test(rs.btnText) && ogH, 'копчето "Посока" върху картата: пак по посоката (' + rs.rot.toFixed(1) + '°), ключът в реда е на "Посока"');
+  // 1.10.15: розетата е отделно кръгло копче (60 px), а надписът „Север / Посока“ е в своя пилула до нея.
+  const c15 = await page.evaluate(() => {
+    const rose = document.querySelector('#northBtn').getBoundingClientRect(), txt = document.querySelector('#northTxt').getBoundingClientRect();
+    const st = getComputedStyle(document.querySelector('#northBtn'));
+    const hit = (p, q) => !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top);
+    return { w: Math.round(rose.width), h: Math.round(rose.height), gap: Math.round(txt.left - rose.right), overlap: hit(rose, txt), round: st.borderRadius,
+      shown: rose.width > 0 && txt.width > 0, label: document.querySelector('#northLbl').textContent.trim() };
+  });
+  check(c15.shown && c15.w === 60 && c15.h === 60 && c15.gap > 0 && !c15.overlap && /50%/.test(c15.round),
+    '1.10.15: розетата е отделно кръгло копче 60x60, а „' + c15.label + '“ е в своя пилула до нея: ' + JSON.stringify(c15));
+  await page.click('#northTxt');
+  await settled(page);
+  rs = await page.evaluate(rotState);
+  check(rs.rot === 0 && /Посока/.test(rs.btnText), '1.10.15: надписът до розетата върши същото - „Север“ изправя картата и надписът става „Посока“');
+  await page.click('#northBtn');
+  await settled(page);
+  rs = await page.evaluate(rotState);
   // Дръпната с пръст карта спира да следва посоката; "Центрирай" я връща.
   const rotBefore = rs.rot;
   await page.mouse.move(640, 500); await page.mouse.down(); await page.mouse.move(560, 450, { steps: 4 }); await page.mouse.up();
@@ -506,12 +523,12 @@ function barFits() {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector('#picTurn').getBoundingClientRect().width > 300, null, { timeout: 3000 }).catch(() => {});
   const pvS = await page.evaluate(() => {
-    const b = document.querySelector('#picNorthBtn').getBoundingClientRect();
+    const b = document.querySelector('#picNorthBox').getBoundingClientRect(), rose = document.querySelector('#picNorthBtn').getBoundingClientRect();
     const bs = [...document.querySelectorAll('.pic-ctl > button')].map(x => x.getBoundingClientRect());
     const hit = (p, q) => !(p.right <= q.left || q.right <= p.left || p.bottom <= q.top || q.bottom <= p.top);
-    return { shown: b.width > 0 && b.left >= 0 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5, clear: bs.every(q => !hit(b, q)), square: bs.every(q => Math.round(q.width) === 38), w: Math.round(b.width) };
+    return { shown: b.width > 0 && b.left >= 0 && b.right <= innerWidth + 0.5 && b.bottom <= innerHeight + 0.5, clear: bs.every(q => !hit(b, q)), square: bs.every(q => Math.round(q.width) === 38), w: Math.round(b.width), rose: Math.round(rose.width) };
   });
-  check(pvS.shown && pvS.clear && pvS.square, '1.9.3, 390 px: „Север“ се побира в колоната на снимката и не застъпва „Към картата“, „1:1“ и „▣“: ' + JSON.stringify(pvS));
+  check(pvS.shown && pvS.clear && pvS.square && pvS.rose === 60, '1.9.3 + 1.10.15, 390 px: розетата и надписът „Север“ се побират в колоната на снимката и не застъпват „Към картата“, „1:1“ и „▣“: ' + JSON.stringify(pvS));
   await page.screenshot({ path: path.join(OUT, 'pic-turn-390.png') });
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.waitForTimeout(200);
