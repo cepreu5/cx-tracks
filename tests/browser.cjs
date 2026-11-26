@@ -41,10 +41,13 @@ function vis(sel) {
   const r = e.getBoundingClientRect(), st = getComputedStyle(e);
   return { shown: r.width > 0 && r.height > 0 && st.visibility !== 'hidden', l: r.left, r: r.right, t: r.top, w: r.width };
 }
-// Завъртането на картата и стрелката "С": посоката от центъра на розата към буквата трябва да е северът на екрана.
+// Завъртането на картата и стрелката на север: посоката от центъра на розата към буквата трябва да е северът на екрана.
 function rotState() {
   const m = __gpxk.map, rec = __gpxk.ui.follower ? __gpxk.ui.follower.rec : [], n = rec.length;
-  const b = document.querySelector('#northBtn'), rose = b.querySelector('.rose').getBoundingClientRect(), let_ = b.querySelector('.n').getBoundingClientRect();
+  // 1.10.19: буквата „С“ я няма - северът се мери по стрелката: посоката от центъра на розетата
+  // към средата на северната й половина (под въртенето това е същата точка, само завъртяна).
+  const b = document.querySelector('#northBtn'), roseEl = b.querySelector('.rose'), rose = roseEl.getBoundingClientRect();
+  const nd = b.querySelector('.needle'), ndr = nd.getBoundingClientRect(), ndcs = getComputedStyle(nd), nda = getComputedStyle(nd, '::after');
   const c = m.project(42.5, 24.7), north = m.project(42.51, 24.7);
   const ang = v => (Math.atan2(v[0], -v[1]) * 180 / Math.PI + 360) % 360; // 0 = нагоре, по часовника
   const back = m.unproject(c.x + 37, c.y - 51), again = m.project(back.lat, back.lon);
@@ -55,9 +58,11 @@ function rotState() {
     recHd: (() => { let i = rec.length - 1; while (i >= 0 && rec[i][4] == null) i--; if (i < 1) return null;
       let j = i - 1; while (j >= 0 && rec[j][4] == null) j--; if (j < 0) return null;
       return U.bearing(rec[j][0], rec[j][1], rec[i][0], rec[i][1]); })(),
-    btnShown: !b.hidden && b.getBoundingClientRect().width > 0, btnText: document.querySelector("#northLbl").textContent.trim(), letter: b.querySelector('.n').textContent,
-    letterAng: ang([let_.left + let_.width / 2 - (rose.left + rose.width / 2), let_.top + let_.height / 2 - (rose.top + rose.height / 2)]),
-    letterUpright: Math.abs(let_.width - let_.height) < 6 && let_.width < 20,
+    btnShown: !b.hidden && b.getBoundingClientRect().width > 0, btnText: document.querySelector("#northLbl").textContent.trim(),
+    hasLetter: !!b.querySelector('.n'),
+    needleAng: ang([ndr.left + ndr.width / 2 - (rose.left + rose.width / 2), ndr.top + ndr.height / 2 - (rose.top + rose.height / 2)]),
+    needleLen: nd.offsetHeight + parseFloat(nda.borderTopWidth), roseIn: roseEl.clientHeight,
+    northColor: ndcs.borderBottomColor, southColor: nda.borderTopColor,
     northAng: ang([north.x - c.x, north.y - c.y]), roundTrip: Math.hypot(again.x - c.x - 37, again.y - c.y + 51)
   };
 }
@@ -449,7 +454,7 @@ function barFits() {
   let rs = await page.evaluate(rotState);
   check(rs.orient === 'heading' && rs.recHd != null && rs.rot > 1 && angDiff(rs.rot, rs.recHd) < 0.5, 'следене, изглед "Карта": посоката на движение сочи нагоре - завъртяна на ' + rs.rot.toFixed(1) + '° (посока ' + (rs.recHd || 0).toFixed(1) + '°)');
   check(angDiff(rs.northAng, 360 - rs.rot) < 1 && rs.roundTrip < 0.01, 'завъртяната карта: северът е на ' + rs.northAng.toFixed(1) + '° от вертикала, хващането (unproject/project) е точно (' + rs.roundTrip.toFixed(4) + ' px)');
-  check(rs.btnShown && rs.letter === 'С' && /Север/.test(rs.btnText) && angDiff(rs.letterAng, rs.northAng) < 8 && rs.letterUpright, 'стрелка "С": показва север (' + rs.letterAng.toFixed(1) + '° срещу ' + rs.northAng.toFixed(1) + '°), буквата е изправена, копчето "Север" се вижда');
+  check(rs.btnShown && !rs.hasLetter && /Север/.test(rs.btnText) && angDiff(rs.needleAng, rs.northAng) < 8 && Math.abs(rs.needleLen - rs.roseIn) < 1.5 && rs.northColor !== rs.southColor, 'стрелката показва север (' + rs.needleAng.toFixed(1) + '° срещу ' + rs.northAng.toFixed(1) + '°), без буква, пълни кръгчето (' + rs.needleLen + ' от ' + rs.roseIn + ' px), северната половина е синя (' + rs.northColor + '), копчето Север се вижда');
   const og = await page.evaluate(() => Array.from(document.querySelectorAll('#followBar [data-orient]')).map(b => b.textContent + (b.classList.contains('on') ? '*' : '')).join('/'));
   check(og === 'Посока*/Север', 'ключ "Посока / Север" в реда на следенето, по подразбиране "Посока": ' + og);
   await page.click('#followBar [data-orient="north"]');
