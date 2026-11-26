@@ -39,6 +39,9 @@
     autoCenter: true, pin: null, profHover: null, picUrl: null, picMeta: null, picLabels: [], picAt: null,
     orient: U.LS.get('orient', 'heading') === 'north' ? 'north' : 'heading', heading: null, lastWalk: null, lastPos: null, rot: 0, nameJob: null,
     awake: U.LS.get('awake', true) !== false, om: null, redundant: [],
+    // 1.10.23: часовникът долу вдясно на картата. clkShow е състоянието на чавката „Покажи часовника“:
+    // по подразбиране е без отметка, тоест часовникът не се вижда, докато не се отметне.
+    clkShow: U.LS.get('clkShow', false) === true,
     // 1.9.5: дефолтната колекция - само името и датата ѝ; самите .gpx файлове стоят в базата под 'defaultGpx'.
     defColl: null
   };
@@ -441,6 +444,16 @@
     attrib();
   }
   function attrib() { $('#attrib').textContent = ui.base === 'topo' ? ATTR.topo : ui.labels ? ATTR.satLabels : ATTR.sat; }
+
+  /* 1.10.23: часовникът долу вдясно - класът е на <html>, за да е скрит още преди app.js,
+     а чавката „Покажи часовника“ горе вдясно винаги показва същото състояние. */
+  function setClockShown(v) {
+    ui.clkShow = !!v;
+    U.LS.set('clkShow', ui.clkShow);
+    document.documentElement.classList.toggle('clock-on', ui.clkShow);
+    var t = $('#clkToggle');
+    if (t) t.checked = ui.clkShow;
+  }
 
   /* 1.5 „Настройки“ (зъбното колелце в лентата): прозрачност на менютата над картата, прагът на
      самозатваряне на малките дупки и цветовете по картата. Пазят се на устройството (gpxk.settings),
@@ -4388,6 +4401,34 @@
     // 1.10.1: „Стрелки“ - посоката по траковете се показва/скрива; изборът се помни.
     $('#arrToggle').checked = ui.arrShow;
     $('#arrToggle').addEventListener('change', function (e) { ui.arrShow = e.target.checked; U.LS.set('arrShow', ui.arrShow); map.redraw(); });
+    // 1.10.23: часовникът долу вдясно на картата. Показва го чавката горе вдясно, а клик върху
+    // самия часовник го скрива; състоянието се помни на устройството. Ko-fi остава на място.
+    $('#clkToggle').checked = ui.clkShow;
+    $('#clkToggle').addEventListener('change', function (e) { setClockShown(e.target.checked); });
+    $('#miniClock').addEventListener('click', function () { setClockShown(false); });
+    setClockShown(ui.clkShow);
+    // Стрелките и чертичките на часовника: геометрията е от uni/Extra/clock-1.html (200 px плочка),
+    // а размерите в css/app.css са в em, за да се смалява целият часовник с една стойност.
+    (function () {
+      var face = $('#clFace');
+      if (!face) return;
+      for (var i = 0; i < 12; i++) {
+        if (i % 3 === 0) continue; // 12, 3, 6 и 9 са цифри, не чертички
+        var m = document.createElement('i');
+        m.className = 'cl-mark';
+        m.style.transform = 'translateX(-50%) rotate(' + (i * 30) + 'deg)';
+        face.appendChild(m);
+      }
+      var hh = $('#clHour'), mm = $('#clMinute'), ss = $('#clSecond');
+      function tick() {
+        var now = new Date(), s = now.getSeconds(), mn = now.getMinutes(), h = now.getHours();
+        hh.style.transform = 'translate(-50%, -100%) rotate(' + ((h % 12) * 30 + mn * 0.5) + 'deg)';
+        mm.style.transform = 'translate(-50%, -100%) rotate(' + (mn * 6 + s * 0.1) + 'deg)';
+        ss.style.transform = 'translate(-50%, -100%) rotate(' + (s * 6) + 'deg)';
+      }
+      tick();
+      setInterval(tick, 1000);
+    })();
     $('#gradeToggle').checked = ui.grade;
     $('#gradeToggle').addEventListener('change', function (e) { ui.grade = e.target.checked; U.LS.set('grade', ui.grade); drawProfile(); });
     // Отклонение: до 3 цифри (0-999 м); прилага се с Enter или при излизане от полето.

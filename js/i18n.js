@@ -234,6 +234,9 @@ I18N.add({
   'act.undo': ['Отмени', 'Undo'],
   'vtx.title': ['Точки - кръгчетата и номерата на чертаните точки', 'Points - the circles and numbers of the drawn points'],
   'vtx.aria': ['Точки', 'Points'],
+  // 1.10.23: часовникът долу вдясно на картата (до иконката за подкрепа)
+  'clk.show': ['Покажи часовника', 'Show the clock'],
+  'clk.aria': ['Часовник - клик върху него го скрива', 'Clock - click it to hide it'],
   'zoom.in': ['Приближи', 'Zoom in'],
   'zoom.out': ['Отдалечи', 'Zoom out'],
   'center': ['Центрирай върху положението ти от GPS', 'Centre on your GPS position'],
