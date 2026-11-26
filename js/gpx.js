@@ -94,8 +94,12 @@
         (w.ele != null ? '<ele>' + Math.round(w.ele) + '</ele>' : '') +
         '<name>' + x(w.name) + '</name></wpt>');
     });
+    var brk = {};
+    (opts.breaks || []).forEach(function (k) { brk[k] = 1; });
     lines.push('  <trk><name>' + x(name) + '</name><trkseg>');
-    (opts.pts || []).forEach(function (p) {
+    (opts.pts || []).forEach(function (p, i) {
+      // Пауза по средата на записа: нова отсечка, за да няма линия през почивката.
+      if (i && brk[i]) lines.push('  </trkseg><trkseg>');
       var s = '    <trkpt lat="' + f6(p[0]) + '" lon="' + f6(p[1]) + '">';
       if (p[2] != null && isFinite(p[2])) s += '<ele>' + (Math.round(p[2] * 10) / 10) + '</ele>';
       if (p[3]) s += '<time>' + new Date(p[3]).toISOString() + '</time>';
