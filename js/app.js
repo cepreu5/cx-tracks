@@ -794,6 +794,18 @@
   function recGapLines(rec) {
     return Core.walkGaps(rec).map(function (g) { return rec.slice(g[0], g[1] + 1); });
   }
+  /* Точките на живата следа, разцепени по паузите (Follower.breaks): между два участъка няма линия -
+     човекът е бил на почивка, а не е минал от единия край до другия. */
+  function recSegs(rec, breaks) {
+    var brk = {}, out = [], cur = [];
+    (breaks || []).forEach(function (k) { brk[k] = 1; });
+    for (var i = 0; i < rec.length; i++) {
+      if (brk[i] && cur.length) { out.push(cur); cur = []; }
+      cur.push(rec[i]);
+    }
+    if (cur.length) out.push(cur);
+    return out;
+  }
 
   function drawMap(ctx, m) {
     var pr = m.projector();
@@ -1037,7 +1049,9 @@
     if (ui.follower) {
       var rec = ui.follower.rec;
       if (rec.length > 1) {
-        path(ctx, pr, rec); stroke(ctx, C.casing, 6); stroke(ctx, C.walked, 3.5);
+        recSegs(rec, ui.follower.breaks).forEach(function (pts) {
+          if (pts.length > 1) { path(ctx, pr, pts); stroke(ctx, C.casing, 6); stroke(ctx, C.walked, 3.5); }
+        });
         recGapLines(rec).forEach(function (pts) { path(ctx, pr, pts); stroke(ctx, C.casing, 4); stroke(ctx, C['walk-gap'], 3.5, [8, 6]); });
       }
       // Точките от копчето "Точка" - ромбче с името (по подразбиране "Точка N").
@@ -3361,7 +3375,7 @@
       walkGapLines(t, [[0, t.len]]).forEach(function (pts) { line(pts, C.casing, 3, 0, true); line(pts, C['walk-gap'], 3, 4, true); });
     });
     if (ui.follower) {
-      line(ui.follower.rec, C.walked, 4, 0);
+      recSegs(ui.follower.rec, ui.follower.breaks).forEach(function (pts) { line(pts, C.walked, 4, 0); });
       recGapLines(ui.follower.rec).forEach(function (pts) { line(pts, C.casing, 4, 0, true); line(pts, C['walk-gap'], 4, 5, true); });
     }
     // Точките от следене - ромбче с името.
@@ -3415,13 +3429,37 @@
      "Следене", докато не следиш, и "Стоп" (червено), докато следиш. */
   function followBtns() {
     var on = !!ui.follower;
+    var paused = on && ui.follower.isPaused();
     $$('[data-act="follow"]').forEach(function (b) {
-      b.textContent = on ? T('follow.stop') : T('follow.start');
-      b.classList.toggle('danger', on);
-      b.setAttribute('aria-pressed', on ? 'true' : 'false');
-      b.setAttribute('aria-label', on ? T('follow.stop.aria') : T('follow.start.aria'));
-      b.title = on ? T('follow.stop.title') : T('follow.start.title');
+      b.textContent = paused ? T('follow.resume') : (on ? T('follow.stop') : T('follow.start'));
+      b.classList.toggle('danger', on && !paused);
+      b.classList.toggle('paused', paused);
+      b.setAttribute('aria-pressed', on && !paused ? 'true' : 'false');
+      b.setAttribute('aria-label', paused ? T('follow.resume.aria') : (on ? T('follow.stop.aria') : T('follow.start.aria')));
+      b.title = paused ? T('follow.resume.title') : (on ? T('follow.stop.title') : T('follow.start.title'));
     });
+  }
+  /* 1.10.16: пауза при дълго натискане на "Стоп". GPS-ът спира, часовникът спира, записът остава;
+     "Продължи" пуска GPS-а пак върху същия запис. Нищо не се записва при паузата - копчето само
+     показва, че е приело. */
+  function pauseFollow() {
+    var f = ui.follower;
+    if (!f || !f.pause()) return;
+    followBtns();
+    renderFollow();
+    toast(T('follow.paused'), false, 5000);
+    map.redraw();
+    drawPicOverlay();
+  }
+  function resumeFollow() {
+    var f = ui.follower;
+    if (!f || !f.resume()) return;
+    followBtns();
+    // Панелът вече не казва "Пауза" - чака първото положение от пуснатия наново GPS.
+    $('#fMsg').textContent = T('follow.waiting'); $('#fMsg').className = 'follow-msg';
+    renderFollow();
+    map.redraw();
+    drawPicOverlay();
   }
   function startFollow(noRoute) {
     if (ui.follower) return;
@@ -3492,6 +3530,12 @@
   function renderFollow() {
     if (!ui.follower) return;
     $('#fTime').textContent = U.duration(ui.follower.elapsed());
+    // На пауза панелът казва защо часовникът стои и че GPS-ът не се чете.
+    if (ui.follower.isPaused()) {
+      var pm = $('#fMsg');
+      pm.textContent = T('follow.paused'); pm.className = 'follow-msg warn';
+      return;
+    }
     if (ui.follower.waiting) { $('#fMsg').textContent = T('follow.waiting'); $('#fMsg').className = 'follow-msg'; return; }
     var p = ui.prog;
     if (!p) {
@@ -3513,7 +3557,7 @@
   function stopFollow(silent) {
     var f = ui.follower;
     if (!f) return;
-    var rec = f.stop(), wpts = f.wpts.slice();
+    var rec = f.stop(), wpts = f.wpts.slice(), brks = (f.breaks || []).slice();
     if ($('#dlgPoint').open) $('#dlgPoint').close();
     clearInterval(ui.followTimer);
     clearInterval(ui.liveTimer);
@@ -3528,7 +3572,7 @@
     showPic(false);
     if (rec.length >= 2) {
       saveWalk({
-        pts: rec, wpts: wpts, name: ui.followName, routeId: cur().id, t: Date.now(), head: 'walk.headStop',
+        pts: rec, breaks: brks, wpts: wpts, name: ui.followName, routeId: cur().id, t: Date.now(), head: 'walk.headStop',
         stats: { time: $('#fTime').textContent, left: $('#fLeft').textContent, off: $('#fOff').textContent }
       });
       if (!silent) askWalk();
@@ -3561,7 +3605,7 @@
      (празно - "Точка N"). Без положение копчето е бледо и казва "няма сигнал" вместо да сложи
      точка на сляпо. Следенето не спира, докато прозорецът е отворен. */
   function pointBtn() {
-    var b = $('#walkPtBtn'), f = ui.follower, ok = !!(f && ui.pos && !f.waiting);
+    var b = $('#walkPtBtn'), f = ui.follower, ok = !!(f && ui.pos && !f.waiting && !f.isPaused());
     b.setAttribute('aria-disabled', ok ? 'false' : 'true');
     b.title = ok ? T('wpt.btn.ok') : T('wpt.btn.no');
   }
@@ -3599,7 +3643,7 @@
   function saveWalk(w) {
     var rec = w.pts, when = w.t || Date.now();
     var wpts = (w.wpts || []).map(function (x) { return { lat: x.lat, lon: x.lon, ele: x.ele, time: x.time, name: x.name }; });
-    var t = { id: U.uid(), name: U.dateDots(when), title: U.dateDots(when), color: nextColor(), pts: rec, breaks: [], wpts: wpts, visible: true, created: Date.now(), walk: true };
+    var t = { id: U.uid(), name: U.dateDots(when), title: U.dateDots(when), color: nextColor(), pts: rec, breaks: (w.breaks || []).slice(), wpts: wpts, visible: true, created: Date.now(), walk: true };
     Core.prep(t);
     S.tracks.push(t);
     S.routes.forEach(function (r) { if (r.id === w.routeId) r.walks = (r.walks || []).concat([t.id]); });
@@ -3608,7 +3652,7 @@
     wr.len = t.len;
     var st = w.stats || {};
     ui.lastWalk = {
-      pts: rec, wpts: wpts, name: w.name, title: t.title, wname: wr.name, trackId: t.id, routeId: wr.id, bar: true,
+      pts: rec, breaks: (w.breaks || []).slice(), wpts: wpts, name: w.name, title: t.title, wname: wr.name, trackId: t.id, routeId: wr.id, bar: true,
       msgK: { head: w.head, name: wr.name },
       stats: { done: U.km(t.len), time: st.time || '-', left: st.left || '-', off: st.off || '-' }
     };
@@ -3640,6 +3684,20 @@
     var job = ui.walkJob;
     return job ? Core.smoothWalk(job.raw, { side: $('#smSide').checked, dense: $('#smDense').checked }) : [];
   }
+  /* Индексите на паузите (1.10.16) след изглаждане: точките са същите масиви, само някои са махнати,
+     затова новата позиция се търси по самата точка. Ненамерена - остава старият индекс. */
+  function remapBreaks(brks, raw, pts) {
+    var out = [];
+    (brks || []).forEach(function (k) {
+      var p = raw[k];
+      if (!p) return;
+      for (var i = 1; i < pts.length; i++) {
+        if (pts[i] === p || pts[i][0] === p[0] && pts[i][1] === p[1] && pts[i][3] === p[3]) { out.push(i); return; }
+      }
+      if (k > 0 && k < pts.length) out.push(k);
+    });
+    return out;
+  }
   function walkPreview() {
     var job = ui.walkJob; if (!job) return;
     var pts = walkChosen(), n = job.raw.length, len = U.lengthOf(pts);
@@ -3652,6 +3710,7 @@
     if (!t) return;
     var pts = walkChosen(), name = $('#walkName').value.trim();
     t.pts = pts;
+    t.breaks = remapBreaks(t.breaks, job.raw, pts);
     delete t._cum; delete t._gaps;
     Core.prep(t);
     if (r) {
@@ -3663,6 +3722,7 @@
     var lw = ui.lastWalk;
     if (lw && lw.trackId === t.id) {
       lw.pts = pts;
+      lw.breaks = t.breaks.slice();
       if (r) lw.wname = r.name;
       if (lw.stats) lw.stats.done = U.km(t.len);
       lw.msgK = { head: 'walk.headStop', name: r ? r.name : t.name };
@@ -3683,7 +3743,7 @@
     var job = ui.walkJob; if (!job) return;
     var t = track(job.trackId), pts = walkChosen(), name = $('#walkName').value.trim() || (t ? t.title : T('walk.def'));
     var fname = plainName(name) + '.gpx';
-    var xml = GPX.build({ name: name, pts: pts, wpts: t ? (t.wpts || []).filter(function (w) { return w.name; }) : [] });
+    var xml = GPX.build({ name: name, pts: pts, wpts: t ? (t.wpts || []).filter(function (w) { return w.name; }) : [], breaks: t ? remapBreaks(t.breaks, job.raw, pts) : [] });
     U.download(new Blob([xml], { type: 'application/gpx+xml' }), fname);
     toast(T('msg.exportedPts', { f: fname, len: U.km(U.lengthOf(pts)), pts: T.n('n.points', pts.length, { n: U.num(pts.length) }) }), false, 4500);
     // 1.9.9: след като файлът е свален, прозорецът се затваря и редът "Следенето спря" се скрива -
@@ -3745,7 +3805,7 @@
   function liveWrite(f) {
     ui.liveN = f.rec.length;
     ui.liveDirty = false;
-    U.DB.set('liveWalk', { pts: f.rec.slice(), wpts: f.wpts.slice(), name: ui.followName, routeId: cur().id, t0: f.t0, saved: Date.now() }).then(function (kept) {
+    U.DB.set('liveWalk', { pts: f.rec.slice(), breaks: (f.breaks || []).slice(), wpts: f.wpts.slice(), name: ui.followName, routeId: cur().id, t0: f.t0, saved: Date.now() }).then(function (kept) {
       if (kept || ui.liveWarned || !ui.follower) return;
       ui.liveWarned = true;
       toast(T('msg.noLive'), true, 9000);
@@ -3770,10 +3830,10 @@
     if (act === 'drop') { toast(T('msg.liveDropped')); return; }
     var pts = lw.pts, t0 = lw.t0 || pts[0][3] || lw.saved, t1 = pts[pts.length - 1][3];
     var w = saveWalk({
-      pts: pts, wpts: lw.wpts, name: lw.name || T('walk.def'), routeId: lw.routeId, t: t0, head: 'walk.headRestored',
+      pts: pts, breaks: lw.breaks, wpts: lw.wpts, name: lw.name || T('walk.def'), routeId: lw.routeId, t: t0, head: 'walk.headRestored',
       stats: { time: t1 && t0 ? U.duration(t1 - t0) : '-' }
     });
-    if (act === 'gpx') walkGpx(w.pts, w.name, w.title, w.wpts);
+    if (act === 'gpx') walkGpx(w.pts, w.name, w.title, w.wpts, false, w.breaks);
   }
 
   /* Посоката на движение: от GPS, ако я дава при движение; иначе от последните две
@@ -3918,9 +3978,9 @@
   // Изминатото като .gpx: пита за име на файла, после сваля. Следенето не спира.
   // done = true само от копчето в панела "Следене": след свалянето панелът вече не го предлага.
   // "Запиши .gpx" при следене не го подава - там следенето продължава и копчето остава.
-  function walkGpx(pts, routeName, title, wpts, done) {
+  function walkGpx(pts, routeName, title, wpts, done, brks) {
     if (!pts || pts.length < 2) return;
-    askName({ kind: 'walk', done: !!done, pts: pts.slice(), wpts: (wpts || []).slice(), title: title || U.dateDots(Date.now()), def: U.dateDots(Date.now()) });
+    askName({ kind: 'walk', done: !!done, pts: pts.slice(), wpts: (wpts || []).slice(), breaks: (brks || []).slice(), title: title || U.dateDots(Date.now()), def: U.dateDots(Date.now()) });
   }
   // Маршрутът като .gpx: пита за име (предложено - името на маршрута); празен маршрут не пита.
   function askRouteGpx(r) {
@@ -3967,7 +4027,7 @@
     } else if (job.kind === 'pic') {
       makePicture(job.withGpx, name);
     } else {
-      var xml = GPX.build({ name: job.title, pts: job.pts, wpts: job.wpts || [] });
+      var xml = GPX.build({ name: job.title, pts: job.pts, wpts: job.wpts || [], breaks: job.breaks || [] });
       U.download(new Blob([xml], { type: 'application/gpx+xml' }), name);
       toast(T('msg.exportedPts', { f: name, len: U.km(U.lengthOf(job.pts)), pts: T.n('n.points', job.pts.length, { n: U.num(job.pts.length) }) }), false, 4500);
       // Свалено от панела "Следене" (1.9.10): панелът вече не предлага копчето за .gpx.
@@ -4250,14 +4310,19 @@
       case 'export-collection': askName({ kind: 'collection', def: '', fallback: 'gpx-kolekciya-' + U.dateDots(Date.now()) + '.json' }); break;
       case 'save': askSave(); break;
       case 'only-route': onlyRoute(); break;
-      case 'follow': if (ui.follower) stopFollow(); else startFollow(); break;
+      case 'follow':
+        /* 1.10.16: на пауза същото копче е "Продължи" - то пуска GPS-а пак върху същия запис. */
+        if (!ui.follower) startFollow();
+        else if (ui.follower.isPaused()) resumeFollow();
+        else stopFollow();
+        break;
       /* 1.10.12: от празната карта следенето тръгва направо, без обяснителния прозорец -
          копчето самото казва, че е без маршрут. */
       case 'follow-no-route': $('#empty').hidden = true; startFollow(true); break;
       case 'follow-stop': stopFollow(); break;
       case 'awake': setAwake(!ui.awake); break;
-      case 'walk-gpx': if (ui.follower) walkGpx(ui.follower.rec, ui.followName, U.dateDots(Date.now()), ui.follower.wpts); break;
-      case 'walk-gpx-done': if (ui.lastWalk) { var lt = track(ui.lastWalk.trackId); walkGpx(ui.lastWalk.pts, ui.lastWalk.name, ui.lastWalk.title, lt ? lt.wpts : ui.lastWalk.wpts, true); } break;
+      case 'walk-gpx': if (ui.follower) walkGpx(ui.follower.rec, ui.followName, U.dateDots(Date.now()), ui.follower.wpts, false, ui.follower.breaks); break;
+      case 'walk-gpx-done': if (ui.lastWalk) { var lt = track(ui.lastWalk.trackId); walkGpx(ui.lastWalk.pts, ui.lastWalk.name, ui.lastWalk.title, lt ? lt.wpts : ui.lastWalk.wpts, true, ui.lastWalk.breaks); } break;
       case 'walk-point': askPoint(); break;
       case 'center': centerMe(); break;
       case 'north': northUp(el); break;
@@ -4301,7 +4366,12 @@
   function bind() {
     document.addEventListener('click', function (e) {
       var b = e.target.closest('[data-act]');
-      if (b && !b.disabled) { e.preventDefault(); onAction(b.dataset.act, b); }
+      if (b && !b.disabled) {
+        e.preventDefault();
+        // След дълго натискане на "Стоп" (пауза) click-ът не бива да спира следенето.
+        if (b.dataset.act === 'follow' && ui.lpAt && Date.now() - ui.lpAt < 1500) { ui.lpAt = 0; return; }
+        onAction(b.dataset.act, b);
+      }
     });
     $$('[data-fold]').forEach(function (c) {
       foldOwn(c, '.fold-t').addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); toggleFold(c.dataset.fold); });
@@ -4357,6 +4427,24 @@
     $('#dlgWalk').addEventListener('close', function () { ui.walkJob = null; });
     $$('#followBar [data-view]').forEach(function (b) { b.addEventListener('click', function () { showPic(b.dataset.view === 'pic'); followBearing(); }); });
     $$('#followBar [data-orient]').forEach(function (b) { b.addEventListener('click', function () { setOrient(b.dataset.orient); }); });
+    /* 1.10.16: дълго натискане (0.6 s) на "Стоп" включва пауза - GPS-ът спира, копчето става
+       "Продължи". Краткото натискане си остава спиране и запис, а на пауза копчето пуска пак. */
+    var HOLD_MS = 600;
+    $$('[data-act="follow"]').forEach(function (b) {
+      var t = null;
+      function end() { clearTimeout(t); t = null; }
+      b.addEventListener('pointerdown', function (e) {
+        if (e.button != null && e.button > 0) return;
+        end();
+        t = setTimeout(function () {
+          t = null;
+          if (ui.follower && !ui.follower.isPaused()) { ui.lpAt = Date.now(); pauseFollow(); }
+        }, HOLD_MS);
+      });
+      ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { b.addEventListener(ev, end); });
+      // Задържането с пръст не бива да отваря менюто на браузъра.
+      b.addEventListener('contextmenu', function (e) { if (ui.follower) e.preventDefault(); });
+    });
     /* Дръпването в „Снимка“ спира автоматичното въртене по движението (както на картата): всичко,
        което мести изгледа - скрол, влачене с пръст или мишка, отнет жест при скрол - се брои за дръпване.
        Програмното скролване на „1:1“ не се брои: то оставя ui.picAt на мястото, което е сложило. */

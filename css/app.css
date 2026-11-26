@@ -213,6 +213,8 @@ body.maptl-stack .maptl { flex-direction: column; align-items: flex-start; }
 .round-fab .ico-svg { width: 20px; height: 20px; }
 .bar-toggle .ico-svg { width: 21px; height: 21px; }
 .follow-btn.danger { color: var(--app-danger); border-color: var(--app-danger); font-weight: 600; }
+/* 1.10.16: на пауза същото копче е "Продължи" - различен цвят, за да се вижда, че следенето е спряно. */
+.follow-btn.paused { color: var(--app-warn); border-color: var(--app-warn); font-weight: 600; }
 .barhandle {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   min-width: 76px; min-height: 30px;

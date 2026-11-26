@@ -19,6 +19,10 @@
     this.rec = [];
     this.wpts = [];      // точките от копчето "Точка": {lat, lon, ele, time, name}
     this.t0 = 0;
+    this.breaks = [];    // индекси на точките, от които следата започва нов участък (след пауза)
+    this.pausedAt = 0;   // кога е започнала паузата (0 - не е на пауза)
+    this.pausedMs = 0;   // колко е стояло на пауза - почивката не влиза в изминалото време
+    this.pendingBreak = false; // първата точка след паузата започва нов участък
     this.lastD = null;
     this.lastOn = null;  // мястото по маршрута на последната записана точка, ако е върху трака
     this.lastFix = null; // последното измерено положение, по което се мери движението
@@ -46,6 +50,10 @@
       this.rec = [];
       this.wpts = [];
       this.t0 = Date.now();
+      this.breaks = [];
+      this.pausedAt = 0;
+      this.pausedMs = 0;
+      this.pendingBreak = false;
       this.lastD = null;
       this.lastOn = null;
       this.lastFix = null;
@@ -80,15 +88,26 @@
         var last = self.rec[self.rec.length - 1];
         if (!self.lastFix || U.hav(self.lastFix[0], self.lastFix[1], p[0], p[1]) > Math.max(5, Math.min(c.accuracy || 0, 25) / 2)) {
           self.lastFix = p;
-          // В следата точката ляга по маршрута, ако е до ON_LIMIT м от него, а между нея и предишната
-          // влизат завоите на маршрута. Точка на същото място като предишната (GPS, който мърда напред-
-          // назад, или ходене напречно на линията) я подменя - иначе в следата влизат отсечки с нула дължина.
-          var br = self.bridge(last, p);
-          br.ins.concat([br.end]).forEach(function (w) {
-            var prev = self.rec[self.rec.length - 1];
-            if (prev && U.hav(prev[0], prev[1], w[0], w[1]) < 0.5) self.rec[self.rec.length - 1] = w;
-            else self.rec.push(w);
-          });
+          if (self.pendingBreak && last && U.hav(last[0], last[1], p[0], p[1]) < 1) {
+            /* Пауза и още сме на същото място: нов участък още не е започнал - чака се движение. */
+          } else if (self.pendingBreak) {
+            /* Първата точка след паузата започва нов участък от следата: без линия през почивката и
+               без точки от маршрута между двете (човекът е бил на почивка, не е минал по него). */
+            self.pendingBreak = false;
+            self.rec.push(p);
+            self.breaks.push(self.rec.length - 1);
+            self.lastOn = null;
+          } else {
+            // В следата точката ляга по маршрута, ако е до ON_LIMIT м от него, а между нея и предишната
+            // влизат завоите на маршрута. Точка на същото място като предишната (GPS, който мърда напред-
+            // назад, или ходене напречно на линията) я подменя - иначе в следата влизат отсечки с нула дължина.
+            var br = self.bridge(last, p);
+            br.ins.concat([br.end]).forEach(function (w) {
+              var prev = self.rec[self.rec.length - 1];
+              if (prev && U.hav(prev[0], prev[1], w[0], w[1]) < 0.5) self.rec[self.rec.length - 1] = w;
+              else self.rec.push(w);
+            });
+          }
         }
         self.cb.position({ lat: c.latitude, lon: c.longitude, alt: c.altitude, acc: c.accuracy, heading: c.heading, speed: c.speed, t: pos.timestamp });
       }, function (err) {
@@ -170,7 +189,42 @@
       this.releaseAwake();
       return this.rec.slice();
     },
-    elapsed: function () { return Date.now() - this.t0; },
+    /* Пауза (дълго натискане на "Стоп"): GPS не се чете, часовникът спира, записът и точките остават.
+       Екранът може да заспи - ключалката се пуска, при "Продължи" се иска пак. */
+    pause: function () {
+      if (this.pausedAt || this.watch == null) return false;
+      navigator.geolocation.clearWatch(this.watch);
+      this.watch = null;
+      this.gen++;
+      this.waiting = false;
+      clearTimeout(this.retry);
+      this.pausedAt = Date.now();
+      this.releaseAwake();
+      this.tellAwake('off');
+      return true;
+    },
+    isPaused: function () { return !!this.pausedAt; },
+    // "Продължи": същият запис и същият часовник, само нов watchPosition; следата започва нов участък.
+    resume: function () {
+      if (!this.pausedAt) return false;
+      this.pausedMs += Date.now() - this.pausedAt;
+      this.pausedAt = 0;
+      this.lastFix = null;
+      this.lastOn = null;
+      this.pendingBreak = true;
+      try {
+        this.listen();
+      } catch (e) {
+        return false;
+      }
+      if (this.awakeOn) this.keepAwake(); else this.tellAwake('off');
+      return true;
+    },
+    // Изминалото време без почивките: часовникът спира, докато е на пауза.
+    elapsed: function () {
+      var now = Date.now();
+      return Math.max(0, now - this.t0 - this.pausedMs - (this.pausedAt ? now - this.pausedAt : 0));
+    },
     // Точка на мястото pos (последното положение от GPS); празно име - "Точка N".
     addPoint: function (pos, name) {
       if (!pos) return null;
