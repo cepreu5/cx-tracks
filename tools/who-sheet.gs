@@ -34,6 +34,12 @@ function doGet() {
 function sheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sh = ss.getSheetByName(SHEET);
+  if (!sh) {
+    // Листът по подразбиране може да е подготвен под друго име - тогава се ползва първият,
+    // стига в A1 да пише „Потребител“.
+    var first = ss.getSheets()[0];
+    if (first && String(first.getRange(1, 1).getValue()).trim() === HEAD[0]) sh = first;
+  }
   if (!sh) sh = ss.insertSheet(SHEET);
   if (sh.getLastRow() === 0) {
     sh.getRange(1, 1, 1, HEAD.length).setValues([HEAD]).setFontWeight('bold').setBackground('#ffff00');
