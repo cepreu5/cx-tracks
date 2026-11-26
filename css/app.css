@@ -706,3 +706,81 @@ td .num, td.num { font-family: var(--app-mono); }
 .dc-list { margin: 6px 0 0; padding-left: 20px; max-height: 40vh; overflow: auto; }
 .dc-list li { padding: 2px 0; }
 .dc-list .linkbtn { text-align: left; font-family: inherit; }
+
+/* ---------------------------------------------------------------------------
+   1.10.23: долу вдясно на картата - часовникът и иконката за подкрепа (Ko-fi)
+   ---------------------------------------------------------------------------
+   Ko-fi дефиницията и стиловете идват от uni (index.html, style.css на SeeNotes) и
+   правят същото: widget-ът се тегли от storage.ko-fi.com и сам слага кутийка с
+   <iframe class="floatingchat-container"> (и -mobi варианта за телефон). По подразбиране
+   кутийката е 180x65, а iframe-ът 195x65, докато видимото лого е само 39x31 - значи голяма
+   прозрачна площ приема кликове и краде натисканията от картата под нея. Затова тук
+   кутийката се свива до самия бутон (мерено в uni на 24.10.2026: бутонът вътре е точно
+   87x46 = лого 39 + 8px отстъп + 20+20 padding; прозорчето е 88x48, с една идея по-голямо).
+   НЕ свивай прозорчето под 88x48 - вътре се появява скролбар и връхтът на логото се реже.
+   За разлика от uni, тук кутийката не стои закована за екрана: тя застава абсолютно върху
+   #kofiSlot (координатите идват от placeKofi() в index.html), за да пътува с картата, а не
+   да виси над панелите при превъртане.
+   Часовникът е пренесен от uni/Extra/clock-1.html с неговите цветове (тъмна плочка, бяла
+   стрелка за часа, зелена за минутата, червена за секундата). Размерите му са в em спрямо
+   ширината на плочката, за да го смалява една стойност: font-size на .miniclock.
+   Редът стои над колоната „+ / − / Центрирай / ▣“, за да не застъпва нищо.
+   --------------------------------------------------------------------------- */
+.mapdock {
+  position: absolute; z-index: 12; right: 10px; bottom: calc(26px + 146px + 8px);
+  display: flex; align-items: flex-end; gap: 8px;
+}
+
+.miniclock {
+  flex: none; width: 96px; height: 96px; padding: 0; border: 0; border-radius: 50%;
+  background: none; font-size: 96px; line-height: 0; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; box-shadow: none;
+}
+.miniclock:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+/* Плочката: същият радиален градиент като в clock-1.html, само в em */
+.miniclock .cl-face {
+  position: relative; display: block; box-sizing: border-box; width: 1em; height: 1em;
+  border-radius: 50%; background: radial-gradient(circle at 30% 30%, #444, #111);
+  box-shadow: inset 0 0 .05em #000, 0 0 .1em rgba(0, 0, 0, .5);
+}
+.miniclock .cl-center {
+  position: absolute; z-index: 3; top: 50%; left: 50%; width: .06em; height: .06em;
+  background: #1df52f; border-radius: 50%; transform: translate(-50%, -50%);
+}
+.miniclock .cl-hand { position: absolute; top: 50%; left: 50%; transform-origin: bottom center; }
+.miniclock .cl-hour { width: .03em; height: .25em; background: #fff; border-radius: .015em; }
+.miniclock .cl-minute { width: .02em; height: .35em; background: #1df52f; border-radius: .01em; }
+.miniclock .cl-second { width: .01em; height: .4em; background: #ff3b3b; border-radius: .005em; box-shadow: 0 0 .03em #ff3b3b; }
+/* Чертичките за часовете: 8 бр. без 12, 3, 6 и 9 - там стоят цифрите */
+.miniclock .cl-mark { position: absolute; top: .02em; left: 50%; width: .02em; height: .06em; background: #eee; transform-origin: center .48em; }
+.miniclock .cl-num {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  width: .1em; height: .1em; font-size: .085em; font-weight: 700; line-height: 1; color: #fff;
+}
+.miniclock .n12 { top: .025em; left: 50%; transform: translateX(-50%); }
+.miniclock .n3 { right: .025em; top: 50%; transform: translateY(-50%); }
+.miniclock .n6 { bottom: .025em; left: 50%; transform: translateX(-50%); }
+.miniclock .n9 { left: .025em; top: 50%; transform: translateY(-50%); }
+/* По подразбиране часовникът е скрит (чавката е без отметка). Показва го класът clock-on
+   на <html>; той се слага още в началото на index.html, за да няма премигване при отваряне. */
+.miniclock { display: none; }
+html.clock-on .miniclock { display: block; }
+
+.mapdock .kofislot { flex: none; width: 88px; height: 48px; }
+
+/* Кутийките на Ko-fi остават в body (преместването в дока презарежда iframe-а и логото
+   изчезва), затова застават абсолютно върху #kofiSlot: --kofi-l / --kofi-t идват от
+   placeKofi() в index.html и са координати в документа, значи иконката пътува с картата. */
+body .floatingchat-container-wrap,
+body .floatingchat-container-wrap-mobi {
+  position: absolute !important;
+  left: var(--kofi-l, 10px) !important; top: var(--kofi-t, 10px) !important;
+  right: auto !important; bottom: auto !important;
+  width: 88px !important; max-width: 88px !important; height: 48px !important; overflow: hidden;
+}
+body iframe.floatingchat-container,
+body iframe.floatingchat-container-mobi {
+  position: absolute !important; left: 0 !important; right: auto !important;
+  top: auto !important; bottom: 0 !important;
+  width: 88px !important; height: 48px !important; border: 0;
+}
