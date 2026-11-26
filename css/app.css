@@ -28,6 +28,7 @@
   /* Цветове върху картата: частите се редуват тъмносин / оранжев, източниците са тънки. */
   --app-map-bg: #d9d4c8;
   --app-route-a: #1d3f9e;
+  --app-compass-n: #1d54c8;
   --app-route-b: #ea7a12;
   --app-casing: #ffffff;
   --app-dup: #d23a2a;
@@ -75,6 +76,7 @@
   --app-shadow-pop: 0 6px 24px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--app-line-strong);
   --app-map-bg: #2a2825;
   --app-route-a: #2f5fd6;
+  --app-compass-n: #4f8ef7;
   --app-route-b: #f08a24;
   --app-casing: #ffffff;
   --app-walk-gap: #f5b82e;
@@ -279,17 +281,15 @@ body.maptl-stack .maptl { flex-direction: column; align-items: flex-start; }
 .compass-rose:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 1px; }
 .compass-rose:active { filter: brightness(.93); }
 .compass-rose .rose { position: relative; width: 48px; height: 48px; border-radius: 50%; background: var(--app-surface); border: 1px solid var(--app-line); transform: rotate(var(--rose, 0deg)); }
-.compass-rose .n {
-  position: absolute; left: 50%; top: 1px; width: 18px; margin-left: -9px; text-align: center;
-  font-size: 13px; font-weight: 700; line-height: 15px; color: var(--app-danger); transform: rotate(calc(-1 * var(--rose, 0deg)));
-}
+/* 1.10.19: без буква „С“ - стрелката пълни цялото кръгче (46 px вътре в рамката) и северната
+   й половина е синя, южната - сива. */
 .compass-rose .needle {
-  position: absolute; left: 50%; top: 23px; width: 0; height: 0; margin-left: -5px;
-  border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--app-danger);
+  position: absolute; left: 50%; top: 0; width: 0; height: 0; margin-left: -6px;
+  border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 23px solid var(--app-compass-n);
 }
 .compass-rose .needle::after {
-  content: ''; position: absolute; left: -5px; top: 10px; width: 0; height: 0;
-  border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 9px solid var(--app-muted);
+  content: ''; position: absolute; left: -6px; top: 23px; width: 0; height: 0;
+  border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 23px solid var(--app-muted);
 }
 /* Текстовият близнак на розетата: същата пилула като преди, само без стрелката в нея. */
 .compass {

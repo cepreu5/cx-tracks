@@ -234,7 +234,6 @@ I18N.add({
   'act.undo': ['Отмени', 'Undo'],
   'vtx.title': ['Точки - кръгчетата и номерата на чертаните точки', 'Points - the circles and numbers of the drawn points'],
   'vtx.aria': ['Точки', 'Points'],
-  'compass.n': ['С', 'N'],
   'zoom.in': ['Приближи', 'Zoom in'],
   'zoom.out': ['Отдалечи', 'Zoom out'],
   'center': ['Центрирай върху положението ти от GPS', 'Centre on your GPS position'],
