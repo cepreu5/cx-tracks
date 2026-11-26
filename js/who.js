@@ -13,7 +13,7 @@
 
   /* Адресът на уеб приложението: Apps Script → „Внедряване“ → „Управление на внедряванията“ → /exec.
      Докато е празен, формата работи и помни отговора на устройството, но не праща нищо. */
-  var URL = '';
+  var URL = 'https://script.google.com/macros/s/AKfycbwIeAv3UZhwTGQmbqBYMATy5inD79Nn87VE6iZYSsz6MRb5lYQk2R7E5fHusg9JZRHqkQ/exec';
   var KEY = 'who';
 
   function data() { return U.LS.get(KEY, null); }
