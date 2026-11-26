@@ -269,6 +269,8 @@ body.following:not(.bar-hidden) .maptl { top: calc(var(--bar-h, 86px) + 10px); }
 .map-undo .ico-svg { width: 19px; height: 19px; }
 /* "Точки": чавката и пръстен с номер, както е маркерът на картата */
 .vtx-ico { width: 18px; height: 18px; }
+/* 1.10.24: чавката „Покажи часовника“ е в горната лента до зъбчатото колело */
+.clk-ico { width: 18px; height: 18px; }
 #vtxChk[hidden] { display: none; }
 /* Розетата "С" и копчето "Север / Посока": под реда горе вдясно, при завъртяна карта.
    1.10.15: розетата е отделно кръгло копче (60 px), а надписът е в своя пилула до нея.
@@ -708,7 +710,7 @@ td .num, td.num { font-family: var(--app-mono); }
 .dc-list .linkbtn { text-align: left; font-family: inherit; }
 
 /* ---------------------------------------------------------------------------
-   1.10.23: долу вдясно на картата - часовникът и иконката за подкрепа (Ko-fi)
+   1.10.23: долу вляво на картата - часовникът и иконката за подкрепа (Ko-fi)
    ---------------------------------------------------------------------------
    Ko-fi дефиницията и стиловете идват от uni (index.html, style.css на SeeNotes) и
    правят същото: widget-ът се тегли от storage.ko-fi.com и сам слага кутийка с
@@ -724,16 +726,24 @@ td .num, td.num { font-family: var(--app-mono); }
    Часовникът е пренесен от uni/Extra/clock-1.html с неговите цветове (тъмна плочка, бяла
    стрелка за часа, зелена за минутата, червена за секундата). Размерите му са в em спрямо
    ширината на плочката, за да го смалява една стойност: font-size на .miniclock.
-   Редът стои над колоната „+ / − / Центрирай / ▣“, за да не застъпва нищо.
+   От 1.10.24 редът е в долния ляв ъгъл на картата: часовникът (64 px) и иконката за подкрепа
+   един до друг, подравнени по долния ръб и тръгващи от левия. Така не застъпват нито
+   колоната „+ / − / Центрирай / ▣“ вдясно, нито розетата горе.
    --------------------------------------------------------------------------- */
 .mapdock {
-  position: absolute; z-index: 12; right: 10px; bottom: calc(26px + 146px + 8px);
-  display: flex; align-items: flex-end; gap: 8px;
+  position: absolute; z-index: 12; left: 10px; right: auto; bottom: 26px;
+  display: flex; flex-direction: row; align-items: flex-end; gap: 6px;
+  width: auto; max-width: calc(100% - 60px);
 }
+/* Редът е в долния ляв ъгъл и тръгва от левия ръб, значи при скрит часовник иконката за
+   подкрепа застава най-вляво. Когато на екрана има ред „Следенето спря“, той заема същото
+   място, затова докато е видим, редът се качва над него; височината идва от --walkbar-h
+   (мери я placeKofi() в index.html). */
+body.walkbar-on .mapdock { bottom: calc(26px + var(--walkbar-h, 44px) + 8px); }
 
 .miniclock {
-  flex: none; width: 96px; height: 96px; padding: 0; border: 0; border-radius: 50%;
-  background: none; font-size: 96px; line-height: 0; cursor: pointer;
+  flex: none; width: 64px; height: 64px; padding: 0; border: 0; border-radius: 50%;
+  background: none; font-size: 64px; line-height: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent; box-shadow: none;
 }
 .miniclock:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }

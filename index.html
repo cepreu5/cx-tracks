@@ -23,7 +23,7 @@
     var seen = false;
     try { seen = !!JSON.parse(localStorage.getItem('gpxk.splash')); } catch (e) { /* няма запис */ }
     if (seen) document.documentElement.classList.add('splash-seen');
-    // 1.10.23: часовникът долу вдясно е скрит, докато чавката му не се отметне - класът се слага
+    // 1.10.23: часовникът долу вляво е скрит, докато чавката му не се отметне - класът се слага
     // още тук, за да няма премигване при отваряне.
     try { if (JSON.parse(localStorage.getItem('gpxk.clkShow')) === true) document.documentElement.classList.add('clock-on'); } catch (e) { /* няма запис */ }
   })();
@@ -56,6 +56,7 @@
     <label class="chk bar-chk" id="labelsChk" data-i18n-title="bar.labels.title" title="Имената и номерата на пътищата върху сателитните снимки"><input type="checkbox" id="labelsToggle" checked> <span data-i18n="bar.labels">Имена</span></label>
     <button class="btn lang-btn" type="button" data-act="lang" id="langBtn" data-i18n-title="lang.btn.title" data-i18n-aria="lang.btn.aria" title="Език на интерфейса" aria-label="Език на интерфейса" aria-haspopup="dialog"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.8 5.6 3.8 9s-1.2 6.4-3.8 9c-2.6-2.6-3.8-5.6-3.8-9S9.4 5.6 12 3z"/></svg><span id="langCode" data-i18n="lang.code">БГ</span></button>
     <button class="btn ico set-btn" type="button" data-act="settings" id="setBtn" data-i18n-title="set.h" data-i18n-aria="set.h" title="Настройки" aria-label="Настройки" aria-haspopup="dialog"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+    <label class="chk bar-chk" id="clkChk" data-i18n-title="clk.show" title="Покажи часовника"><input type="checkbox" id="clkToggle" data-i18n-aria="clk.show" aria-label="Покажи часовника"><svg class="ico-svg clk-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5.3l3.5 2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></label>
   </div>
   <div class="bar-row tools" id="tools">
     <div class="seg" role="group" data-i18n-aria="mode.aria" aria-label="Режим">
@@ -106,9 +107,6 @@
     </div>
     <button class="btn ico map-undo" type="button" data-act="undo" id="undoBtn" data-i18n-title="act.undo" data-i18n-aria="act.undo" title="Отмени" aria-label="Отмени" disabled><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg></button>
     <label class="chk" id="vtxChk" data-i18n-title="vtx.title" title="Точки - кръгчетата и номерата на чертаните точки"><input type="checkbox" id="vtxToggle" checked data-i18n-aria="vtx.aria" aria-label="Точки"><svg class="ico-svg vtx-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="7.6" fill="none" stroke="currentColor" stroke-width="2.6"/><text x="12" y="16.1" text-anchor="middle" font-size="10.5" font-weight="700" font-family="ui-monospace, Menlo, monospace" fill="currentColor">1</text></svg></label>
-    <!-- 1.10.23: часовникът долу вдясно на картата, до иконката за подкрепа. Чавката го показва:
-         по подразбиране е без отметка и часовникът не се вижда. Клик върху самия часовник го скрива. -->
-    <label class="chk" id="clkChk" data-i18n-title="clk.show" title="Покажи часовника"><input type="checkbox" id="clkToggle" data-i18n-aria="clk.show" aria-label="Покажи часовника"><svg class="ico-svg clk-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5.3l3.5 2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></label>
     <!-- 1.10.22: на мястото на чавката „Стрелки“ (тя мина в лентата при „Имена“) стои полето „Отклонение“. -->
     <label class="tol"><span class="tol-label" data-i18n="bar.tol">Отклонение</span> <input type="text" class="tolInput num" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="20" autocomplete="off" data-i18n-aria="tol.aria" data-i18n-title="tol.title" aria-label="Максимално допустимо отклонение в метри" title="Отклонение в метри, от 0 до 999. Enter прилага."> <span class="tol-unit" data-i18n="unit.m">м</span></label>
     <div id="northBox" class="compass-box" hidden>
@@ -122,9 +120,10 @@
     <button class="btn ico center-btn" data-act="center" id="centerBtn" data-i18n-title="center" data-i18n-aria="center" title="Центрирай върху положението ти от GPS" aria-label="Центрирай върху положението ти от GPS"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="6.4"/><circle cx="12" cy="12" r="1.9" fill="currentColor" stroke="none"/><path d="M12 1.8v3.7M12 18.5v3.7M1.8 12h3.7M18.5 12h3.7"/></svg></button>
     <button class="btn ico" data-act="fit" data-i18n-title="fit" data-i18n-aria="fit" title="Покажи целия маршрут" aria-label="Покажи целия маршрут">&#9635;</button>
   </div>
-  <!-- 1.10.23: долу вдясно - часовникът и иконката за подкрепа (Ko-fi). Редът стои над
-       колоната „+ / − / Центрирай / ▣“. Часовникът се скрива с чавката горе вдясно и с
-       клик върху самия него; Ko-fi остава на място. Часовникът е от uni/Extra/clock-1.html. -->
+  <!-- 1.10.24: долу вляво на картата - часовникът и иконката за подкрепа (Ko-fi). Редът
+       тръгва от левия ръб, значи при скрит часовник иконката за подкрепа застава най-вляво.
+       Часовникът се скрива с чавката горе вдясно и с клик върху самия него. Часовникът е от
+       uni/Extra/clock-1.html. -->
   <div id="mapDock" class="mapdock">
     <button id="miniClock" class="miniclock" type="button" data-act="clock-hide" data-i18n-title="clk.hide" data-i18n-aria="clk.aria" title="Скрий часовника" aria-label="Часовник - клик върху него го скрива">
       <span id="clFace" class="cl-face" aria-hidden="true">
@@ -589,12 +588,21 @@
     function placeKofi() {
       var slot = document.getElementById('kofiSlot');
       if (!slot) return;
-      var r = slot.getBoundingClientRect(), st = document.documentElement.style;
+      var st = document.documentElement.style, wb = document.getElementById('walkBar');
+      // Докато редът „Следенето спря“ е на екрана, нашият ред се качва над него (виж CSS),
+      // затова му трябва височината на онзи ред - тя се мени, защото се увива на тесен екран.
+      st.setProperty('--walkbar-h', ((wb && !wb.hidden) ? wb.offsetHeight : 0) + 'px');
+      var r = slot.getBoundingClientRect();
       st.setProperty('--kofi-l', Math.round(r.left + window.pageXOffset) + 'px');
       st.setProperty('--kofi-t', Math.round(r.top + window.pageYOffset) + 'px');
     }
     window.addEventListener('resize', placeKofi);
     window.addEventListener('orientationchange', placeKofi);
+    // Часовникът се показва и скрива с клас clock-on на <html>, а редът „Следенето спря“ - с
+    // клас walkbar-on на <body>. И двете местят нашия ред, значи иконката трябва да го последва:
+    // при скрит часовник тя застава най-вляво.
+    new MutationObserver(placeKofi).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(placeKofi).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     placeKofi();
 
     var s = document.createElement('script');
