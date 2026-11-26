@@ -200,16 +200,17 @@ body.following:not(.bar-hidden) .mapctl.tr { top: calc(var(--bar-h, 86px) + 10px
 body.following:not(.bar-hidden) .pic-scroll { padding-top: calc(var(--bar-h, 86px) + 2px); }
 /* Горе вляво, на реда на "Сателит / Топо": "↓" към числата, кръглата "Лента" (скрива и връща лентата)
    и "Следене / Стоп" - при всяко положение на лентата. Слиза под лентата, както контролите вдясно. */
+/* 1.10.20: групата горе вляво е винаги в стълбичка - "Следене / Стоп" отгоре, кръглата "Лента" под него.
+   Дотогава двете стояха една до друга, докато се събират до реда горе вдясно, и копчето за лентата
+   излизаше вдясно от "Следене". */
 .maptl {
   position: absolute; z-index: 25; left: 10px; top: 96px;
-  display: flex; align-items: center; gap: 6px; transition: top .18s ease;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; transition: top .18s ease;
 }
 body.bar-hidden .maptl { top: calc(12px + env(safe-area-inset-top)); }
 body.following:not(.bar-hidden) .maptl { top: calc(var(--bar-h, 86px) + 10px); }
 /* "Следене / Стоп": текстово копче като копчетата в лентата, винаги тук - и при отворена, и при скрита лента */
 .maptl .follow-fab { background: var(--app-overlay); box-shadow: var(--app-shadow); flex: none; }
-/* Стълбичка, когато редицата не се събира вляво от реда горе вдясно (класът го слага app.js) */
-body.maptl-stack .maptl { flex-direction: column; align-items: flex-start; }
 /* Кръглите "↓" и "Лента": като стрелката нагоре долу вдясно */
 .btn.round-fab { width: 36px; height: 36px; min-width: 0; min-height: 0; padding: 0; border-radius: 50%; background: var(--app-overlay); box-shadow: var(--app-shadow); }
 .round-fab .ico-svg { width: 20px; height: 20px; }
