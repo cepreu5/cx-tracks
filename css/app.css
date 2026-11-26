@@ -23,6 +23,8 @@
   --app-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   --app-radius: 6px;
   --app-radius-sm: 4px;
+  /* 1.10.21: една височина за всички копчета от горния ред на картата */
+  --maprow-h: 34px;
   --app-shadow: 0 0 0 1px var(--app-line-strong);
   --app-shadow-pop: 0 6px 24px rgba(31, 29, 26, 0.18), 0 0 0 1px var(--app-line-strong);
   /* Цветове върху картата: частите се редуват тъмносин / оранжев, източниците са тънки. */
@@ -210,9 +212,9 @@ body.following:not(.bar-hidden) .pic-scroll { padding-top: calc(var(--bar-h, 86p
 body.bar-hidden .maptl { top: calc(12px + env(safe-area-inset-top)); }
 body.following:not(.bar-hidden) .maptl { top: calc(var(--bar-h, 86px) + 10px); }
 /* "Следене / Стоп": текстово копче като копчетата в лентата, винаги тук - и при отворена, и при скрита лента */
-.maptl .follow-fab { background: var(--app-overlay); box-shadow: var(--app-shadow); flex: none; }
+.maptl .follow-fab { background: var(--app-overlay); box-shadow: var(--app-shadow); flex: none; height: var(--maprow-h); padding-top: 0; padding-bottom: 0; }
 /* Кръглите "↓" и "Лента": като стрелката нагоре долу вдясно */
-.btn.round-fab { width: 36px; height: 36px; min-width: 0; min-height: 0; padding: 0; border-radius: 50%; background: var(--app-overlay); box-shadow: var(--app-shadow); }
+.btn.round-fab { width: var(--maprow-h); height: var(--maprow-h); min-width: 0; min-height: 0; padding: 0; border-radius: 50%; background: var(--app-overlay); box-shadow: var(--app-shadow); }
 .round-fab .ico-svg { width: 20px; height: 20px; }
 .bar-toggle .ico-svg { width: 21px; height: 21px; }
 .follow-btn.danger { color: var(--app-danger); border-color: var(--app-danger); font-weight: 600; }
@@ -258,8 +260,12 @@ body.following:not(.bar-hidden) .maptl { top: calc(var(--bar-h, 86px) + 10px); }
 /* 1.6: една стрелка - най-горе се обръща надолу (към числата под картата), другаде сочи нагоре */
 .totop-fab[data-dir="down"] .ico-svg { transform: rotate(180deg); }
 .seg.base button { display: inline-flex; align-items: center; justify-content: center; padding: 3px 9px; }
+/* 1.10.21: „Сателит / Топо“ в горния ред е също колкото останалите копчета там (--maprow-h),
+   а вътрешните копчета взимат височината без рамката на групата. */
+.mapctl.tr .seg { height: var(--maprow-h); }
+.mapctl.tr .seg button { height: calc(var(--maprow-h) - 2px); min-height: 0; }
 /* "Отмени" горе вдясно: квадратно копче, колкото "Сателит / Топо"; избледнява при празна история (.btn:disabled) */
-.mapctl .btn.map-undo { width: 38px; min-width: 0; min-height: 30px; height: 30px; padding: 0; }
+.mapctl .btn.map-undo { width: 38px; min-width: 0; min-height: var(--maprow-h); height: var(--maprow-h); padding: 0; }
 .map-undo .ico-svg { width: 19px; height: 19px; }
 /* "Точки": чавката и пръстен с номер, както е маркерът на картата */
 .vtx-ico { width: 18px; height: 18px; }
@@ -312,7 +318,7 @@ body.following:not(.bar-hidden) .maptl { top: calc(var(--bar-h, 86px) + 10px); }
 .walkbar .wb-t { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .walkbar .btn.ico { flex-shrink: 0; }
 body.walkbar-on .toast { bottom: 118px; }
-.mapctl .chk { background: var(--app-overlay); border: 1px solid var(--app-line-strong); border-radius: var(--app-radius-sm); padding: 4px 8px; min-height: 30px; }
+.mapctl .chk { background: var(--app-overlay); border: 1px solid var(--app-line-strong); border-radius: var(--app-radius-sm); padding: 4px 8px; height: var(--maprow-h); min-height: 0; }
 .attrib {
   position: absolute; left: 0; bottom: 0; z-index: 10; font-size: 10.5px;
   background: var(--app-overlay); color: var(--app-muted); padding: 1px 6px; border-top-right-radius: var(--app-radius-sm);
