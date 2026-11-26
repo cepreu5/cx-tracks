@@ -39,7 +39,7 @@
     autoCenter: true, pin: null, profHover: null, picUrl: null, picMeta: null, picLabels: [], picAt: null,
     orient: U.LS.get('orient', 'heading') === 'north' ? 'north' : 'heading', heading: null, lastWalk: null, lastPos: null, rot: 0, nameJob: null,
     awake: U.LS.get('awake', true) !== false, om: null, redundant: [],
-    // 1.10.23: часовникът долу вдясно на картата. clkShow е състоянието на чавката „Покажи часовника“:
+    // 1.10.23: часовникът долу вляво на картата. clkShow е състоянието на чавката „Покажи часовника“:
     // по подразбиране е без отметка, тоест часовникът не се вижда, докато не се отметне.
     clkShow: U.LS.get('clkShow', false) === true,
     // 1.9.5: дефолтната колекция - само името и датата ѝ; самите .gpx файлове стоят в базата под 'defaultGpx'.
@@ -445,7 +445,7 @@
   }
   function attrib() { $('#attrib').textContent = ui.base === 'topo' ? ATTR.topo : ui.labels ? ATTR.satLabels : ATTR.sat; }
 
-  /* 1.10.23: часовникът долу вдясно - класът е на <html>, за да е скрит още преди app.js,
+  /* 1.10.23: часовникът долу вляво - класът е на <html>, за да е скрит още преди app.js,
      а чавката „Покажи часовника“ горе вдясно винаги показва същото състояние. */
   function setClockShown(v) {
     ui.clkShow = !!v;
@@ -4401,7 +4401,7 @@
     // 1.10.1: „Стрелки“ - посоката по траковете се показва/скрива; изборът се помни.
     $('#arrToggle').checked = ui.arrShow;
     $('#arrToggle').addEventListener('change', function (e) { ui.arrShow = e.target.checked; U.LS.set('arrShow', ui.arrShow); map.redraw(); });
-    // 1.10.23: часовникът долу вдясно на картата. Показва го чавката горе вдясно, а клик върху
+    // 1.10.23: часовникът долу вляво на картата. Показва го чавката горе вдясно, а клик върху
     // самия часовник го скрива; състоянието се помни на устройството. Ko-fi остава на място.
     $('#clkToggle').checked = ui.clkShow;
     $('#clkToggle').addEventListener('change', function (e) { setClockShown(e.target.checked); });
