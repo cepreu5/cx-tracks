@@ -4438,12 +4438,18 @@
         end();
         t = setTimeout(function () {
           t = null;
+          // 1.10.17: ако системата все пак е маркирала текста на копчето, маркировката се маха.
+          var sel = window.getSelection && window.getSelection();
+          if (sel && sel.rangeCount && sel.anchorNode && b.contains(sel.anchorNode)) sel.removeAllRanges();
           if (ui.follower && !ui.follower.isPaused()) { ui.lpAt = Date.now(); pauseFollow(); }
         }, HOLD_MS);
       });
       ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { b.addEventListener(ev, end); });
-      // Задържането с пръст не бива да отваря менюто на браузъра.
-      b.addEventListener('contextmenu', function (e) { if (ui.follower) e.preventDefault(); });
+      // 1.10.17: задържането с пръст не бива да започва селекция на текста - селекцията отнема
+      // жеста (pointercancel) и паузата не се включваше. Задържането не бива и да отваря
+      // менюто на браузъра: копчето няма нищо за него.
+      b.addEventListener('selectstart', function (e) { e.preventDefault(); });
+      b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
     });
     /* Дръпването в „Снимка“ спира автоматичното въртене по движението (както на картата): всичко,
        което мести изгледа - скрол, влачене с пръст или мишка, отнет жест при скрол - се брои за дръпване.
