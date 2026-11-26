@@ -586,6 +586,24 @@
     ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(255,255,255,0.92)'; ctx.strokeText(text, x, y);
     ctx.fillStyle = color || '#1f1d1a'; ctx.fillText(text, x, y);
   }
+  /* 1.10.14: надпис върху плътна бяла кутийка с черен текст - за надпис, който иначе се губи
+     върху светъл терен (отклонението от маршрута). Кутийката е бяла и на светла, и на тъмна тема. */
+  function mapChip(ctx, x, y, text) {
+    ctx.font = '600 12px ' + U.cssVar('--app-font');
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    var w = Math.ceil(ctx.measureText(text).width), h = 19, px = 6, r = 4;
+    var bx = Math.round(x - px), by = Math.round(y - h / 2), bw = w + px * 2;
+    ctx.beginPath();
+    ctx.moveTo(bx + r, by);
+    ctx.arcTo(bx + bw, by, bx + bw, by + h, r);
+    ctx.arcTo(bx + bw, by + h, bx, by + h, r);
+    ctx.arcTo(bx, by + h, bx, by, r);
+    ctx.arcTo(bx, by, bx + bw, by, r);
+    ctx.closePath();
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(0,0,0,0.22)'; ctx.stroke();
+    ctx.fillStyle = '#000000'; ctx.fillText(text, x, y);
+  }
 
   // Точките на трака без махнатите дубликати - по една поредица за всеки видим отрязък.
   function shownRanges(t, secs) {
@@ -1036,7 +1054,7 @@
         var nq = pr(ui.prog.lat, ui.prog.lon);
         ctx.beginPath(); ctx.moveTo(pq[0], pq[1]); ctx.lineTo(nq[0], nq[1]);
         stroke(ctx, C.casing, 5); stroke(ctx, C.warn, 3, [4, 4]);
-        mapLabel(ctx, pq[0] + 14, pq[1] - 14, T('map.off', { d: U.meters(ui.prog.off) }), C.warn);
+        mapChip(ctx, pq[0] + 14, pq[1] - 14, T('map.off', { d: U.meters(ui.prog.off) }));
       }
       var accPx = (ui.pos.acc || 0) / m.metersPerPixel();
       if (accPx > 12) {
