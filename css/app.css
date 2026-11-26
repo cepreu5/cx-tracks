@@ -252,29 +252,45 @@ body.maptl-stack .maptl { flex-direction: column; align-items: flex-start; }
 /* "Точки": чавката и пръстен с номер, както е маркерът на картата */
 .vtx-ico { width: 18px; height: 18px; }
 #vtxChk[hidden] { display: none; }
-/* Стрелката "С" и копчето "Север": под реда горе вдясно, при завъртяна карта */
-.compass {
+/* Розетата "С" и копчето "Север / Посока": под реда горе вдясно, при завъртяна карта.
+   1.10.15: розетата е отделно кръгло копче (60 px), а надписът е в своя пилула до нея.
+   Двете вършат едно и също - каквото предлага надписът, това прави и розетата. */
+.compass-box {
   position: absolute; right: 0; top: calc(100% + 8px);
-  display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 3px 10px 3px 4px;
+  display: flex; align-items: center; gap: 8px;
+}
+.compass-box[hidden] { display: none; }
+.compass-rose {
+  flex-shrink: 0; width: 60px; height: 60px; padding: 0; border-radius: 50%;
+  border: 1px solid var(--app-line-strong); background: var(--app-overlay); color: var(--app-ink);
+  box-shadow: var(--app-shadow); font: inherit; cursor: pointer;
+  display: grid; place-items: center;
+}
+.compass-rose[hidden] { display: none; }
+.compass-rose:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 1px; }
+.compass-rose:active { filter: brightness(.93); }
+.compass-rose .rose { position: relative; width: 48px; height: 48px; border-radius: 50%; background: var(--app-surface); border: 1px solid var(--app-line); transform: rotate(var(--rose, 0deg)); }
+.compass-rose .n {
+  position: absolute; left: 50%; top: 1px; width: 18px; margin-left: -9px; text-align: center;
+  font-size: 13px; font-weight: 700; line-height: 15px; color: var(--app-danger); transform: rotate(calc(-1 * var(--rose, 0deg)));
+}
+.compass-rose .needle {
+  position: absolute; left: 50%; top: 23px; width: 0; height: 0; margin-left: -5px;
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 10px solid var(--app-danger);
+}
+.compass-rose .needle::after {
+  content: ''; position: absolute; left: -5px; top: 10px; width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 9px solid var(--app-muted);
+}
+/* Текстовият близнак на розетата: същата пилула като преди, само без стрелката в нея. */
+.compass {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 3px 12px;
   border: 1px solid var(--app-line-strong); border-radius: 999px;
   background: var(--app-overlay); color: var(--app-ink); box-shadow: var(--app-shadow);
   font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
 }
 .compass[hidden] { display: none; }
 .compass:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 1px; }
-.compass .rose { position: relative; flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: var(--app-surface); border: 1px solid var(--app-line); transform: rotate(var(--rose, 0deg)); }
-.compass .n {
-  position: absolute; left: 50%; top: 0; width: 14px; margin-left: -7px; text-align: center;
-  font-size: 10.5px; font-weight: 700; line-height: 12px; color: var(--app-danger); transform: rotate(calc(-1 * var(--rose, 0deg)));
-}
-.compass .needle {
-  position: absolute; left: 50%; top: 12px; width: 0; height: 0; margin-left: -4px;
-  border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 8px solid var(--app-danger);
-}
-.compass .needle::after {
-  content: ''; position: absolute; left: -4px; top: 8px; width: 0; height: 0;
-  border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 7px solid var(--app-muted);
-}
 /* Ред за сваляне на изминатото: върху картата, вижда се без превъртане */
 .walkbar {
   position: absolute; z-index: 13; left: 10px; right: 100px; bottom: 26px; margin: 0 auto; max-width: 560px;
@@ -342,10 +358,9 @@ body.bar-hidden .pic-scroll { padding-top: 0; }
 .pic-ctl { position: absolute; right: 10px; bottom: 26px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .pic-ctl .btn.ico { width: 38px; padding-left: 0; padding-right: 0; background: var(--app-overlay); }
 .pic-ctl .pic-one { font-size: 12px; font-weight: 600; font-family: var(--app-mono); }
-/* „Север / Посока“ в „Картина“: същата пилула като на картата, най-горе в колоната на копчетата.
-   Слотът е display:contents, за да е копчето ред на самата колона (подредбата и отстоянията идват от .pic-ctl). */
-.pic-compass-slot { display: contents; }
-.pic-compass { position: relative; right: auto; top: auto; }
+/* „Север / Посока“ в „Картина“: същата розета и същото текстово копче, най-горе в колоната на копчетата.
+   Подредбата и отстоянията идват от .pic-ctl; тук само се отменя заковаването за картата. */
+.pic-box { position: relative; right: auto; top: auto; align-self: flex-end; }
 
 /* Под картата - всичко останало, скролва се */
 .panel { max-width: 1240px; margin: 0 auto; padding: 14px 14px 40px; }

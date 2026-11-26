@@ -3809,22 +3809,31 @@
     }
     showCompass();
   }
-  /* Стрелката "С" и двурежимното копче - върху картата и в изглед „Снимка“ (един и същ вид и един и същ
-     избор): "Север", докато кадърът е завъртян; "Посока", докато е север-нагоре, а посоката на движение е
-     известна (и след "Стоп"). Без известна посока - само "Север", и то само при завъртян кадър. */
+  /* Розетата "С" и текстовото копче до нея - върху картата и в изглед „Снимка“ (един и същ вид и един и
+     същ избор): "Север", докато кадърът е завъртян; "Посока", докато е север-нагоре, а посоката на
+     движение е известна (и след "Стоп"). Без известна посока - нищо не се вижда.
+     1.10.15: розетата е отделно кръгло копче, надписът - в своя пилула до нея; двете правят едно и също. */
   function showCompass(rot) {
     if (rot != null) ui.rot = rot;
     var r = ui.rot || 0;
     var offer = r ? 'north' : ui.heading != null ? 'heading' : '';
-    [[$('#northBtn'), $('#northLbl'), ''], [$('#picNorthBtn'), $('#picNorthLbl'), '.pic']].forEach(function (x) {
-      var b = x[0], lbl = x[1], k = x[2];
-      if (!b || !lbl) return;
-      b.hidden = !offer;
-      b.dataset.offer = offer;
+    [[$('#northBox'), $('#northBtn'), $('#northTxt'), $('#northLbl'), ''],
+      [$('#picNorthBox'), $('#picNorthBtn'), $('#picNorthTxt'), $('#picNorthLbl'), '.pic']].forEach(function (x) {
+      var box = x[0], rose = x[1], txt = x[2], lbl = x[3], k = x[4];
+      if (!box || !rose || !txt || !lbl) return;
+      box.hidden = !offer;
+      rose.hidden = !offer;
+      txt.hidden = !offer;
+      rose.dataset.offer = offer;
+      txt.dataset.offer = offer;
       lbl.textContent = offer === 'heading' ? T('orient.heading') : T('orient.north');
-      b.setAttribute('aria-label', offer === 'heading' ? T('compass' + k + '.heading.aria') : T('compass' + k + '.north.aria'));
-      b.title = offer === 'heading' ? T('compass' + k + '.heading.title') : T('compass' + k + '.north.title');
-      b.style.setProperty('--rose', (-r).toFixed(1) + 'deg');
+      var aria = offer === 'heading' ? T('compass' + k + '.heading.aria') : T('compass' + k + '.north.aria');
+      var title = offer === 'heading' ? T('compass' + k + '.heading.title') : T('compass' + k + '.north.title');
+      [rose, txt].forEach(function (b) {
+        b.setAttribute('aria-label', aria);
+        b.title = title;
+        b.style.setProperty('--rose', (-r).toFixed(1) + 'deg');
+      });
     });
     turnPic();
   }
