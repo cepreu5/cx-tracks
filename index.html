@@ -84,7 +84,7 @@
       <button data-orient="north" data-i18n="orient.north" data-i18n-title="orient.north.title" title="Север сочи нагоре">Север</button>
     </div>
     <button class="btn awake-btn" data-act="awake" id="awakeBtn" aria-pressed="true" data-i18n-title="awake.title" title="Екранът да не заспива, докато следиш"><span class="walk-w" data-i18n="awake.w">Екранът </span><span data-i18n="awake.t">буден</span></button>
-    <button class="btn" data-act="walk-gpx" id="walkGpxBtn" aria-disabled="true" data-i18n-title="walkgpx.title" title="Записва изминатото дотук като .gpx - следенето продължава"><span class="walk-w" data-i18n="walkgpx.w">Запиши </span>.gpx</button>
+    <button class="btn" data-act="walk-gpx" id="walkGpxBtn" aria-disabled="true" data-i18n-title="walkgpx.title" title="Записва следата дотук като .gpx - следенето продължава"><span class="walk-w" data-i18n="walkgpx.w">Запиши </span>.gpx</button>
   </div>
 </header>
 
@@ -138,7 +138,7 @@
   </div>
   <div id="attrib" class="attrib"></div>
   <div id="walkBar" class="walkbar" role="region" data-i18n-aria="walkbar.aria" aria-label="Изминатото" hidden>
-    <span class="wb-t"><span data-i18n="walkbar.stopped">Следенето спря: </span><b id="walkBarName" data-i18n="walk.def">изминат</b></span>
+    <span class="wb-t"><span data-i18n="walkbar.stopped">Следенето спря: </span><b id="walkBarName" data-i18n="walk.def">следа</b></span>
     <button class="btn sm pri" data-act="walk-gpx-done" id="walkBarBtn" data-i18n="walkbar.dl">Запиши изминалото като .gpx</button>
     <button class="btn sm ico" data-act="walkbar-close" data-i18n-aria="walkbar.close" data-i18n-title="act.close" aria-label="Затвори реда за записа" title="Затвори">&times;</button>
   </div>
@@ -195,7 +195,7 @@
   <!-- Ред под картата, докато има излишни пръстени: отваря списъка пак -->
   <p id="ringsRow" class="rings-row" hidden><span id="ringsRowT"></span> · <button type="button" class="linkbtn" id="ringsOpen" data-i18n="rings.review">Прегледай</button></p>
   <section id="followPanel" class="card follow-panel" hidden>
-    <button class="btn sm ico follow-x" data-act="walk-forget" id="walkForget" data-i18n-aria="walk.forget.aria" data-i18n-title="walk.forget.title" aria-label="Махни панела „Следене“" title="Махни панела и изминатото за запис" hidden>&times;</button>
+    <button class="btn sm ico follow-x" data-act="walk-forget" id="walkForget" data-i18n-aria="walk.forget.aria" data-i18n-title="walk.forget.title" aria-label="Махни панела „Следене“" title="Махни панела и следата за запис" hidden>&times;</button>
     <div class="follow-stats">
       <div><small data-i18n="fs.done">Изминати</small><b class="num" id="fDone">0</b></div>
       <div><small data-i18n="fs.time">Време</small><b class="num" id="fTime">0:00</b></div>
@@ -205,7 +205,7 @@
     <p id="fMsg" class="follow-msg" data-i18n="follow.waiting">Чакам сигнал от GPS...</p>
     <p id="fAwake" class="follow-msg muted" hidden></p>
     <div id="walkDone" class="row follow-done" hidden>
-      <button class="btn pri" data-act="walk-gpx-done" data-i18n="walk.dl">Запиши изминатото като .gpx</button>
+      <button class="btn pri" data-act="walk-gpx-done" data-i18n="walk.dl">Запиши следата като .gpx</button>
       <span class="muted small" data-i18n="walk.done.note">записът се отваря от "Записани маршрути" и се редактира като всеки друг</span>
     </div>
   </section>
@@ -455,7 +455,7 @@
 
 <dialog id="dlgWalk" class="dlg dlg-sm">
   <form method="dialog" id="walkForm">
-    <h3 data-i18n="walk.h">Запис на изминатото</h3>
+    <h3 data-i18n="walk.h">Запис на следата</h3>
     <label class="walk-field"><span class="small muted" data-i18n="walk.name">Име на записа</span>
       <input id="walkName" type="text" autocomplete="off" spellcheck="false">
     </label>

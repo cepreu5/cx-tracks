@@ -2815,7 +2815,7 @@
       var secs = t.visible !== false && A.byTrack[t.id], np = secs ? secs.filter(function (x) { return x.kind === 'part'; }).length : 0;
       return '<li data-track="' + t.id + '" class="' + (t.visible === false ? 'off' : '') + '">' +
         '<span class="sw" style="background:' + trackColor(t) + '"></span>' +
-        '<span class="t" title="' + U.esc(t.title || t.orig || t.name) + '">' + U.esc(t.name) + (t.walk ? ' <small>' + TE('tr.walk') + '</small>' : '') +
+        '<span class="t" title="' + U.esc(t.title || t.orig || t.name) + '">' + U.esc(t.name) + (t.walk && String(t.name).indexOf(T('walk.name.def')) < 0 ? ' <small>' + TE('tr.walk') + '</small>' : '') +
         (secs ? ' <small class="tr-parts">· ' + U.esc(T.n('tr.parts', np)) + '</small>' : '') +
         (delL ? ' <small>· ' + TE('tr.dels', { len: U.km(delL) }) + '</small>' : '') + '</span>' +
         '<span class="v">' + U.km(t.len - delL) +
@@ -3651,14 +3651,16 @@
     toast(T('msg.wptPlaced', { name: w.name, cnt: T.n('n.points', f.wpts.length) }));
   }
 
-  /* Изминатото като нормален трак: нов трак с дата за име в изминатите на следения
+  /* Следата като нормален трак: нов трак с дата за име в изминатите на следения
      маршрут и отделен запис в "Записани маршрути" (една част - целият трак). Текущ остава
      отвореният маршрут. Същият път за "Стоп" и за възстановено незавършено следене.
-     1.10.11: името е само датата (23.11.2026) - думата "изминат" отпадна по заявка. */
+     1.10.29: името е „Следа гггг.мм.дд“ („Следа 2026.11.26“) - думата „Следа“ идва на мястото
+     на махнатото в 1.10.11 "изминат", за да се вижда в списъка кое е следа и кое сглобен маршрут. */
+  function traceName(when) { return T('walk.name.def') + ' ' + U.dateDots(when); }
   function saveWalk(w) {
     var rec = w.pts, when = w.t || Date.now();
     var wpts = (w.wpts || []).map(function (x) { return { lat: x.lat, lon: x.lon, ele: x.ele, time: x.time, name: x.name }; });
-    var t = { id: U.uid(), name: U.dateDots(when), title: U.dateDots(when), color: nextColor(), pts: rec, breaks: (w.breaks || []).slice(), wpts: wpts, visible: true, created: Date.now(), walk: true };
+    var t = { id: U.uid(), name: traceName(when), title: traceName(when), color: nextColor(), pts: rec, breaks: (w.breaks || []).slice(), wpts: wpts, visible: true, created: Date.now(), walk: true };
     Core.prep(t);
     S.tracks.push(t);
     S.routes.forEach(function (r) { if (r.id === w.routeId) r.walks = (r.walks || []).concat([t.id]); });

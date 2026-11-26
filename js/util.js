@@ -48,9 +48,11 @@
     var d = new Date(t);
     return d.getDate() + ' ' + list('months.short', 12)[d.getMonth()];
   }
+  /* 1.10.29: датата за име на файл е гггг.мм.дд (преди дд.мм.гггг) - така файловете се подреждат
+     по дата и в папка, и в облак. */
   function dateDots(t) {
     var d = new Date(t);
-    return pad(d.getDate()) + '.' + pad(d.getMonth() + 1) + '.' + d.getFullYear();
+    return d.getFullYear() + '.' + pad(d.getMonth() + 1) + '.' + pad(d.getDate());
   }
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function duration(ms) {
