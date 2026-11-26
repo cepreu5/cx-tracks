@@ -2287,7 +2287,9 @@
     var jn = cutJoin(t, a, b);
     toast(T(jn.joined ? 'msg.cutJoined' : jn.d ? 'msg.cutLong' : 'msg.cutDone', { len: U.km(b - a), name: t.name, d: U.dist(jn.d || 0), max: ceilM(Core.LINK_MAX) }), false, jn.d && !jn.joined ? 7000 : 5000);
     ui.cut = null;
-    updateCutBox();
+    // 1.10.22: след „Потвърди“ изрязването приключва - панелът се скрива и режимът се връща на „Избор“.
+    // Дотук режимът оставаше „Изрязване“ и updateCutBox() държеше панела отворен с началния му текст.
+    if (ui.mode === 'cut') setMode('select'); else updateCutBox();
     analyzeNow();
   }
   // Отворът около [a, b] (изтритото и махнатото, слети) - ако е вътре в трака, двата му края се свързват направо.
