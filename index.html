@@ -87,10 +87,12 @@
 
 <section id="mapwrap" class="mapwrap" data-i18n-aria="map.aria" aria-label="Карта">
   <div id="map" class="map"></div>
-  <!-- Горе вляво: "↓" към числата, кръглата "Лента" (скрива и връща лентата, стрелкичката сочи накъде) и текстовото "Следене / Стоп" - винаги тук, лентата го няма -->
+  <!-- Горе вляво, 1.10.18: първо е текстовото "Следене / Стоп / Продължи", после кръглата "Лента".
+       Копчето е най-вляво (а при стълбичка - най-отгоре), за да не мърда, когато надписът му
+       се смени с по-дългия "Продължи"; "Лента" слиза под него. -->
   <div class="maptl">
-    <button id="barHandle" class="btn ico round-fab bar-toggle" type="button" data-act="toggle-bar" data-dir="up" aria-expanded="true" data-i18n-aria="bar.hide" data-i18n-title="bar.hide" aria-label="Скрий горната лента" title="Скрий горната лента"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3.4" width="6" height="6" rx="1.2"/><rect x="9" y="3.4" width="6" height="6" rx="1.2"/><rect x="15" y="3.4" width="6" height="6" rx="1.2"/><path class="bt-arr" d="M12 19.4V13M8.8 16.2 12 13l3.2 3.2"/></svg></button>
     <button id="followMapBtn" class="btn follow-btn follow-fab" type="button" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
+    <button id="barHandle" class="btn ico round-fab bar-toggle" type="button" data-act="toggle-bar" data-dir="up" aria-expanded="true" data-i18n-aria="bar.hide" data-i18n-title="bar.hide" aria-label="Скрий горната лента" title="Скрий горната лента"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3.4" width="6" height="6" rx="1.2"/><rect x="9" y="3.4" width="6" height="6" rx="1.2"/><rect x="15" y="3.4" width="6" height="6" rx="1.2"/><path class="bt-arr" d="M12 19.4V13M8.8 16.2 12 13l3.2 3.2"/></svg></button>
   </div>
   <div class="mapctl tr">
     <div class="seg base" role="group" data-i18n-aria="base.aria" aria-label="Основа на картата">
