@@ -42,6 +42,7 @@
     // 1.10.23: часовникът долу вляво на картата. clkShow е състоянието на чавката „Покажи часовника“:
     // по подразбиране е без отметка, тоест часовникът не се вижда, докато не се отметне.
     clkShow: U.LS.get('clkShow', false) === true,
+    clkTimer: null, // 1.10.30: таймерът на стрелките - върви само докато часовникът се вижда
     // 1.9.5: дефолтната колекция - само името и датата ѝ; самите .gpx файлове стоят в базата под 'defaultGpx'.
     defColl: null
   };
@@ -447,12 +448,14 @@
 
   /* 1.10.23: часовникът долу вляво - класът е на <html>, за да е скрит още преди app.js,
      а чавката „Покажи часовника“ горе вдясно винаги показва същото състояние. */
+  var clockSync = null; // 1.10.30: пуска и спира таймера на часовника (слага се при рисуването му)
   function setClockShown(v) {
     ui.clkShow = !!v;
     U.LS.set('clkShow', ui.clkShow);
     document.documentElement.classList.toggle('clock-on', ui.clkShow);
     var t = $('#clkToggle');
     if (t) t.checked = ui.clkShow;
+    if (clockSync) clockSync();
   }
 
   /* 1.5 „Настройки“ (зъбното колелце в лентата): прозрачност на менютата над картата, прагът на
@@ -4428,8 +4431,20 @@
         mm.style.transform = 'translate(-50%, -100%) rotate(' + (mn * 6 + s * 0.1) + 'deg)';
         ss.style.transform = 'translate(-50%, -100%) rotate(' + (s * 6) + 'deg)';
       }
-      tick();
-      setInterval(tick, 1000);
+      /* 1.10.30: таймерът върви само докато часовникът се вижда. При скрит часовник
+         не се смята нищо и не се пипа DOM-ът; при показване стрелките застават веднага
+         на вярното място. */
+      clockSync = function () {
+        if (ui.clkShow) {
+          if (ui.clkTimer) return;
+          tick();
+          ui.clkTimer = setInterval(tick, 1000);
+        } else if (ui.clkTimer) {
+          clearInterval(ui.clkTimer);
+          ui.clkTimer = null;
+        }
+      };
+      clockSync();
     })();
     $('#gradeToggle').checked = ui.grade;
     $('#gradeToggle').addEventListener('change', function (e) { ui.grade = e.target.checked; U.LS.set('grade', ui.grade); drawProfile(); });
