@@ -4738,6 +4738,10 @@
     $$('#langForm input[name="lang"]').forEach(function (r) { r.addEventListener('change', function () { if (r.checked) I18N.setPref(r.value); }); });
     $('#langTrSel').addEventListener('change', function (e) { useTr(e.target.value); });
     splash();
+    // 1.10.26: първото стартиране на устройството пита име, град и държава (js/who.js).
+    // Пита се след началния екран и не влиза върху друг отворен прозорец; отговорът се праща
+    // към таблицата без да се чака нищо.
+    if (window.Who) window.Who.ask();
     applyFolds();
     showVersion();
     setMode('select');

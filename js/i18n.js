@@ -854,4 +854,14 @@ I18N.add({
   'msg.partFlipped': ['Обърнат старт и край на първата част', 'Start and end of the first part swapped']
 });
 
+/* ---- 1.10.26: кратката форма при първото стартиране (име, град, държава) ---- */
+I18N.add({
+  'who.h': ['Кой използва приложението', 'Who is using the app'],
+  'who.lead': ['Пита се само веднъж на това устройство. Трите полета отиват в таблицата на създателя на приложението.', 'Asked only once on this device. The three fields go to the app creator\u2019s spreadsheet.'],
+  'who.name': ['Име', 'Name'],
+  'who.city': ['Град', 'City'],
+  'who.country': ['Държава', 'Country'],
+  'who.later': ['По-късно', 'Later']
+});
+
 I18N.start();
