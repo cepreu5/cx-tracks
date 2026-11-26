@@ -215,6 +215,13 @@ body.maptl-stack .maptl { flex-direction: column; align-items: flex-start; }
 .follow-btn.danger { color: var(--app-danger); border-color: var(--app-danger); font-weight: 600; }
 /* 1.10.16: на пауза същото копче е "Продължи" - различен цвят, за да се вижда, че следенето е спряно. */
 .follow-btn.paused { color: var(--app-warn); border-color: var(--app-warn); font-weight: 600; }
+/* 1.10.17: дългото натискане на „Стоп“ не бива да селектира текста на копчето - на телефона
+   селекцията отнема жеста и паузата не се включваше. Затова текстът тук не се маркира,
+   няма меню при задържане и няма сив отпечатък от докосването. */
+.follow-btn, .follow-fab {
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
 .barhandle {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
   min-width: 76px; min-height: 30px;
