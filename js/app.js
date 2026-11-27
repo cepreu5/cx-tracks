@@ -3449,11 +3449,11 @@
     var on = !!ui.follower;
     var paused = on && ui.follower.isPaused();
     $$('[data-act="follow"]').forEach(function (b) {
-      b.textContent = paused ? T('follow.resume') : (on ? T('follow.stop') : T('follow.start'));
+      b.textContent = paused ? T('follow.resume') : (on ? T('follow.stop') : T('follow.go'));
       b.classList.toggle('danger', on && !paused);
       b.classList.toggle('paused', paused);
       b.setAttribute('aria-pressed', on && !paused ? 'true' : 'false');
-      b.setAttribute('aria-label', paused ? T('follow.resume.aria') : (on ? T('follow.stop.aria') : T('follow.start.aria')));
+      b.setAttribute('aria-label', paused ? T('follow.resume.aria') : (on ? T('follow.stop.aria') : T('follow.go.aria')));
       b.title = paused ? T('follow.resume.title') : (on ? T('follow.stop.title') : T('follow.start.title'));
     });
   }
@@ -3609,6 +3609,9 @@
     ui.awake = !!on;
     U.LS.set('awake', ui.awake);
     $('#awakeBtn').setAttribute('aria-pressed', ui.awake ? 'true' : 'false');
+    // 1.10.33: копчето носи икона на монитор и казва само Вкл. / Изкл. - буден или позволено заспиване.
+    var lb = $('#awakeTxt'), k = ui.awake ? 'awake.v.on' : 'awake.v.off';
+    if (lb) { lb.setAttribute('data-i18n', k); lb.textContent = T(k); }
     if (ui.follower) ui.follower.setAwake(ui.awake);
   }
   function showAwake(state) {
