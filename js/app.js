@@ -43,6 +43,8 @@
     // по подразбиране е без отметка, тоест часовникът не се вижда, докато не се отметне.
     clkShow: U.LS.get('clkShow', false) === true,
     clkTimer: null, // 1.10.30: таймерът на стрелките - върви само докато часовникът се вижда
+    // 1.10.37: точката, избрана с кръстчето на лупата в „Местене“ - стои с пръстен до следващото докосване.
+    pick: null,
     // 1.9.5: дефолтната колекция - само името и датата ѝ; самите .gpx файлове стоят в базата под 'defaultGpx'.
     defColl: null
   };
@@ -1022,6 +1024,15 @@
       });
     }
 
+    // 1.10.37: избраната с лупата точка в „Местене“ - пръстен, който стои до следващото докосване.
+    if (ui.pick && ui.pick.at) {
+      var pkq = pr(ui.pick.at[0], ui.pick.at[1]);
+      ctx.beginPath(); ctx.arc(pkq[0], pkq[1], 11, 0, Math.PI * 2);
+      ctx.lineWidth = 3; ctx.strokeStyle = C.accent; ctx.stroke();
+      ctx.beginPath(); ctx.arc(pkq[0], pkq[1], 4, 0, Math.PI * 2);
+      ctx.fillStyle = C.accent; ctx.fill();
+    }
+
     // 1.7: върховете на колекцията. „Местене“ и „Махане“ (отблизо) показват върховете на траковете; върховете на връзките -
     // и в „Добавяне“. В „Добавяне“ отворените краища са с кръгчета, а недовършената връзка - на пунктир.
     if (!following) drawCollVertices(ctx, m, pr, tb);
@@ -1495,16 +1506,58 @@
       if (h.kind === 'part') showSegMenu(h.sec, null, p);
       else if (h.kind === 'marker') showDupMenu(h.sec);
       else if (h.kind === 'fork') showJuncMenu(h.j);
+      // 1.10.37: кръстчето върху чертана точка я избира - отваря се менюто ѝ, както при късо докосване.
+      else if (h.kind === 'vertex') showPointMenu(h);
       return;
     }
     if (ui.mode === 'cut') { cutClick(p); return; }
-    if (ui.mode === 'add') { addVertex(p); return; }
+    if (ui.mode === 'add') { addLoupePoint(p); return; }
+    if (ui.mode === 'move') {
+      // 1.10.37: кръстчето избира точката - тя светва с пръстен и остава избрана до следващото
+      // докосване, за да се хване и влачи без търсене.
+      var mv = hitVertex(p, null, true);
+      if (!mv) return;
+      ui.pick = { v: mv, at: vertexAt(mv) };
+      map.redraw();
+      toast(T('msg.grabPoint'));
+      return;
+    }
     if (ui.mode === 'remove') {
       var rv = hitVertex(p, null, true);
       if (rv) { removeAny(rv); return; }
       var rl = hitLink(p);
       if (rl) removeLink(rl);
     }
+  }
+
+  // 1.10.37: в „Връзка“ кръстчето на лупата слага точката точно върху трака - мястото под кръста
+  // се смъква до най-близката точка от най-близкия трак (до 18 px, както при „Изрязване“).
+  // Ако наблизо няма трак, точката пада там, където е кръстчето.
+  function addLoupePoint(p) {
+    var nt = nearestTrack(p, 18);
+    if (!nt) { addVertex(p); return; }
+    var n = Core.nearestOnTrack(nt.t, p.lat, p.lon);
+    if (!n) { addVertex(p); return; }
+    addVertex({ x: p.x, y: p.y, lat: n.lat, lon: n.lon });
+  }
+  // Къде е върхът на картата - за пръстена на избраната с лупата точка (чертана, от връзка или от трак).
+  function vertexAt(v) {
+    if (!v) return null;
+    if (v.kind === 'vertex') {
+      var it = cur().items[v.idx];
+      return it && it.pts[v.pi] ? [it.pts[v.pi].lat, it.pts[v.pi].lon] : null;
+    }
+    if (v.kind === 'lvertex') {
+      var q = (v.ref && v.ref.pts || [])[v.pi];
+      return q ? [q[0], q[1]] : null;
+    }
+    if (v.kind === 'tvertex') {
+      var t = track(v.trackId);
+      if (!t) return null;
+      var hit = liveVertices(t).filter(function (x) { return x.i === v.i; })[0];
+      return hit ? hit.p : null;
+    }
+    return null;
   }
 
   // ---- Действия върху картата ----
@@ -2196,6 +2249,8 @@
   }
 
   function onPress(p, e) {
+    // 1.10.37: ново докосване маха пръстена на избраната с лупата точка.
+    if (ui.pick) { ui.pick = null; map.redraw(); }
     var hk = hitCutHandle(p);
     if (hk) return cutDrag(hk);
     if (ui.follower) return null;
@@ -2685,6 +2740,7 @@
 
   function setMode(m) {
     ui.mode = m;
+    ui.pick = null;
     $$('#tools [data-mode]').forEach(function (b) { b.classList.toggle('on', b.dataset.mode === m); });
     document.body.className = document.body.className.replace(/\bmode-\w+/g, '').trim() + ' mode-' + m;
     if (m !== 'cut' && ui.cut && ui.cut.b == null) ui.cut = null;
