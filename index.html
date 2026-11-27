@@ -83,7 +83,7 @@
       <button data-orient="heading" class="on" data-i18n="orient.heading" data-i18n-title="orient.heading.title" title="Посоката на движение сочи нагоре">Посока</button>
       <button data-orient="north" data-i18n="orient.north" data-i18n-title="orient.north.title" title="Север сочи нагоре">Север</button>
     </div>
-    <button class="btn awake-btn" data-act="awake" id="awakeBtn" aria-pressed="true" data-i18n-title="awake.title" title="Екранът да не заспива, докато следиш"><span class="walk-w" data-i18n="awake.w">Екранът </span><span data-i18n="awake.t">буден</span></button>
+    <button class="btn awake-btn" data-act="awake" id="awakeBtn" aria-pressed="true" data-i18n-title="awake.title" data-i18n-aria="awake.title" title="Екранът да не заспива, докато следиш" aria-label="Екранът да не заспива, докато следиш"><svg class="ico-svg awake-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="2.6" y="4" width="18.8" height="12.6" rx="2"/><path d="M12 16.6v3.4M8.2 20.4h7.6"/></svg><span id="awakeTxt" data-i18n="awake.v.on">Вкл.</span></button>
     <button class="btn" data-act="walk-gpx" id="walkGpxBtn" aria-disabled="true" data-i18n-title="walkgpx.title" title="Записва следата дотук като .gpx - следенето продължава"><span class="walk-w" data-i18n="walkgpx.w">Запиши </span>.gpx</button>
   </div>
 </header>
@@ -97,7 +97,7 @@
        Копчето е най-вляво (а при стълбичка - най-отгоре), за да не мърда, когато надписът му
        се смени с по-дългия "Продължи"; "Лента" слиза под него. -->
   <div class="maptl">
-    <button id="followMapBtn" class="btn follow-btn follow-fab" type="button" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
+    <button id="followMapBtn" class="btn follow-btn follow-fab" type="button" data-act="follow" aria-pressed="false" data-i18n="follow.go" data-i18n-aria="follow.go.aria" aria-label="Следи - пусни следенето по GPS">Следи</button>
     <button id="barHandle" class="btn ico round-fab bar-toggle" type="button" data-act="toggle-bar" data-dir="up" aria-expanded="true" data-i18n-aria="bar.hide" data-i18n-title="bar.hide" aria-label="Скрий горната лента" title="Скрий горната лента"><svg class="ico-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="3.4" width="6" height="6" rx="1.2"/><rect x="9" y="3.4" width="6" height="6" rx="1.2"/><rect x="15" y="3.4" width="6" height="6" rx="1.2"/><path class="bt-arr" d="M12 19.4V13M8.8 16.2 12 13l3.2 3.2"/></svg></button>
   </div>
   <div class="mapctl tr">
@@ -236,7 +236,7 @@
       <button class="btn" data-act="export-gpx" data-i18n="act.exportGpx">Запиши .gpx</button>
       <button class="btn" data-act="picture" data-i18n="act.picture">Снимка</button>
       <button class="btn" data-act="save" data-i18n="act.save">Запази</button>
-      <button class="btn follow-btn" data-act="follow" aria-pressed="false" data-i18n="follow.start" data-i18n-aria="follow.start.aria" aria-label="Следене - пусни следенето по GPS">Следене</button>
+      <button class="btn follow-btn" data-act="follow" aria-pressed="false" data-i18n="follow.go" data-i18n-aria="follow.go.aria" aria-label="Следи - пусни следенето по GPS">Следи</button>
       <!-- 1.10.10: маха от картата всички тракове без част в маршрута; „Отмени“ ги връща. -->
       <button class="btn" data-act="only-route" data-i18n="act.onlyRoute" data-i18n-title="act.onlyRoute.title" title="Махни от картата всички тракове, които не участват в маршрута. „Отмени“ ги връща.">Само маршрута</button>
       <label class="tol"><span data-i18n="bar.tol">Отклонение</span> <input type="text" class="tolInput num" inputmode="numeric" pattern="[0-9]*" maxlength="3" value="20" autocomplete="off" data-i18n-aria="tol.aria" data-i18n-title="tol.title" aria-label="Максимално допустимо отклонение в метри" title="Отклонение в метри, от 0 до 999. Enter прилага."> <span class="tol-unit" data-i18n="unit.m">м</span></label>

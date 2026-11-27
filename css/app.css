@@ -183,6 +183,8 @@ body.bar-hidden .bar { transform: translateY(-110%); }
 .tol b { min-width: 44px; }
 .follow-row { font-size: 13px; }
 .follow-row .seg, .follow-row .btn { flex-shrink: 0; }
+.awake-btn { display: inline-flex; align-items: center; gap: 5px; }
+.awake-btn .awake-ico { width: 17px; height: 17px; }
 .awake-btn[aria-pressed="true"] { background: var(--app-accent); color: var(--app-accent-ink); border-color: var(--app-accent); font-weight: 600; }
 
 /* Картата - цял екран */

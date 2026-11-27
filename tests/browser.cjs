@@ -282,7 +282,7 @@ function barFits() {
   check(hb.tag === 'BUTTON' && hb.label === 'Покажи горната лента' && hb.text === '' && hb.dir === 'down', 'табчето е бутон без дума, с aria-label: ' + hb.label + ', стрелкичката сочи ' + hb.dir);
   check(hb.w === 36 && hb.h === 36 && hb.top <= 14 && hb.left <= 120, 'табчето: ' + Math.round(hb.w) + 'x' + Math.round(hb.h) + ' px, горе вляво (' + Math.round(hb.left) + ',' + Math.round(hb.top) + ')');
   const fab = await page.evaluate(fabState);
-  check(fab.shown && fab.text === 'Следене' && fab.pressed === 'false' && fab.left >= hb.left + hb.w && !fab.overTr && !fab.overHandle, 'при скрита лента копчето "Следене" е върху картата горе вляво, вдясно от "Лента": ' + JSON.stringify(fab));
+  check(fab.shown && fab.text === 'Следи' && fab.pressed === 'false' && fab.left >= hb.left + hb.w && !fab.overTr && !fab.overHandle, 'при скрита лента копчето "Следене" е върху картата горе вляво, вдясно от "Лента": ' + JSON.stringify(fab));
   await page.waitForFunction(() => document.querySelector('.mapctl.tr').getBoundingClientRect().top < 20, null, { timeout: 3000 }).catch(() => {});
   const row1280 = await page.evaluate(handleRow);
   check(row1280.sameRow && !row1280.xOverlap, 'на 1280 px табчето и "Сателит / Топо / Имена" са на един ред и не се застъпват: ' + row1280.info);
@@ -1669,14 +1669,14 @@ function barFits() {
   await p9.setInputFiles('#fileInput', writeGpx('budene', line(42.5, 24.7, 42.52, 24.7, 80)));
   await p9.waitForFunction(() => __gpxk.S.tracks.length === 1);
   await p9.evaluate(() => { const S = __gpxk.S, t = S.tracks[0], r = S.routes.find(x => x.id === S.curId); r.items = [{ type: 'part', trackId: t.id, a: 0, b: t.len, rev: false }]; __gpxk.refresh(); });
-  const st9 = () => p9.evaluate(() => { const f = __gpxk.ui.follower; return { on: !!f, n: f ? f.rec.length : 0, len: f ? U.lengthOf(f.rec) : 0, t0: f ? f.t0 : 0, calls: __geo.calls, wake: __geo.wake, held: !!__geo.held, msg: document.querySelector('#fMsg').textContent, awake: document.querySelector('#fAwake').hidden ? '' : document.querySelector('#fAwake').textContent, btn: document.querySelector('#awakeBtn').getAttribute('aria-pressed'), done: document.querySelector('#fDone').textContent, live: document.querySelector('#dlgLive').open }; });
+  const st9 = () => p9.evaluate(() => { const f = __gpxk.ui.follower; return { on: !!f, n: f ? f.rec.length : 0, len: f ? U.lengthOf(f.rec) : 0, t0: f ? f.t0 : 0, calls: __geo.calls, wake: __geo.wake, held: !!__geo.held, msg: document.querySelector('#fMsg').textContent, awake: document.querySelector('#fAwake').hidden ? '' : document.querySelector('#fAwake').textContent, btn: document.querySelector('#awakeBtn').getAttribute('aria-pressed'), btxt: document.querySelector('#awakeTxt').textContent, done: document.querySelector('#fDone').textContent, live: document.querySelector('#dlgLive').open }; });
   await p9.click('#followMapBtn');
   await p9.waitForFunction(() => __gpxk.ui.follower && __gpxk.ui.follower.rec.length > 0, null, { timeout: 10000 });
   await p9.waitForFunction(() => !!__geo.held, null, { timeout: 3000 }).catch(() => {});
   const w9 = await st9();
-  check(w9.btn === 'true' && w9.held && w9.wake === 1 && w9.awake === 'Екранът няма да заспива, докато следиш.', '"Екранът буден" е включено по подразбиране, ключалката се държи: "' + w9.awake + '"');
+  check(w9.btn === 'true' && w9.btxt === 'Вкл.' && w9.held && w9.wake === 1 && w9.awake === 'Екранът няма да заспива, докато следиш.', 'Копчето с монитора казва "Вкл." и е включено по подразбиране, ключалката се държи: "' + w9.awake + '"');
   const bb9 = await p9.evaluate(() => { const r = document.querySelector('#followBar').getBoundingClientRect(); return Array.from(document.querySelectorAll('#followBar .btn, #followBar .seg')).every(b => { const q = b.getBoundingClientRect(); return q.width > 0 && q.left >= r.left - 1 && q.right <= r.right + 1; }) && document.documentElement.scrollWidth <= innerWidth; });
-  check(bb9, '390 px: копчето "буден" се събира в реда на следенето, без хоризонтален скрол');
+  check(bb9, '390 px: копчето с монитора се събира в реда на следенето, без хоризонтален скрол');
   await ctx9.setGeolocation({ latitude: 42.5009, longitude: 24.7 });
   await p9.waitForFunction(() => __gpxk.ui.follower.rec.length > 1, null, { timeout: 10000 });
   const a9 = await st9();
@@ -1719,7 +1719,7 @@ function barFits() {
   // Изключване на режима: ключалката се пуска, при връщане не се иска; изборът се помни.
   await p9.click('#awakeBtn');
   const f9 = await st9();
-  check(f9.btn === 'false' && !f9.held && f9.awake === 'Екранът може да заспи - следенето продължава при събуждане.' && await p9.evaluate(() => U.LS.get('awake', true)) === false, 'изключен "буден": ключалката се пуска, панелът казва "' + f9.awake + '", изборът е в localStorage');
+  check(f9.btn === 'false' && f9.btxt === 'Изкл.' && !f9.held && f9.awake === 'Екранът може да заспи - следенето продължава при събуждане.' && await p9.evaluate(() => U.LS.get('awake', true)) === false, 'изключен "буден": ключалката се пуска, панелът казва "' + f9.awake + '", изборът е в localStorage');
   await p9.evaluate(() => { __geo.set('hidden'); __geo.set('visible'); });
   check((await st9()).wake === f9.wake, 'изключен режим: при връщане ключалката не се иска');
   // Отказ от браузъра: панелът го казва.
