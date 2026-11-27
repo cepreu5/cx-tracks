@@ -386,13 +386,21 @@
         var h = self.opts.onPress ? self.opts.onPress(geo({ x: p.x, y: p.y }), e) : null;
         drag = h ? { handler: h } : { pan: true, lx: p.x, ly: p.y };
         clearTimeout(longT);
-        if (!h && self.opts.onLongPress) {
+        // 1.10.36: в „Изрязване“, „Местене“ и „Махане“ задържането пуска лупата и когато е хванало
+        // точка или ръкохватка - тя се влачи под пръста, а кръгът показва уголемено къде отива.
+        var dragLoupe = !!h && !!self.opts.loupeDrag && self.opts.loupeDrag();
+        if (self.opts.onLongPress && (!h || dragLoupe)) {
           longT = setTimeout(function () {
             if (!start || start.moved || pointers.size !== 1) return;
             var lh = self.opts.onLongPress(geo({ x: start.x, y: start.y }));
-            if (lh) { drag = { handler: lh }; start.long = true; return; }
+            var finger = start.type !== 'mouse';
+            if (lh) { drag = { handler: lh }; start.long = true; }
+            if (dragLoupe && finger) {
+              if (startLoupe({ x: start.x, y: start.y })) { start.long = true; drag.loupeHold = true; }
+              return;
+            }
             // Точка или маркер не хванаха задържането - пускаме лупата.
-            if (start.type === 'mouse') return;
+            if (lh || !finger) return;
             if (startLoupe({ x: start.x, y: start.y })) {
               start.long = true;
               drag = { loupe: true };
@@ -419,8 +427,11 @@
         }
         if (!start || !drag) return;
         if (start.loupe) {
+          if (!start.loupeMoved && Math.hypot(p.x - start.x, p.y - start.y) > 9) start.loupeMoved = true;
           self.loupe = { x: p.x, y: p.y };
           if (self.opts.onHover) self.opts.onHover(geo({ x: p.x, y: p.y }));
+          // 1.10.36: хванатата точка върви под пръста, докато трае лупата.
+          if (drag && drag.loupeHold && drag.handler) drag.handler.move(geo(p));
           self.redraw();
           return;
         }
@@ -443,8 +454,19 @@
         clearTimeout(longT);
         c.classList.remove('panning');
         if (start && start.loupe) {
+          // 1.10.35: при вдигане на пръста лупата се затваря, но точката под него се предава на
+          // приложението - то оставя маркировката на участъка и отваря менюто му. При отменено
+          // докосване (pointercancel) не се прави нищо.
+          // 1.10.36: ако под лупата се е влачила точка, тя се пуска там, където е пръстът; без
+          // местене жестът е късо докосване.
+          var lp = pos(e), up = e.type === 'pointerup', held = drag && drag.loupeHold ? drag.handler : null;
+          var still = !start.loupeMoved;
           stopLoupe();
           drag = null; start = null;
+          if (held) {
+            if (up && still && held.tap) held.tap(geo(lp));
+            else if (held.end) held.end(geo(lp));
+          } else if (up && self.opts.onLoupeEnd) self.opts.onLoupeEnd(geo(lp));
           self.redraw();
           return;
         }

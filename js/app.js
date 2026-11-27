@@ -1448,6 +1448,8 @@
     hoverRaf = requestAnimationFrame(function () {
       hoverRaf = null;
       var p2 = hoverP, tip = $('#tip');
+      // 1.10.35: маркировка, оставена след лупата, не гасне, когато пръстът се вдигне (pointerleave).
+      if (!p2 && ui.hover && ui.hover.press) { tip.hidden = true; return; }
       var h = p2 && !ui.om && (ui.mode === 'select' || ui.mode === 'remove' || ui.mode === 'move') ? hitTest(p2) : null;
       if (h && ui.mode !== 'select' && h.kind !== 'vertex') h = null;
       if (p2 && ui.mode === 'cut') {
@@ -1473,6 +1475,36 @@
       } else tip.hidden = true;
       if (changed) { map.redraw(); highlightRows(); }
     });
+  }
+
+  // 1.10.35: вдигане на пръста от лупата оставя маркировката на участъка и отваря менюто му -
+  // същото, което прави краткото докосване. Маркировката е „задържана“ (press) и се маха при
+  // следващото докосване на картата.
+  // 1.10.36: в другите режими лупата е за точно мерене - точката под пръста получава същото,
+  // което би получила при късо докосване точно там.
+  function onLoupeEnd(p) {
+    if (ui.follower) return;
+    if (ui.mode === 'select') {
+      var h = hitTest(p);
+      if (!h || h.kind === 'none') return;
+      ui.hover = h;
+      h.press = true;
+      map.canvas.classList.add('hot');
+      map.redraw();
+      highlightRows();
+      if (h.kind === 'part') showSegMenu(h.sec, null, p);
+      else if (h.kind === 'marker') showDupMenu(h.sec);
+      else if (h.kind === 'fork') showJuncMenu(h.j);
+      return;
+    }
+    if (ui.mode === 'cut') { cutClick(p); return; }
+    if (ui.mode === 'add') { addVertex(p); return; }
+    if (ui.mode === 'remove') {
+      var rv = hitVertex(p, null, true);
+      if (rv) { removeAny(rv); return; }
+      var rl = hitLink(p);
+      if (rl) removeLink(rl);
+    }
   }
 
   // ---- Действия върху картата ----
@@ -4735,11 +4767,14 @@
   function init() {
     applySettings();
     map = new window.TileMap($('#map'), {
-      onClick: onClick, onPress: onPress, onLongPress: onLongPress, onHover: onHover,
+      onClick: onClick, onPress: onPress, onLongPress: onLongPress, onHover: onHover, onLoupeEnd: onLoupeEnd,
       background: function () { return C['map-bg']; },
       dblZoom: function () { return ui.mode === 'select' && !ui.hover; },
-      // 1.10.34: лупата при задържане е само в „Избор“ и не докато следим.
-      loupe: function () { return ui.mode === 'select' && !ui.follower; }
+      // 1.10.34: лупата при задържане. 1.10.36: работи във всички режими, не докато следим.
+      loupe: function () { return !ui.follower; },
+      // 1.10.36: в „Изрязване“, „Местене“ и „Махане“ задържането върху точка или ръкохватка също
+      // пуска лупата - тя се влачи под пръста, а кръгът показва уголемено къде отива.
+      loupeDrag: function () { return !ui.follower && (ui.mode === 'cut' || ui.mode === 'move' || ui.mode === 'remove'); }
     });
     map.addDrawer(drawMap);
     map.on('viewchange', function (v) { U.LS.set('view', v); if (!$('#pointMenu').hidden) hidePointMenu(); if (ui.om && JSON.stringify(v) !== ui.omView) hideObjMenu(); });
