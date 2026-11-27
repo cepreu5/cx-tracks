@@ -1522,7 +1522,10 @@
       var rv = hitVertex(p, null, true);
       if (rv) { removeAny(rv); return; }
       var rl = hitLink(p);
-      if (rl) removeLink(rl);
+      if (rl) { removeLink(rl); return; }
+      // 1.10.39: кръстчето върху трак (не върху негова точка) избира участъка и отваря менюто му -
+      // там е „Разреждане“.
+      segMenuAt(p);
     }
   }
 
@@ -2023,6 +2026,17 @@
     analyzeNow();
     toast(T('msg.vtxRemoved', { name: trackLabel(t) }));
   }
+  /* 1.10.39 „Разреждане“: маха излишните точки на трака (Core.thinPts) и пуска разстоянията по него -
+     изтрито, махнато, връзки, части на маршрутите - да следват новите върхове, както при местене. */
+  function thinTrack(t) {
+    if (!t) return;
+    var r = Core.thinPts(t.pts, Core.THIN_M, t.breaks || []);
+    if (!r.removed) { toast(T('msg.thinNone')); return; }
+    pushUndo(true);
+    editTrackPts(t, r.pts, r.map);
+    analyzeNow();
+    toast(T('msg.thinDone', { n: r.removed, name: trackLabel(t) }), false, 5000);
+  }
   /* 1.8 „Удължи/Скъси“: от менюто на трака (под „Добави в маршрута“) на свободния му край (Core.openEnds) се слага една
      специална точка - пръстен с кръстче и ореол. Влачи се с пръст или мишка; при пускане:
      върху края на трак (и на същия) - двата края се свързват: тракът расте до точно този край;
@@ -2301,6 +2315,21 @@
     return vertexDrag(v);
   }
 
+  // 1.10.39: в „Махане“ посочването върху трак (а не върху негова точка) избира трака и отваря
+  // менюто на участъка - там е „Разреждане“. Маркерът на дубликат и пръстенът на разклонение не
+  // пречат: в този режим се избира линията под пръста. Връща true, ако е отворило меню.
+  function segMenuAt(p) {
+    var nt = nearestTrack(p, 9);
+    if (nt) {
+      var n = Core.nearestOnTrack(nt.t, p.lat, p.lon), secs = A.byTrack[nt.t.id] || [];
+      var sec = secs.filter(function (s) { return s.kind !== 'gap' && n.d >= s.a && n.d <= s.b; })[0];
+      if (sec && sec.kind !== 'dup' && sec.kind !== 'del') { showSegMenu(sec, null, p); return true; }
+    }
+    var h = hitTest(p);
+    if (h && h.kind === 'item' && h.g.item.type === 'part') { showSegMenu(secAt(h.g.item, p), h.idx, p); return true; }
+    return false;
+  }
+
   function onClick(p) {
     // Осветеното със задържане гасне със следващото докосване.
     if (ui.hover && ui.hover.press) { ui.hover = null; map.redraw(); }
@@ -2318,7 +2347,12 @@
       var v = hitVertex(p, null, true), lk = !v && ui.mode === 'remove' && hitLink(p);
       if (v && ui.mode === 'remove') removeAny(v);
       else if (lk) removeLink(lk);
-      else if (!v) toast(ui.mode === 'remove' ? T('msg.clickRemove') : T('msg.grabPoint'));
+      // 1.10.39: в „Махане“ докосването върху трак (не върху негова точка) избира трака и отваря
+      // менюто на участъка - там е „Разреждане“.
+      else if (!v) {
+        if (ui.mode === 'remove' && segMenuAt(p)) return;
+        toast(ui.mode === 'remove' ? T('msg.clickRemove') : T('msg.grabPoint'));
+      }
       return;
     }
     var h = hitTest(p);
@@ -2517,6 +2551,14 @@
       if (fk) btns.push({ key: 'fork', label: T('om.fork'), run: function () { switchFork(fk); } });
     }
     if (btns.length && !btns[0].cls) btns[0].cls = 'pri';
+    // 1.10.39: „Разреждане“ - излишните точки на трака падат (до 1 м отклонение от правата между
+    // съседните). Бутонът казва още преди натискане колко точки ще паднат.
+    if (t && t.pts && t.pts.length > 2) {
+      var thn = Core.thinPts(t.pts, Core.THIN_M, t.breaks || []);
+      btns.push({ key: 'thin', label: T('om.thin'),
+        sub: thn.removed ? T('om.thin.sub', { n: thn.removed, m: t.pts.length }) : T('om.thin.none'),
+        run: function () { thinTrack(t); } });
+    }
     // 1.8: „Удължи/Скъси“ - точно под първото копче, по един ред за всеки свободен край на трака.
     // 1.9: над него „Свържи с най-близката линия“ - един клик, ако най-близката линия е до тавана (Core.LINK_MAX).
     var xr = t ? extRows(t) : [], nears = xr.map(nearTarget), nn = nears.filter(Boolean).length;

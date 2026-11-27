@@ -1322,3 +1322,45 @@ console.log('общ участък OK');
     '1.10.0: левият свършва в c и десният тръгва от c срещу записа');
   console.log('1.10.0 посока и повторно добавяне на участък: отиване и връщане с една част два пъти, без дупки и без скок: OK');
 })();
+
+/* 1.10.39: „Разреждане“ - излишните точки на трака падат, линията остава същата (до 1 м). */
+(function () {
+  var m = 8.983e-6; // градуси на метър по меридиана
+  function line(n, stepLon, jit) {
+    var p = [];
+    for (var i = 0; i <= n; i++) p.push([42.5 + (jit ? Math.sin(i * 7.3) * jit : 0), 24.7 + i * stepLon, 500 + i, 't' + i]);
+    return p;
+  }
+  // Гъста почти права линия: остават само двата края, височината и времето им стоят.
+  var a = line(200, 0.0001, 0.45 * m), r = Core.thinPts(a, 1);
+  assert.ok(r.removed === 199 && r.pts.length === 2, '1.10.39: права линия от 201 точки остава с 2, а е с ' + r.pts.length);
+  assert.ok(r.pts[0][2] === 500 && r.pts[0][3] === 't0' && r.pts[1][3] === 't200', '1.10.39: височината и времето на краищата стоят');
+  // Точка на 5 м встрани не е излишна.
+  var b = line(60, 0.0001, 0);
+  b[30][0] = 42.5 + 5 * m;
+  var r2 = Core.thinPts(b, 1);
+  assert.ok(r2.pts.filter(function (p) { return Math.abs(p[0] - (42.5 + 5 * m)) < 1e-9; }).length === 1, '1.10.39: точка на 5 м встрани остава');
+  // map: новият номер на стария връх или -1.
+  var good = r.map.length === a.length && a.every(function (p, i) { return r.map[i] < 0 ? r.pts.indexOf(p) < 0 : r.pts[r.map[i]] === p; });
+  assert.ok(good, '1.10.39: map сочи новите номера, -1 за махнатите');
+  // Неподвижна точка (прекъсване в записа) остава.
+  assert.ok(Core.thinPts(a, 1, [100]).pts.some(function (p) { return p[3] === 't100'; }), '1.10.39: неподвижната точка остава');
+  // Нищо за махане при къси тракове.
+  assert.ok(Core.thinPts([], 1).removed === 0 && Core.thinPts([[1, 2], [1, 2]], 1).removed === 0 && Core.thinPts([[1, 2], [1, 2], [1, 2]], 1).removed === 1, '1.10.39: празен, две и три еднакви точки');
+  // Най-голямото отклонение на махнатите точки от останалата линия е под 1 м.
+  var r6 = Core.thinPts(line(300, 0.00008, 0.6 * m), 1), worst = 0;
+  for (var i = 0; i < 300; i++) {
+    if (r6.map[i] >= 0) continue;
+    var px = 24.7 + i * 0.00008, py = 42.5 + Math.sin(i * 7.3) * 0.6 * m, best = Infinity;
+    for (var j = 0; j + 1 < r6.pts.length; j++) {
+      var p = r6.pts[j], q = r6.pts[j + 1], kx = Math.cos(py * Math.PI / 180) * 111320, ky = 111320;
+      var dxx = (q[1] - p[1]) * kx, dyy = (q[0] - p[0]) * ky, l2 = dxx * dxx + dyy * dyy;
+      var t = l2 ? (((px - p[1]) * kx) * dxx + ((py - p[0]) * ky) * dyy) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      best = Math.min(best, Math.hypot(((px - p[1]) * kx) - t * dxx, ((py - p[0]) * ky) - t * dyy));
+    }
+    worst = Math.max(worst, best);
+  }
+  assert.ok(worst <= 1.05, '1.10.39: махнатите точки са до 1 м от останалата линия (най-много ' + worst.toFixed(2) + ' м)');
+  console.log('1.10.39 разреждане: излишните точки падат, линията остава същата: OK');
+})();
