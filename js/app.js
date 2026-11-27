@@ -1515,11 +1515,7 @@
     if (ui.mode === 'move') {
       // 1.10.37: кръстчето избира точката - тя светва с пръстен и остава избрана до следващото
       // докосване, за да се хване и влачи без търсене.
-      var mv = hitVertex(p, null, true);
-      if (!mv) return;
-      ui.pick = { v: mv, at: vertexAt(mv) };
-      map.redraw();
-      toast(T('msg.grabPoint'));
+      pickAt(p);
       return;
     }
     if (ui.mode === 'remove') {
@@ -1528,6 +1524,28 @@
       var rl = hitLink(p);
       if (rl) removeLink(rl);
     }
+  }
+
+  // 1.10.37: избира върха под кръстчето на лупата и го оставя с пръстен до следващото докосване.
+  // 1.10.38: същото се вика и когато кръстчето е стояло три секунди на едно място.
+  function pickAt(p) {
+    var v = hitVertex(p, null, true);
+    if (!v || sameVertex(ui.pick && ui.pick.v, v)) return false;
+    ui.pick = { v: v, at: vertexAt(v) };
+    map.redraw();
+    toast(T('msg.grabPoint'));
+    return true;
+  }
+  function sameVertex(a, b) {
+    if (!a || !b) return false;
+    var qa = vertexAt(a), qb = vertexAt(b);
+    return !!qa && !!qb && Math.abs(qa[0] - qb[0]) < 1e-9 && Math.abs(qa[1] - qb[1]) < 1e-9;
+  }
+  // 1.10.38: кръстчето на лупата е стояло три секунди на едно място. В „Местене“ това избира
+  // елемента под кръста, без пръстът да се вдига - изборът светва с пръстен и остава.
+  function onLoupeDwell(p) {
+    if (ui.follower || ui.mode !== 'move') return;
+    if (pickAt(p) && navigator.vibrate) try { navigator.vibrate(15); } catch (er) { /* няма значение */ }
   }
 
   // 1.10.37: в „Връзка“ кръстчето на лупата слага точката точно върху трака - мястото под кръста
@@ -4824,6 +4842,8 @@
     applySettings();
     map = new window.TileMap($('#map'), {
       onClick: onClick, onPress: onPress, onLongPress: onLongPress, onHover: onHover, onLoupeEnd: onLoupeEnd,
+      // 1.10.38: кръстчето стои три секунди на едно място - в „Местене“ избира точката под него.
+      onLoupeDwell: onLoupeDwell,
       background: function () { return C['map-bg']; },
       dblZoom: function () { return ui.mode === 'select' && !ui.hover; },
       // 1.10.34: лупата при задържане. 1.10.36: работи във всички режими, не докато следим.

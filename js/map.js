@@ -339,6 +339,7 @@
       var pinch = null;
       var longT = null;
       var lastTap = 0;
+      var dwellT = null, dwellAt = null;
 
       function pos(e) {
         var r = c.getBoundingClientRect();
@@ -354,12 +355,28 @@
         if (start) start.loupe = true;
         if (navigator.vibrate) try { navigator.vibrate(12); } catch (er) { /* няма значение */ }
         c.classList.add('loupe-on');
+        startDwell(p);
         if (self.opts.onHover) self.opts.onHover(geo({ x: p.x, y: p.y }));
         self.redraw();
         return true;
       }
+      /* 1.10.38: кръстчето, което стои на едно място три секунди, казва на приложението какво има
+         под него - без пръстът да се вдига. Приложението решава какво значи това в текущия режим. */
+      var DWELL_MS = 3000, DWELL_PX = 9;
+      function stopDwell() { clearTimeout(dwellT); dwellT = null; dwellAt = null; }
+      function startDwell(p) {
+        stopDwell();
+        if (!self.opts.onLoupeDwell) return;
+        dwellAt = { x: p.x, y: p.y };
+        dwellT = setTimeout(function () {
+          dwellT = null;
+          if (!self.loupe || !self.opts.onLoupeDwell || !dwellAt) return;
+          self.opts.onLoupeDwell(geo({ x: dwellAt.x, y: dwellAt.y }));
+        }, DWELL_MS);
+      }
       function stopLoupe() {
         if (!self.loupe) return;
+        stopDwell();
         self.loupe = null;
         self.loupeC.hidden = true;
         c.classList.remove('loupe-on');
@@ -429,6 +446,7 @@
         if (start.loupe) {
           if (!start.loupeMoved && Math.hypot(p.x - start.x, p.y - start.y) > 9) start.loupeMoved = true;
           self.loupe = { x: p.x, y: p.y };
+          if (!dwellAt || Math.hypot(p.x - dwellAt.x, p.y - dwellAt.y) > DWELL_PX) startDwell(p);
           if (self.opts.onHover) self.opts.onHover(geo({ x: p.x, y: p.y }));
           // 1.10.36: хванатата точка върви под пръста, докато трае лупата.
           if (drag && drag.loupeHold && drag.handler) drag.handler.move(geo(p));
