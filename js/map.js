@@ -10,6 +10,11 @@
   var MIN_Z = 2, MAX_Z = 19;
   var CACHE_MAX = 600;
   var ROT_STEP = 15;
+  /* 1.10.34: лупа при задържане на картата. Кръгът стои над пръста, за да не го закрива,
+     показва картата около точката, увеличена LOUPE_K пъти. */
+  var LOUPE_R = 56;      // радиус на кръга в екранни пиксели
+  var LOUPE_K = 2.4;     // колко пъти е увеличението
+  var LOUPE_GAP = 86;    // колко над пръста е центърът на кръга
 
   function lon2x(lon) { return (lon + 180) / 360; }
   function lat2y(lat) {
@@ -33,6 +38,12 @@
     this.canvas.setAttribute('aria-label', T('map.aria'));
     el.appendChild(this.canvas);
     this.ctx = this.canvas.getContext('2d');
+    // Лупата е на собствено платно: иначе увеличението би взело и предишния си образ.
+    this.loupeC = document.createElement('canvas');
+    this.loupeC.className = 'map-loupe';
+    this.loupeC.hidden = true;
+    el.appendChild(this.loupeC);
+    this.loupe = null;   // {x, y} - точката под пръста, докато трае задържането
     this.cx = lon2x(24.7036);
     this.cy = lat2y(42.5006);
     this.zoom = 13;
@@ -261,6 +272,63 @@
         try { this.drawers[j](ctx, this); } catch (e) { console.error(e); }
         ctx.restore();
       }
+      if (this.loupe) this._drawLoupe();
+    },
+
+    // Правоъгълникът на кръга в екранни координати на картата: {x, y} е горният ляв ъгъл, r е радиусът.
+    loupeBox: function () {
+      var l = this.loupe, R = LOUPE_R;
+      if (!l) return null;
+      return {
+        x: Math.max(R + 6, Math.min(this.w - R - 6, l.x)) - R,
+        y: Math.max(R + 6, Math.min(this.h - R - 6, l.y - LOUPE_GAP)) - R,
+        r: R
+      };
+    },
+
+    _drawLoupe: function () {
+      var b = this.loupeBox();
+      if (!b) return;
+      var R = b.r, d = R * 2, dpr = this.dpr, c = this.loupeC, ctx = c.getContext('2d');
+      var px = Math.round(d * dpr);
+      if (c.width !== px || c.height !== px) {
+        c.width = px; c.height = px;
+        c.style.width = d + 'px'; c.style.height = d + 'px';
+      }
+      c.style.left = Math.round(b.x) + 'px';
+      c.style.top = Math.round(b.y) + 'px';
+      c.hidden = false;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, px, px);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(px / 2, px / 2, px / 2, 0, Math.PI * 2);
+      ctx.clip();
+      var s = (R / LOUPE_K) * dpr;
+      ctx.drawImage(this.canvas, this.loupe.x * dpr - s, this.loupe.y * dpr - s, s * 2, s * 2, 0, 0, px, px);
+      ctx.restore();
+      // Пръстен: бял отвътре, тънък тъмен отвън, за да се чете върху всяка карта.
+      ctx.lineWidth = 3 * dpr;
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath(); ctx.arc(px / 2, px / 2, px / 2 - 1.5 * dpr, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 1 * dpr;
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.beginPath(); ctx.arc(px / 2, px / 2, px / 2 - 3 * dpr, 0, Math.PI * 2); ctx.stroke();
+      // Кръстче в средата - точно точката под пръста.
+      var k = 8 * dpr;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 3 * dpr;
+      ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.moveTo(px / 2 - k, px / 2); ctx.lineTo(px / 2 + k, px / 2);
+      ctx.moveTo(px / 2, px / 2 - k); ctx.lineTo(px / 2, px / 2 + k);
+      ctx.stroke();
+      ctx.lineWidth = 1 * dpr;
+      ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(px / 2 - k, px / 2); ctx.lineTo(px / 2 + k, px / 2);
+      ctx.moveTo(px / 2, px / 2 - k); ctx.lineTo(px / 2, px / 2 + k);
+      ctx.stroke();
     },
 
     _bindInput: function () {
@@ -278,6 +346,26 @@
       }
       function geo(p) { var g = self.unproject(p.x, p.y); p.lat = g.lat; p.lon = g.lon; return p; }
 
+      /* 1.10.34: задържане върху празно място или върху трак пуска лупа - кръг с увеличен
+         образ над пръста. Местенето на пръста мести точката, картата не мърда. */
+      function startLoupe(p) {
+        if (self.opts.loupe && !self.opts.loupe()) return false;
+        self.loupe = { x: p.x, y: p.y };
+        if (start) start.loupe = true;
+        if (navigator.vibrate) try { navigator.vibrate(12); } catch (er) { /* няма значение */ }
+        c.classList.add('loupe-on');
+        if (self.opts.onHover) self.opts.onHover(geo({ x: p.x, y: p.y }));
+        self.redraw();
+        return true;
+      }
+      function stopLoupe() {
+        if (!self.loupe) return;
+        self.loupe = null;
+        self.loupeC.hidden = true;
+        c.classList.remove('loupe-on');
+        self.redraw();
+      }
+
       c.addEventListener('pointerdown', function (e) {
         if (e.button > 0) return;
         c.focus({ preventScroll: true });
@@ -286,6 +374,7 @@
         pointers.set(e.pointerId, p);
         if (pointers.size === 2) {
           clearTimeout(longT);
+          stopLoupe();
           if (drag && drag.handler && drag.handler.cancel) drag.handler.cancel();
           var a = Array.from(pointers.values());
           pinch = { d: Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y), z: self.zoom, mx: (a[0].x + a[1].x) / 2, my: (a[0].y + a[1].y) / 2 };
@@ -301,7 +390,13 @@
           longT = setTimeout(function () {
             if (!start || start.moved || pointers.size !== 1) return;
             var lh = self.opts.onLongPress(geo({ x: start.x, y: start.y }));
-            if (lh) { drag = { handler: lh }; start.long = true; }
+            if (lh) { drag = { handler: lh }; start.long = true; return; }
+            // Точка или маркер не хванаха задържането - пускаме лупата.
+            if (start.type === 'mouse') return;
+            if (startLoupe({ x: start.x, y: start.y })) {
+              start.long = true;
+              drag = { loupe: true };
+            }
           }, 480);
         }
       });
@@ -323,6 +418,12 @@
           return;
         }
         if (!start || !drag) return;
+        if (start.loupe) {
+          self.loupe = { x: p.x, y: p.y };
+          if (self.opts.onHover) self.opts.onHover(geo({ x: p.x, y: p.y }));
+          self.redraw();
+          return;
+        }
         if (!start.moved && Math.hypot(p.x - start.x, p.y - start.y) > (start.type === 'mouse' ? 4 : 9)) {
           start.moved = true;
           clearTimeout(longT);
@@ -341,6 +442,12 @@
         pointers.delete(e.pointerId);
         clearTimeout(longT);
         c.classList.remove('panning');
+        if (start && start.loupe) {
+          stopLoupe();
+          drag = null; start = null;
+          self.redraw();
+          return;
+        }
         if (pinch) {
           if (pointers.size < 2) pinch = null;
           if (pointers.size === 0) { drag = null; start = null; }

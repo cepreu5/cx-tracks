@@ -1462,6 +1462,13 @@
         tip.hidden = false;
         var x = Math.min(p2.x + 14, map.w - 290), y = p2.y + 16;
         if (y > map.h - 60) y = p2.y - 50;
+        // 1.10.34: при лупа надписът застава над кръга, за да не го закрива пръстът.
+        var lb = map.loupeBox && map.loupeBox();
+        if (lb) {
+          var tw = tip.offsetWidth || 200, th = tip.offsetHeight || 40;
+          x = Math.min(Math.max(8, lb.x + lb.r - tw / 2), Math.max(8, map.w - tw - 8));
+          y = Math.max(8, lb.y - th - 8);
+        }
         tip.style.left = x + 'px'; tip.style.top = y + 'px';
       } else tip.hidden = true;
       if (changed) { map.redraw(); highlightRows(); }
@@ -4730,7 +4737,9 @@
     map = new window.TileMap($('#map'), {
       onClick: onClick, onPress: onPress, onLongPress: onLongPress, onHover: onHover,
       background: function () { return C['map-bg']; },
-      dblZoom: function () { return ui.mode === 'select' && !ui.hover; }
+      dblZoom: function () { return ui.mode === 'select' && !ui.hover; },
+      // 1.10.34: лупата при задържане е само в „Избор“ и не докато следим.
+      loupe: function () { return ui.mode === 'select' && !ui.follower; }
     });
     map.addDrawer(drawMap);
     map.on('viewchange', function (v) { U.LS.set('view', v); if (!$('#pointMenu').hidden) hidePointMenu(); if (ui.om && JSON.stringify(v) !== ui.omView) hideObjMenu(); });

@@ -195,6 +195,9 @@ body.bar-hidden .bar { transform: translateY(-110%); }
 body.mode-add .map-canvas, body.mode-cut .map-canvas { cursor: crosshair; }
 body.mode-remove .map-canvas { cursor: not-allowed; }
 .map-canvas.hot { cursor: pointer; }
+/* 1.10.34: лупата при задържане на картата - кръг над пръста, собствено платно над картата. */
+.map-loupe { position: absolute; z-index: 6; pointer-events: none; border-radius: 50%; }
+.map-canvas.loupe-on { cursor: crosshair; }
 
 .mapctl { position: absolute; z-index: 10; display: flex; gap: 6px; }
 .mapctl.tr { right: 10px; top: 96px; align-items: center; transition: top .18s ease; }
