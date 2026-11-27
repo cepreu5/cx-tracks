@@ -870,4 +870,14 @@ I18N.add({
   'who.err': ['Попълни и трите полета.', 'Fill in all three fields.']
 });
 
+/* 1.10.39: „Разреждане“ - излишните точки на трака падат от менюто на участъка */
+I18N.add({
+  'om.thin': ['Разреждане', 'Thin out'],
+  'om.thin.sub': ['маха {n} от {m} точки', 'removes {n} of {m} points'],
+  'om.thin.none': ['няма излишни точки', 'no spare points'],
+  'msg.thinNone': ['Няма излишни точки - тракът е колкото трябва.', 'No spare points - the track is as dense as it needs to be.'],
+  'msg.thinDone': ['Махнати {n} точки от „{name}“ - линията остава същата (до 1 м). „Отмени“ ги връща.', 'Removed {n} points from “{name}” - the line stays the same (within 1 m). “Undo” brings them back.'],
+  'hint': ['Клик върху сегмент отваря меню: „Добави в маршрута“ го слага като следваща част, „Изтрий участъка“ го маха от картата, от трака и от маршрута, „Разреждане“ маха излишните точки на трака - средната от три съседни пада, ако е на правата между крайните (до 1 м отклонение), и така докато не остане нито една. Пръстенът е точка на разклонение: клик върху него отваря менюто му - „Продължи по“ сменя посоката там, „Изтрий разклонението“ слива двете парчета на трака. Дублиращите се участъци са извън маршрута, а общата отсечка между две части се минава веднъж. Четирите режима пипат колекцията, не маршрута: „Изрязване“ маха с две точки част от трака и свързва краищата направо (до 1000 м), „Връзка“ затваря дупка, „Местене“ и „Махане“ местят и махат върховете на траковете и връзките; в „Махане“ докосването върху трак, а не върху негова точка, избира трака и отваря това меню; „Удължи/Скъси“ от менюто на трака влачи свободния му край - удължава, скъсява, прави разклонение или свързва с друг трак; „Отмени“ връща всичко. Посочването на ред в списъка светва същия сегмент на картата.', 'Clicking a segment opens a menu: “Add to route” adds it as the next part, “Delete stretch” removes it from the map, the track and the route, “Thin out” drops the track’s spare points - the middle of three neighbours goes if it lies on the line between the outer two (within 1 m), and so on until none is left. A ring is a junction: clicking it opens its menu - “Continue along” changes the direction there, “Delete junction” joins the two pieces of the track. Duplicate stretches stay out of the route, and a stretch shared by two parts is ridden once. The four modes work on the collection, not on the route: “Cut” removes a piece of a track with two points and joins the ends directly (up to 1000 m), “Link” closes a gap, “Move” and “Remove” move and remove the vertices of tracks and links; in “Remove” a tap on a track rather than on one of its points selects the track and opens this menu; “Extend/Shorten” from a track’s menu drags its free end - longer, shorter, a junction or a join with another track; “Undo” brings everything back. Pointing at a row in the list highlights the same segment on the map.']
+});
+
 I18N.start();

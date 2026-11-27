@@ -1874,6 +1874,52 @@
     return out;
   }
 
+  /* 1.10.39 „Разреждане“: излишните точки на трака падат. Средната от три съседни останали точки пада,
+     ако е на не повече от tolM метра от правата между двете крайни; минава се пак, докато няма какво
+     да падне. Първата и последната точка на всеки непрекъснат участък стоят - те са краищата на
+     линията; fixed са индексите, които нищо не маха (прекъсванията в записа, t.breaks). Връща
+     {pts, map, removed}: map[i] е новият номер на стария връх i, -1 за махнатите - същото
+     преобразуване, което editTrackPts в app.js иска, за да слязат разстоянията по трака. */
+  var THIN_M = 1;
+  function thinDev(b, a, c) {
+    var kx = Math.cos(b[0] * U.RAD) * MPD, ky = MPD;
+    var r = U.projectSeg(b[1] * kx, b[0] * ky, a[1] * kx, a[0] * ky, c[1] * kx, c[0] * ky);
+    return Math.sqrt(r.d2);
+  }
+  function thinPts(pts, tolM, fixed) {
+    var n = (pts || []).length, tol = tolM > 0 ? tolM : THIN_M, i;
+    var map = [], out = [];
+    if (n < 3) {
+      for (i = 0; i < n; i++) { map.push(i); out.push(pts[i]); }
+      return { pts: out, map: map, removed: 0 };
+    }
+    var keep = new Array(n), fk = [];
+    for (i = 0; i < n; i++) keep[i] = true;
+    (fixed || []).forEach(function (k) { if (k > 0 && k < n - 1 && fk.indexOf(k) < 0) fk.push(k); });
+    keep[0] = true; keep[n - 1] = true;
+    // Всеки непрекъснат участък се разрежда сам, между два съседни неподвижни върха.
+    var edges = [0].concat(fk.sort(function (a, b) { return a - b; })).concat([n - 1]);
+    for (var e = 0; e + 1 < edges.length; e++) {
+      var s = edges[e], en = edges[e + 1], changed = true, guard = 0;
+      while (changed && guard++ < n + 2) {
+        changed = false;
+        var last = s;
+        for (i = s + 1; i < en; i++) {
+          if (!keep[i]) continue;
+          var k = i + 1;
+          while (k < en && !keep[k]) k++;
+          if (thinDev(pts[i], pts[last], pts[k]) <= tol) { keep[i] = false; changed = true; }
+          else last = i;
+        }
+      }
+    }
+    for (i = 0; i < n; i++) {
+      if (keep[i]) { map.push(out.length); out.push(pts[i]); }
+      else map.push(-1);
+    }
+    return { pts: out, map: map, removed: n - out.length };
+  }
+
   window.Core = {
     prep: prep, analyze: analyze, slice: slice, pointAt: pointAt, nearestOn: nearestOn, alongOn: alongOn, atLineEnd: atLineEnd,
     nearestOnTrack: nearestOnTrack, invalidShare: invalidShare, routeGeometry: routeGeometry,
@@ -1885,6 +1931,7 @@
     mergeIv: mergeIv, trimItems: trimItems, cutsToDels: cutsToDels, walkGaps: walkGaps, WALK_GAP: WALK_GAP, smoothWalk: smoothWalk, SMOOTH_M: SMOOTH_M,
     joinTol: joinTol, nearestLive: nearestLive, skipEnds: skipEnds, collectionLinks: collectionLinks, openEnds: openEnds, addLink: addLink,
     remapper: remapper, trackLine: trackLine, LINK_MAX: LINK_MAX, LINK_SNAP_M: LINK_SNAP_M, GAP_CEIL_M: GAP_CEIL_M,
-    liveParts: liveParts, partAt: partAt, JOIN_MIN: JOIN_MIN, extendEnd: extendEnd, trimEnd: trimEnd, insertVertex: insertVertex, nearestInRange: nearestIn
+    liveParts: liveParts, partAt: partAt, JOIN_MIN: JOIN_MIN, extendEnd: extendEnd, trimEnd: trimEnd, insertVertex: insertVertex, nearestInRange: nearestIn,
+    thinPts: thinPts, THIN_M: THIN_M
   };
 })();

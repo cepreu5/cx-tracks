@@ -150,11 +150,15 @@ function barFits() {
   // От 1.8 устройство без запазен избор тръгва на тъмна тема; досегашните проверки тръгват със светла (както преди),
   // newContext({ theme: true }) - с истинското начало.
   browser.newContext = async (o = {}) => {
-    const { splash, menus, rings, folds, dupMenu, theme, ...rest } = o;
+    // От 1.10.26 при първо пускане излиза формата за име, град и държава (#dlgWho) и прихваща
+    // кликовете. Досегашните проверки тръгват като „вече отговорено“; newContext({ who: true })
+    // оставя формата да излезе.
+    const { splash, menus, rings, folds, dupMenu, theme, who, ...rest } = o;
     const c = await rawContext(Object.assign({ locale: 'bg-BG' }, rest));
     if (!theme) await c.addInitScript(() => { try { if (localStorage.getItem('gpxk.mode') == null) localStorage.setItem('gpxk.mode', JSON.stringify('light')); } catch (e) { /* */ } });
     if (!folds) await c.addInitScript(() => { try { if (localStorage.getItem('gpxk.fold') == null) localStorage.setItem('gpxk.fold', JSON.stringify({ parts: true, tracks: true })); } catch (e) { /* */ } });
     if (!splash) await c.addInitScript(() => { try { if (localStorage.getItem('gpxk.splash') == null) localStorage.setItem('gpxk.splash', 'true'); } catch (e) { /* */ } });
+    if (!who) await c.addInitScript(() => { try { if (localStorage.getItem('gpxk.who') == null) localStorage.setItem('gpxk.who', JSON.stringify({ name: 'Тест', city: 'София', country: 'Bulgaria', at: '2026-11-27T00:00:00.000Z' })); } catch (e) { /* */ } });
     if (!rings) await c.addInitScript(() => { addEventListener('DOMContentLoaded', () => { const d = document.getElementById('dlgRings'); if (d) new MutationObserver(() => { if (d.open) document.getElementById('ringsKeep').click(); }).observe(d, { attributes: true, attributeFilter: ['open'] }); }); });
     if (!menus || !dupMenu) {
       const rawPage = c.newPage.bind(c);
